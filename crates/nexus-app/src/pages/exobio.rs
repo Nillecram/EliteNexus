@@ -7,7 +7,186 @@ use nexus_model::exobio::SampleInProgress;
 use nexus_model::location::surface_distance;
 use nexus_model::GameState;
 
-pub fn show(ui: &mut Ui, gs: &GameState) {
+use crate::jobs::Slot;
+use crate::untouched::{self, Candidate, Evidence, Stats};
+
+/// State of the "Find untouched planets" search.
+pub struct ExobioUi {
+    target: usize,
+    radius: u32,
+    include_mapped: bool,
+    job: Slot<Result<(Vec<Candidate>, Stats), String>>,
+    /// The search the results belong to (species, radius).
+    searched: Option<(&'static str, u32)>,
+    /// Start a search on the first frame (screenshot runs: `--tab untouched`).
+    autorun: bool,
+}
+
+impl Default for ExobioUi {
+    fn default() -> Self {
+        let target = untouched::targets().iter().position(|s| s.name == "Stratum Tectonicas").unwrap_or(0);
+        ExobioUi { target, radius: 500, include_mapped: true, job: Slot::default(), searched: None, autorun: false }
+    }
+}
+
+impl ExobioUi {
+    /// `autorun`: start a search on the first frame (screenshot runs).
+    pub fn new(autorun: bool) -> Self {
+        ExobioUi { autorun, ..Default::default() }
+    }
+}
+
+/// What the page asks the app to do.
+pub enum ExoAction {
+    /// Open Navigation with this system as the destination.
+    PlotTo(String),
+}
+
+pub fn show(ui: &mut Ui, gs: &GameState, st: &mut ExobioUi, spansh: &nexus_spansh::Spansh, rt: &tokio::runtime::Handle, db: Option<&nexus_galaxy::GalaxyDb>) -> Option<ExoAction> {
+    show_page(ui, gs);
+    ui.add_space(GAP);
+    let action = untouched_card(ui, gs, st, spansh, rt, db);
+    ui.add_space(GAP);
+    bio_bodies(ui, gs);
+    action
+}
+
+/// "Find untouched planets": where a valuable species should grow and nobody sharing data has
+/// mapped or sampled (see untouched.rs for what that can and cannot prove).
+fn untouched_card(ui: &mut Ui, gs: &GameState, st: &mut ExobioUi, spansh: &nexus_spansh::Spansh, rt: &tokio::runtime::Handle, db: Option<&nexus_galaxy::GalaxyDb>) -> Option<ExoAction> {
+    st.job.tick();
+    let targets = untouched::targets();
+    let mut action = None;
+    card_tinted(ui, icon::SPARKLE, "Find untouched planets", pal::ACCENT, |ui| {
+        ui.add(
+            egui::Label::new(
+                RichText::new("Planets where a valuable species should grow and that no commander sharing data (EDMC, EDDiscovery…) has mapped or sampled, so the first-logged bonus (×5) is likely still there.")
+                    .color(pal::DIM),
+            )
+            .wrap(),
+        );
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
+            let cur = targets.get(st.target).or(targets.first()).copied();
+            if let Some(cur) = cur {
+                egui::ComboBox::from_id_salt("untouched-species")
+                    .width(300.0)
+                    .selected_text(format!("{} · {} first logged", cur.name, short_credits(nexus_data::bio_predict::payout(cur.value, true))))
+                    .show_ui(ui, |ui| {
+                        for (i, s) in targets.iter().enumerate() {
+                            ui.selectable_value(&mut st.target, i, format!("{} · {} ({} first logged)", s.name, short_credits(s.value), short_credits(nexus_data::bio_predict::payout(s.value, true))));
+                        }
+                    });
+            }
+            crate::widgets::segmented(ui, &mut st.radius, &[(250, "250 ly"), (500, "500 ly"), (1000, "1,000 ly"), (2000, "2,000 ly")]);
+            crate::widgets::toggle(ui, &mut st.include_mapped, "Include mapped, never sampled");
+            let origin = gs.location.star_pos;
+            let busy = st.job.busy();
+            let label = if busy { "Searching…" } else { "Search" };
+            let clicked = ui.add_enabled_ui(!busy && origin.is_some(), |ui| crate::widgets::primary_button(ui, label)).inner.clicked();
+            if (clicked || std::mem::take(&mut st.autorun))
+                && !busy
+                && let (Some(origin), Some(species)) = (origin, cur)
+            {
+                let q = untouched::Query { species, origin, radius_ly: f64::from(st.radius), include_mapped: st.include_mapped, limit: 25 };
+                st.searched = Some((species.name, st.radius));
+                let sp = spansh.clone();
+                let db = db.cloned();
+                st.job.run_async(ui.ctx(), rt, async move {
+                    let footfalled = move |name: &str| db.as_ref().and_then(|d| d.body_by_name(name).ok().flatten()).is_some_and(|b| b.was_footfalled.is_some_and(|s| s.value));
+                    untouched::find(&sp, &q, footfalled).await
+                });
+            }
+            if busy {
+                ui.spinner();
+            }
+        });
+        ui.add_space(6.0);
+        match &st.job.last {
+            None if !st.job.busy() => {
+                ui.add(egui::Label::new(RichText::new("Pick a species and a range, then Search. Planets are checked on Spansh against everything commanders have shared.").size(size::FOOTNOTE).color(pal::DIM)).wrap());
+            }
+            None => {}
+            Some(Err(e)) => {
+                ui.add(egui::Label::new(RichText::new(format!("{} {e}", icon::WARNING_CIRCLE)).color(pal::BAD)).wrap());
+            }
+            Some(Ok((list, stats))) => {
+                let (name, radius) = st.searched.unwrap_or(("", st.radius));
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(format!(
+                            "{} planets with {} conditions and biology within {} ly. Of the {} nearest (out to {:.0} ly): {} already sampled, {} mapped without it, {} in populated systems, {} footfalled.",
+                            if stats.matched >= 10_000 { "10,000+".to_string() } else { stats.matched.to_string() },
+                            name,
+                            radius,
+                            stats.examined,
+                            stats.reach_ly,
+                            stats.sampled,
+                            stats.mapped,
+                            stats.populated,
+                            stats.footfalled
+                        ))
+                        .size(size::FOOTNOTE)
+                        .color(pal::DIM),
+                    )
+                    .wrap(),
+                );
+                ui.add_space(6.0);
+                if list.is_empty() {
+                    empty(ui, icon::PLANET, "Nothing untouched in range", "Every planet with these conditions nearby has been mapped or sampled by someone. Try a larger range: the further from the bubble, the more untouched planets.");
+                    return;
+                }
+                Grid::new("untouched").max_col_width(ui.available_width()).num_columns(7).striped(true).spacing([14.0, 10.0]).show(ui, |ui| {
+                    for t in ["Planet", "Distance", "Evidence", "Chance", "If first logged", "Last data", ""] {
+                        th(ui, t);
+                    }
+                    ui.end_row();
+                    for c in list {
+                        ui.vertical(|ui| {
+                            ui.spacing_mut().item_spacing.y = 0.0;
+                            let short = c.body.strip_prefix(&c.system).map(str::trim).filter(|s| !s.is_empty()).unwrap_or(&c.body);
+                            ui.label(RichText::new(short).font(display(size::CALLOUT)).color(pal::TEXT));
+                            ui.label(RichText::new(&c.system).size(size::CAPTION).color(pal::DIM));
+                        })
+                        .response
+                        .on_hover_text(format!(
+                            "{} · {:.0} K · {:.2} g · {} biological signal{}{}",
+                            c.atmosphere,
+                            c.temperature_k.unwrap_or(0.0),
+                            c.gravity_g.unwrap_or(0.0),
+                            c.bio_signals,
+                            if c.bio_signals == 1 { "" } else { "s" },
+                            c.distance_ls.map(|d| format!(" · {d:.0} ls from arrival")).unwrap_or_default()
+                        ));
+                        ui.label(RichText::new(format!("{:.0} ly", c.distance_ly)).color(pal::TEXT));
+                        let (txt, col, tip) = match c.evidence {
+                            Evidence::NoTrace => ("No trace", pal::GOOD, "No commander who shares data has mapped or sampled this planet."),
+                            Evidence::GenusConfirmed => ("Mapped, not sampled", pal::CYAN, "Someone DSS-mapped it, so the genus is confirmed, but nobody has logged samples."),
+                        };
+                        badge(ui, txt, col).on_hover_text(tip);
+                        ui.label(RichText::new(format!("{:.0}%", c.chance * 100.0)).color(pal::TEXT));
+                        ui.label(RichText::new(short_credits(c.value_first_logged)).font(display(size::CALLOUT)).color(pal::GOLD));
+                        ui.label(RichText::new(c.last_data.map(|t| crate::widgets::ago(nexus_journal::Timestamp(t))).unwrap_or_else(|| "?".into())).color(pal::DIM));
+                        ui.horizontal(|ui| {
+                            if crate::widgets::icon_button(ui, icon::COPY, "Copy the system name").clicked() {
+                                ui.ctx().copy_text(c.system.clone());
+                            }
+                            if crate::widgets::icon_button(ui, icon::PATH, "Plot a route there").clicked() {
+                                action = Some(ExoAction::PlotTo(c.system.clone()));
+                            }
+                        });
+                        ui.end_row();
+                    }
+                });
+            }
+        }
+    });
+    action
+}
+
+/// Sampling and unsold data.
+fn show_page(ui: &mut Ui, gs: &GameState) {
     let pos = gs.status.as_ref().and_then(|s| s.lat_lon());
     let radius = gs.status.as_ref().and_then(|s| s.planet_radius);
     let heading = gs.status.as_ref().and_then(|s| s.heading);
@@ -24,8 +203,6 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
         });
         c.add(|ui| unsold(ui, gs));
     });
-    ui.add_space(GAP);
-    bio_bodies(ui, gs);
 }
 
 fn unsold(ui: &mut Ui, gs: &GameState) {

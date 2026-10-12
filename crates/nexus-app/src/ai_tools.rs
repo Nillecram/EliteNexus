@@ -172,6 +172,43 @@ impl NexusTools {
         }))
     }
 
+    fn untouched_biology(&self, a: &Value) -> Result<Value, String> {
+        let me = self.me()?;
+        let (origin, near) = self.origin(a, &me)?;
+        let species = match arg_str(a, "species") {
+            Some(n) => nexus_data::exobio::species(&n).ok_or_else(|| format!("Unknown species \"{n}\"."))?,
+            None => nexus_data::exobio::species("Stratum Tectonicas").ok_or("Species data missing.")?,
+        };
+        let q = crate::untouched::Query {
+            species,
+            origin,
+            radius_ly: arg_f64(a, "max_distance_ly").unwrap_or(500.0).clamp(20.0, 5000.0),
+            include_mapped: arg_bool(a, "include_mapped").unwrap_or(true),
+            limit: arg_f64(a, "limit").map(|v| v as usize).unwrap_or(10).clamp(1, 25),
+        };
+        let db = self.db.clone();
+        let footfalled = move |name: &str| {
+            db.as_ref().and_then(|d| d.body_by_name(name).ok().flatten()).is_some_and(|b| b.was_footfalled.is_some_and(|s| s.value))
+        };
+        let (list, st) = self.rt.block_on(crate::untouched::find(&self.spansh, &q, footfalled))?;
+        Ok(json!({
+            "near": near,
+            "species": species.name,
+            "value_cr": species.value,
+            "value_if_first_logged_cr": bp::payout(species.value, true),
+            "radius_ly": q.radius_ly,
+            "how_to_read": "no_trace = no commander who shares data (EDMC, EDDiscovery, …) has DSS-mapped or sampled the planet; mapped_never_sampled = someone DSS-mapped it (the genus is confirmed there) but nobody logged samples. Players without such tools leave no trace, so both are strong leads, not guarantees. Populated systems and planets your data says were footfalled are already left out.",
+            "searched": { "matching_planets": st.matched, "examined_nearest": st.examined, "examined_out_to_ly": r1(st.reach_ly), "already_sampled": st.sampled, "mapped_without_this_genus": st.mapped, "populated_system": st.populated, "footfalled": st.footfalled, "conditions_rule_it_out": st.ruled_out },
+            "candidates": list.iter().map(|c| json!({
+                "system": c.system, "body": c.body, "distance_ly": r1(c.distance_ly), "distance_ls": c.distance_ls.map(|d| d.round()),
+                "evidence": match c.evidence { crate::untouched::Evidence::NoTrace => "no_trace", crate::untouched::Evidence::GenusConfirmed => "mapped_never_sampled" },
+                "chance_pct": (c.chance * 100.0).round(), "atmosphere": c.atmosphere, "temperature_k": c.temperature_k.map(f64::round),
+                "gravity_g": c.gravity_g.map(|g| (g * 100.0).round() / 100.0), "bio_signals": c.bio_signals,
+                "last_data_days": c.last_data.map(|t| (hours_ago(t) / 24.0).round()),
+            })).collect::<Vec<_>>(),
+        }))
+    }
+
     fn price_deals(&self, a: &Value) -> Result<Value, String> {
         let me = self.me()?;
         let (origin, near) = self.origin(a, &me)?;
@@ -728,8 +765,8 @@ impl NexusTools {
 
 /// `SurfaceGravity` per g and `SurfacePressure` per atmosphere as the galaxy database and Spansh
 /// use them; the exobiology rules use BioScan's slightly different constants.
-const STANDARD_G: f64 = 9.80665;
-const STANDARD_ATM: f64 = 101_325.0;
+pub(crate) const STANDARD_G: f64 = 9.80665;
+pub(crate) const STANDARD_ATM: f64 = 101_325.0;
 /// Bodies listed by `system_bodies` (the agent cuts tool results at 12 000 characters).
 const MAX_BODIES: usize = 20;
 const SPANSH_TIMEOUT: Duration = Duration::from_secs(25);
@@ -905,7 +942,7 @@ fn parent_ref(p: &dump::ParentRef) -> ParentRef {
 }
 
 /// Spansh (EDSM-style) planet sub-type -> journal `PlanetClass`.
-fn journal_planet_class(sub: &str) -> String {
+pub(crate) fn journal_planet_class(sub: &str) -> String {
     let s = sub.trim();
     let class = match s {
         "Metal-rich body" => "Metal rich body",
@@ -1359,6 +1396,7 @@ impl ToolHost for NexusTools {
             "commander" => self.commander(),
             "find_commodity" => self.find_commodity(args),
             "price_deals" => self.price_deals(args),
+            "untouched_biology" => self.untouched_biology(args),
             "sell_my_cargo" => self.sell_my_cargo(args),
             "trade_routes" => self.trade_routes(args),
             "nearest_service" => self.nearest_service(args),
@@ -1415,6 +1453,20 @@ pub fn specs() -> Vec<ToolSpec> {
                     "min_ratio": { "type": "number", "description": "How much better than average, e.g. 1.3 = 30 % (default); 2 = double; 10 = ten times." },
                     "max_age_hours": { "type": "number", "description": "Only prices reported in the last N hours. Default 48." },
                     "include_carriers": { "type": "boolean" },
+                    "limit": { "type": "integer" }
+                }),
+                &[],
+            ),
+        },
+        ToolSpec {
+            name: "untouched_biology",
+            description: "Find planets where a valuable exobiology species should grow (default Stratum Tectonicas, 19 M Cr, 95 M with the first-logged bonus) and that no data-sharing commander has DSS-mapped or sampled, so the ×5 first-logged bonus is likely still available. Searches Spansh around a system, leaves out populated systems and planets known to be footfalled, ranks by expected bonus value and distance.",
+            parameters: schema(
+                json!({
+                    "species": { "type": "string", "description": "e.g. Stratum Tectonicas (default), Concha Biconcavis, Tussock Stigmasis, Fonticulua Segmentatus, Fonticulua Fluctus." },
+                    "near_system": { "type": "string", "description": NEAR },
+                    "max_distance_ly": { "type": "number", "description": "Default 500." },
+                    "include_mapped": { "type": "boolean", "description": "Also list planets someone DSS-mapped (genus confirmed) but nobody sampled. Default true." },
                     "limit": { "type": "integer" }
                 }),
                 &[],
@@ -1618,13 +1670,13 @@ mod tests {
         assert!(tools.call("journal_search", &json!({ "query": "gold" })).unwrap()["matches_newest_first"].as_array().unwrap().is_empty());
         assert!(tools.call("nope", &json!({})).is_err());
         assert!(tools.call("find_commodity", &json!({})).is_err(), "missing required argument is an error, not a panic");
-        assert_eq!(specs().len(), 14);
+        assert_eq!(specs().len(), 15);
 
         // The full loop with a scripted model: one tool call, then an answer.
         struct Script(parking_lot::Mutex<Vec<nexus_ai::Reply>>);
         impl nexus_ai::Backend for Script {
             fn complete(&self, _s: &str, tools: &[ToolSpec], turns: &[nexus_ai::Turn]) -> Result<nexus_ai::Reply, nexus_ai::AiError> {
-                assert_eq!(tools.len(), 14);
+                assert_eq!(tools.len(), 15);
                 if turns.len() > 1 {
                     assert!(matches!(&turns[2], nexus_ai::Turn::ToolResult { content, is_error: false, .. } if content.contains("Beta Hub")));
                 }

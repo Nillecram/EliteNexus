@@ -18,6 +18,7 @@ mod sync;
 mod testutil;
 mod theme;
 mod tts;
+mod untouched;
 mod widgets;
 
 fn app_icon() -> egui::IconData {

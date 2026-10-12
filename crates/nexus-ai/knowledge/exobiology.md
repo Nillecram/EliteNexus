@@ -23,3 +23,14 @@ Each genus needs specific conditions: atmosphere type (thin carbon dioxide, ammo
 2. Use a ship with good jump range that lands easily; an SRV helps cover distance between samples on rough terrain.
 3. On each body: DSS-map it to reveal the genera, land near the biological zone, sample each species three times.
 4. Sell regularly at Vista Genomics; check the unsold value on the Exobiology page.
+
+## Finding untouched planets (first-logged bonus)
+
+Nothing proves a planet is untouched; only the opposite can be proven. Evidence that someone was there: Spansh lists the
+planet's genera (someone DSS-mapped it with a tool that uploads to EDDN), biology landmarks (someone logged samples, on
+foot), `WasMapped` true (someone mapped it and sold the data; this lags until they sell), `WasFootfalled` true.
+A planet with biological signals and none of that has never been mapped or sampled by a commander who shares data
+(EDMC, EDDiscovery…). The `untouched_biology` tool and Exobiology › Find untouched planets search for exactly that
+around a system for a chosen species (Stratum Tectonicas by default) and rank by expected first-logged value and
+distance. "Mapped, never sampled" planets have the genus confirmed. Near the bubble almost everything is mapped and
+sampled; a few thousand light years out, a third or more of the planets with the right conditions show no trace.

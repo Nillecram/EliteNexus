@@ -67,6 +67,7 @@ pub struct NexusApp {
     applied_scale: f32,
     settings_dirty: Option<Instant>,
     explo: pages::exploration::ExplorationUi,
+    exo: pages::exobio::ExobioUi,
     fleet: pages::fleet::FleetUi,
     eng: pages::engineering::EngineeringUi,
     log: pages::logbook::LogbookUi,
@@ -139,6 +140,7 @@ impl NexusApp {
             applied_scale: 0.0,
             settings_dirty: None,
             explo: Default::default(),
+            exo: pages::exobio::ExobioUi::new(ov.tab.as_deref() == Some("untouched") && shot.is_some()),
             fleet: Default::default(),
             eng: Default::default(),
             log: Default::default(),
@@ -433,7 +435,11 @@ impl NexusApp {
         let mut body = |ui: &mut Ui| match page {
             Page::Dashboard => pages::dashboard::show(ui, gs),
             Page::Exploration => pages::exploration::show(ui, gs, &mut self.explo, high_value),
-            Page::Exobiology => pages::exobio::show(ui, gs),
+            Page::Exobiology => {
+                if let Some(pages::exobio::ExoAction::PlotTo(s)) = pages::exobio::show(ui, gs, &mut self.exo, &self.spansh, self.rt.handle(), self.market.db.as_ref()) {
+                    map_action = Some(pages::galaxy_map::MapAction::PlotTo(s));
+                }
+            }
             Page::GalaxyMap => map_action = pages::galaxy_map::show(ui, gs, &mut self.map, &route),
             Page::Mining => pages::mining::show(ui, gs),
             Page::Colonisation => pages::colonisation::show(ui, gs, &self.market, &mut self.colo),
