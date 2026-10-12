@@ -5,7 +5,8 @@ use rusqlite::Connection;
 use std::time::Duration;
 
 /// Bump when the schema changes incompatibly. The database is a cache that can be rebuilt from
-/// EDDN and dumps, so an older schema is dropped and recreated.
+/// EDDN and dumps, so an older schema is dropped and recreated. New tables (`CREATE TABLE IF NOT
+/// EXISTS`, e.g. `bodies`) are added to existing databases without a bump.
 pub(crate) const SCHEMA_VERSION: i64 = 2;
 
 const TABLES: &str = r#"
@@ -131,7 +132,47 @@ CREATE TABLE IF NOT EXISTS price_history (
     PRIMARY KEY (market_id, commodity_id, ts)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS price_history_ts ON price_history(ts);
+
+-- Planets and moons worth asking about (see BodyUpdate for what is kept and how it merges).
+-- Flags: NULL unknown, 0/1; *_seen: unix seconds when true was first seen, or while false the
+-- newest observation that said false. Sources: 0 EDDN, 1 journal, 2 Spansh, 3 EDDN archive.
+-- checked_online: last on-demand footfall lookup (unix seconds), so it isn't repeated within a day.
+CREATE TABLE IF NOT EXISTS bodies (
+    system_id64     INTEGER NOT NULL,
+    body_id         INTEGER NOT NULL,
+    name            TEXT COLLATE NOCASE,
+    planet_class    TEXT,
+    atmosphere      TEXT,
+    atmosphere_type TEXT,
+    gravity_g       REAL,
+    temperature_k   REAL,
+    pressure_atm    REAL,
+    volcanism       TEXT,
+    terraform_state TEXT,
+    distance_ls     REAL,
+    landable        INTEGER,
+    scan_updated    INTEGER,
+    was_discovered  INTEGER,
+    discovered_seen INTEGER,
+    was_mapped      INTEGER,
+    mapped_seen     INTEGER,
+    was_footfalled  INTEGER,
+    footfall_seen   INTEGER,
+    footfall_source INTEGER,
+    bio_signals     INTEGER,
+    geo_signals     INTEGER,
+    genera          TEXT,
+    signals_updated INTEGER,
+    updated         INTEGER NOT NULL,
+    source          INTEGER NOT NULL,
+    checked_online  INTEGER,
+    PRIMARY KEY (system_id64, body_id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS bodies_name ON bodies(name);
 "#;
+
+/// Columns added to existing tables after they were first created: (table, column, type).
+const ADDED_COLUMNS: &[(&str, &str, &str)] = &[("bodies", "checked_online", "INTEGER")];
 
 const DROP_ALL: &str = r#"
 DROP TABLE IF EXISTS systems;
@@ -143,6 +184,7 @@ DROP TABLE IF EXISTS market;
 DROP TABLE IF EXISTS system_factions;
 DROP TABLE IF EXISTS ring_signals;
 DROP TABLE IF EXISTS price_history;
+DROP TABLE IF EXISTS bodies;
 "#;
 
 /// Pragmas shared by every connection.
@@ -182,9 +224,24 @@ pub(crate) fn open_writer(path: &std::path::Path) -> Result<Connection> {
         conn.execute_batch(DROP_ALL)?;
     }
     conn.execute_batch(TABLES)?;
+    add_missing_columns(&conn)?;
     conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION}"))?;
     seed_commodities(&conn)?;
     Ok(conn)
+}
+
+/// `CREATE TABLE IF NOT EXISTS` leaves an existing table alone: add the columns it lacks.
+fn add_missing_columns(conn: &Connection) -> Result<()> {
+    for (table, column, kind) in ADDED_COLUMNS {
+        let present: bool = conn
+            .prepare(&format!("SELECT 1 FROM pragma_table_info('{table}') WHERE name = ?1"))?
+            .exists([column])?;
+        if !present {
+            tracing::info!(table, column, "adding a column to the galaxy database");
+            conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} {kind}"))?;
+        }
+    }
+    Ok(())
 }
 
 /// Opens a read connection (`query_only`).
@@ -241,5 +298,21 @@ mod tests {
             .expect("query");
         assert_eq!(used, 1);
         conn.execute_batch(TABLES).expect("schema");
+    }
+
+    #[test]
+    fn existing_tables_get_new_columns() {
+        let conn = Connection::open_in_memory().expect("open");
+        // the first shape of `bodies`, before `checked_online`
+        let old = TABLES
+            .replace("    checked_online  INTEGER,\n", "")
+            .replace("\r\n    checked_online  INTEGER,", "");
+        assert!(!old.contains("checked_online  INTEGER"));
+        conn.execute_batch(&old).expect("old schema");
+        conn.execute_batch(TABLES).expect("schema");
+        add_missing_columns(&conn).expect("migrate");
+        add_missing_columns(&conn).expect("idempotent");
+        conn.execute_batch("INSERT INTO bodies (system_id64, body_id, updated, source, checked_online) VALUES (5, 1, 0, 0, 7)")
+            .expect("new column usable");
     }
 }

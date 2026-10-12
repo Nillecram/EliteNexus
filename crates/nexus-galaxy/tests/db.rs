@@ -815,6 +815,124 @@ fn eddn_messages_end_to_end() {
     assert_eq!(hits[0].price, 51000);
 }
 
+// ---------------------------------------------------------------------------------------------
+// Bodies (footfall, signals)
+// ---------------------------------------------------------------------------------------------
+
+const SWOILZ: u64 = 908552967066;
+
+fn eddn_msg(schema: &str, message: serde_json::Value) -> serde_json::Value {
+    json!({"$schemaRef": format!("https://eddn.edcd.io/schemas/{schema}"),
+           "header": {"uploaderID": "x", "softwareName": "t", "softwareVersion": "1", "gameversion": "4.4.1.1"},
+           "message": message})
+}
+
+/// A landable planet `Scan` as EDDN relays it.
+fn planet_scan(ts: i64, body_id: u32, name: &str, footfalled: bool) -> serde_json::Value {
+    json!({"timestamp": nexus_journal::Timestamp(ts).to_iso(), "event": "Scan", "ScanType": "Detailed", "BodyName": name,
+        "BodyID": body_id, "StarSystem": "Swoilz MH-W c17-3", "SystemAddress": SWOILZ, "DistanceFromArrivalLS": 1209.4,
+        "TerraformState": "", "PlanetClass": "High metal content body", "Atmosphere": "thin carbon dioxide atmosphere",
+        "AtmosphereType": "CarbonDioxide", "Volcanism": "", "SurfaceGravity": 0.876, "SurfaceTemperature": 165.2,
+        "SurfacePressure": 1107.5, "Landable": true, "WasDiscovered": true, "WasMapped": false, "WasFootfalled": footfalled,
+        "StarPos": [-28.8, -112.4, -96.9]})
+}
+
+#[test]
+fn bodies_merge_footfall_and_signals() {
+    let mut t = TempDb::new("bodies");
+    let db = t.db();
+    let t0 = now() - 10 * 86_400;
+    let a4 = "Swoilz MH-W c17-3 A 4";
+    // FSS signals arrive first (as in the journal), then the scan: a biology body, kept from EDDN.
+    let fss = eddn_msg(
+        "fssbodysignals/1",
+        json!({"timestamp": nexus_journal::Timestamp(t0).to_iso(), "event": "FSSBodySignals", "BodyName": a4, "BodyID": 6,
+            "SystemAddress": SWOILZ, "StarSystem": "Swoilz MH-W c17-3", "StarPos": [-28.8, -112.4, -96.9],
+            "Signals": [{"Type": "$SAA_SignalType_Biological;", "Count": 4}]}),
+    );
+    assert_eq!(db.ingest_eddn(&fss), 1);
+    assert_eq!(db.ingest_eddn(&eddn_msg("journal/1", planet_scan(t0 + 1, 6, a4, false))), 1);
+    // Bare rock from EDDN is not kept; our own scan of it is.
+    db.ingest_eddn(&eddn_msg("journal/1", planet_scan(t0 + 2, 7, "Swoilz MH-W c17-3 A 5", false)));
+    db.ingest_journal("Scan", &planet_scan(t0 + 3, 8, "Swoilz MH-W c17-3 A 6", false));
+    db.flush().expect("flush");
+
+    let bodies = db.bodies_in_system(SWOILZ).expect("q");
+    assert_eq!(bodies.iter().map(|b| b.body_id).collect::<Vec<_>>(), vec![6, 8], "{bodies:#?}");
+    let b = &bodies[0];
+    assert_eq!(b.name.as_deref(), Some(a4));
+    assert_eq!(b.bio_signals, Some(4));
+    assert_eq!(b.planet_class.as_deref(), Some("High metal content body"));
+    assert_eq!(b.atmosphere_type.as_deref(), Some("CarbonDioxide"));
+    assert!((b.gravity_g.expect("g") - 0.0893).abs() < 1e-3);
+    assert_eq!(b.landable, Some(true));
+    assert_eq!(b.was_footfalled, Some(Seen { value: false, at_unix: t0 + 1 }));
+    assert_eq!(b.footfall_source, Some(Source::Eddn));
+    assert_eq!(b.was_discovered.map(|s| s.value), Some(true));
+    assert_eq!(bodies[1].source, Source::Journal);
+    assert!(db.system_by_id(SWOILZ).expect("q").is_none(), "Scan/FSSBodySignals add no system rows");
+
+    // DSS genera, then another commander samples organics there: footfalled.
+    let dss = eddn_msg(
+        "journal/1",
+        json!({"timestamp": nexus_journal::Timestamp(t0 + 100).to_iso(), "event": "SAASignalsFound", "BodyName": a4,
+            "SystemAddress": SWOILZ, "BodyID": 6, "StarSystem": "Swoilz MH-W c17-3", "StarPos": [-28.8, -112.4, -96.9],
+            "Signals": [{"Type": "$SAA_SignalType_Biological;", "Count": 4}],
+            "Genuses": [{"Genus": "$Codex_Ent_Bacterial_Genus_Name;"}, {"Genus": "$Codex_Ent_Stratum_Genus_Name;"},
+                        {"Genus": "$Codex_Ent_Tubus_Genus_Name;"}, {"Genus": "$Codex_Ent_Tussocks_Genus_Name;"}]}),
+    );
+    db.ingest_eddn(&dss);
+    let organic = eddn_msg(
+        "scanorganic/1",
+        json!({"timestamp": nexus_journal::Timestamp(t0 + 5000).to_iso(), "event": "ScanOrganic", "ScanType": "Log",
+            "Genus": "$Codex_Ent_Stratum_Genus_Name;", "Species": "$Codex_Ent_Stratum_07_Name;", "SystemAddress": SWOILZ,
+            "BodyID": 6, "StarSystem": "Swoilz MH-W c17-3", "StarPos": [-28.8, -112.4, -96.9]}),
+    );
+    db.ingest_eddn(&organic);
+    // A scan made before the landing but delivered late (and a newer FSS count) can't undo it.
+    db.ingest_eddn(&eddn_msg("journal/1", planet_scan(t0 + 4000, 6, a4, false)));
+    db.ingest_eddn(&fss);
+    db.flush().expect("flush");
+    let b = db.body_by_name("swoilz mh-w c17-3 a 4").expect("q").expect("A 4");
+    assert_eq!(b.genera.len(), 4);
+    assert_eq!(b.was_footfalled, Some(Seen { value: true, at_unix: t0 + 5000 }));
+    assert_eq!(b.updated_unix, t0 + 5000);
+    // An EDDN scan of a body we already have (bare rock we scanned ourselves) updates it.
+    db.ingest_eddn(&eddn_msg("journal/1", planet_scan(t0 + 6000, 8, "Swoilz MH-W c17-3 A 6", true)));
+    db.flush().expect("flush");
+    let a6 = db.body_by_name("Swoilz MH-W c17-3 A 6").expect("q").expect("A 6");
+    assert_eq!(a6.was_footfalled, Some(Seen { value: true, at_unix: t0 + 6000 }));
+    assert_eq!(a6.footfall_source, Some(Source::Eddn));
+    assert!(db.body_by_name("Swoilz MH-W c17-3 A 5").expect("q").is_none());
+    // Prefix search finds a system's bodies (e.g. when the system itself isn't stored).
+    let found = db.find_bodies("SWOILZ MH-W C17-3 ", 10).expect("q");
+    assert_eq!(found.len(), 2);
+    assert!(db.find_bodies("Swoilz MH-W c17-30 ", 10).expect("q").is_empty());
+
+    // Replaying the same observations (the journal history at every start) writes nothing new.
+    let before = db.bodies_in_system(SWOILZ).expect("q");
+    db.ingest_journal("Scan", &planet_scan(t0 + 3, 8, "Swoilz MH-W c17-3 A 6", false));
+    db.ingest_eddn(&dss);
+    db.flush().expect("flush");
+    assert_eq!(db.bodies_in_system(SWOILZ).expect("q"), before);
+    t.reopen();
+    assert_eq!(t.db().bodies_in_system(SWOILZ).expect("q"), before);
+}
+
+#[test]
+fn all_eddn_bodies_option_keeps_bare_rock() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("galaxy-allbodies-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    {
+        let opts = GalaxyOptions { all_eddn_bodies: true, ..GalaxyOptions::default() };
+        let db = GalaxyDb::open_with(dir.join("galaxy.db"), opts).expect("open");
+        db.ingest_eddn(&eddn_msg("journal/1", planet_scan(now() - 60, 7, "Swoilz MH-W c17-3 A 5", false)));
+        db.flush().expect("flush");
+        assert_eq!(db.bodies_in_system(SWOILZ).expect("q").len(), 1);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn handle_is_clone_send_sync() {
     fn check<T: Clone + Send + Sync + 'static>() {}

@@ -30,8 +30,10 @@ pub fn eddn_schema_name(schema_ref: &str) -> Option<&str> {
 
 impl Ingest {
     /// Converts one EDDN envelope. Handles `commodity/3`, `journal/1` (`FSDJump`, `Location`,
-    /// `CarrierJump`, `Docked`, `SAASignalsFound`) and `approachsettlement/1`; returns nothing for
-    /// `/test` schemas, other schemas and malformed messages.
+    /// `CarrierJump`, `Docked`, `SAASignalsFound`, `Scan`), `fssbodysignals/1`, `scanorganic/1` and
+    /// `approachsettlement/1`; returns nothing for `/test` schemas, other schemas and malformed
+    /// messages. Body data from Legacy-galaxy clients (game 3.x) is dropped: its discovery flags
+    /// belong to another galaxy.
     pub fn from_eddn(envelope: &Value) -> Vec<Ingest> {
         let Some(schema) = envelope.get("$schemaRef").and_then(Value::as_str) else {
             return Vec::new();
@@ -42,10 +44,9 @@ impl Ingest {
         let Some(msg) = envelope.get("message").filter(|m| m.is_object()) else {
             return Vec::new();
         };
-        let gateway = envelope
-            .get("header")
-            .and_then(|h| get_ts(h, "gatewayTimestamp"));
-        match name {
+        let header = envelope.get("header");
+        let gateway = header.and_then(|h| get_ts(h, "gatewayTimestamp"));
+        let mut items = match name {
             "commodity/3" => commodity_snapshot(msg, gateway)
                 .map(Ingest::Market)
                 .into_iter()
@@ -54,17 +55,27 @@ impl Ingest {
                 Some(event) => convert_journal(event, msg, Source::Eddn, gateway),
                 None => Vec::new(),
             },
+            "fssbodysignals/1" => convert_journal("FSSBodySignals", msg, Source::Eddn, gateway),
+            "scanorganic/1" => convert_journal("ScanOrganic", msg, Source::Eddn, gateway),
             "approachsettlement/1" => {
                 convert_journal("ApproachSettlement", msg, Source::Eddn, gateway)
             }
             _ => Vec::new(),
+        };
+        if header
+            .and_then(|h| get_str(h, "gameversion"))
+            .is_some_and(is_legacy_galaxy)
+        {
+            items.retain(|i| !matches!(i, Ingest::Body(_)));
         }
+        items
     }
 
     /// Converts one of our own journal events. `FSDJump` / `Location` / `CarrierJump` (system state,
     /// factions, powers; plus the station when docked), `Docked` (station details), `SAASignalsFound`
-    /// on rings, `ApproachSettlement`, and `Market` **with** the `Items` of Market.json (pass the
-    /// companion file's JSON as the event).
+    /// (ring hotspots; planet signals and genera), `Scan` and `FSSBodySignals` (planets and moons),
+    /// `Disembark` on a planet (footfall), `ApproachSettlement`, and `Market` **with** the `Items` of
+    /// Market.json (pass the companion file's JSON as the event).
     pub fn from_journal_event(event: &str, json: &Value) -> Vec<Ingest> {
         convert_journal(event, json, Source::Journal, None)
     }
@@ -231,10 +242,36 @@ pub(crate) fn convert_journal(
             let sys_id = get_id(v, "SystemAddress").filter(|a| *a > 1);
             let sys_name = get_text(v, "StarSystem");
             out.extend(position_only(v, ts, sys_id, sys_name.as_deref()));
-            if let Some(r) = ring_signals(v, ts, sys_id, sys_name) {
-                out.push(Ingest::RingSignals(r));
+            match ring_signals(v, ts, sys_id, sys_name) {
+                Some(r) => out.push(Ingest::RingSignals(r)),
+                None => out.extend(body_signals(v, ts, source).map(Ingest::Body)),
             }
             out
+        }
+        // Planets and moons. No system rows from these: EDDN relays ~200 scans a minute, mostly of
+        // unpopulated systems (the same volume FSDJump filtering keeps out).
+        "Scan" => body_scan(v, ts, source)
+            .map(Ingest::Body)
+            .into_iter()
+            .collect(),
+        "FSSBodySignals" => body_signals(v, ts, source)
+            .map(Ingest::Body)
+            .into_iter()
+            .collect(),
+        // On foot on a planet: the body has been footfalled. `ScanOrganic` needs the genetic sampler
+        // (EDDN `scanorganic/1`); its "Analyse" step can fire later, even in another system.
+        "ScanOrganic" => {
+            if get_str(v, "ScanType").is_some_and(|t| t.eq_ignore_ascii_case("Analyse")) {
+                return Vec::new();
+            }
+            let body_id = get_body_id(v, "BodyID").or_else(|| get_body_id(v, "Body"));
+            on_foot(v, ts, source, body_id, get_text(v, "BodyName"))
+        }
+        "Disembark" => {
+            if get_bool(v, "OnPlanet") != Some(true) || get_bool(v, "OnStation") == Some(true) {
+                return Vec::new();
+            }
+            on_foot(v, ts, source, get_body_id(v, "BodyID"), get_text(v, "Body"))
         }
         "Market" => market_json(v, ts, source)
             .map(Ingest::Market)
@@ -242,6 +279,146 @@ pub(crate) fn convert_journal(
             .collect(),
         _ => Vec::new(),
     }
+}
+
+/// Journal `SurfaceGravity` (m/s²) per g and `SurfacePressure` (Pa) per atmosphere: the standard
+/// values, as Spansh and EDSM use.
+const STANDARD_GRAVITY: f64 = 9.80665;
+const STANDARD_ATMOSPHERE: f64 = 101_325.0;
+
+/// Body ids start at 0 (the main star).
+fn get_body_id(v: &Value, key: &str) -> Option<u32> {
+    u32::try_from(get_i64(v, key)?).ok()
+}
+
+/// Journal text that says "nothing" (`""`, `None`, `No atmosphere`, `No volcanism`) -> `None`.
+fn get_present(v: &Value, key: &str) -> Option<String> {
+    get_text(v, key).filter(|s| {
+        let l = s.to_ascii_lowercase();
+        l != "none" && !l.starts_with("no ")
+    })
+}
+
+/// Cheap check on a raw journal line before it is parsed: `false` when it can't produce anything
+/// for the database. Only `Scan` lines are filtered (most of them are stars, belt clusters and
+/// planets nobody lands on); positive matches only, so an unexpected format just costs a parse.
+pub fn journal_line_useful(event: &str, line: &str) -> bool {
+    if event != "Scan" {
+        return true;
+    }
+    if line.contains("\"StarType\"") || !line.contains("\"PlanetClass\"") {
+        return false;
+    }
+    let notable = ["\"Earthlike body\"", "\"Water world\"", "\"Ammonia world\""]
+        .iter()
+        .any(|c| line.contains(c));
+    notable || !(line.contains("\"Landable\":false") && line.contains("\"TerraformState\":\"\""))
+}
+
+/// `gameversion` of a Legacy-galaxy (Horizons 3.x) client.
+fn is_legacy_galaxy(game_version: &str) -> bool {
+    let v = game_version.trim();
+    v.starts_with("CAPI-Legacy")
+        || v.split('.')
+            .next()
+            .and_then(|major| major.parse::<u32>().ok())
+            .is_some_and(|major| major < 4)
+}
+
+/// A planet or moon `Scan` that can matter: landable, Earth-like / water / ammonia world or
+/// terraformable. Stars, belt clusters, rings and other planets give `None`.
+fn body_scan(v: &Value, ts: i64, source: Source) -> Option<BodyUpdate> {
+    let scan = BodyScan {
+        planet_class: get_text(v, "PlanetClass")?,
+        atmosphere: get_present(v, "Atmosphere"),
+        atmosphere_type: get_present(v, "AtmosphereType"),
+        gravity_g: get_f64(v, "SurfaceGravity").map(|g| g / STANDARD_GRAVITY),
+        temperature_k: get_f64(v, "SurfaceTemperature"),
+        pressure_atm: get_f64(v, "SurfacePressure").map(|p| p / STANDARD_ATMOSPHERE),
+        volcanism: get_present(v, "Volcanism"),
+        terraform_state: get_text(v, "TerraformState").filter(|t| is_terraformable(Some(t))),
+        distance_ls: get_f64(v, "DistanceFromArrivalLS").filter(|d| *d >= 0.0),
+        landable: get_bool(v, "Landable").unwrap_or(false),
+    };
+    if !scan.landable && !scan.is_notable() {
+        return None;
+    }
+    Some(BodyUpdate {
+        system_id64: get_id(v, "SystemAddress").filter(|a| *a > 1)?,
+        body_id: get_body_id(v, "BodyID")?,
+        name: get_text(v, "BodyName"),
+        scan: Some(scan),
+        was_discovered: get_bool(v, "WasDiscovered"),
+        was_mapped: get_bool(v, "WasMapped"),
+        was_footfalled: get_bool(v, "WasFootfalled"),
+        signals: None,
+        timestamp: ts,
+        source,
+        checked_online: None,
+    })
+}
+
+/// `$SAA_SignalType_Biological;` -> `Biological`.
+fn signal_type(raw: &str) -> &str {
+    let t = raw.trim().trim_start_matches('$').trim_end_matches(';');
+    t.strip_prefix("SAA_SignalType_").unwrap_or(t)
+}
+
+/// Biological / geological signal counts of a planet (`FSSBodySignals`, `SAASignalsFound`), with the
+/// genera a DSS scan revealed (`SAASignalsFound.Genuses`).
+fn body_signals(v: &Value, ts: i64, source: Source) -> Option<BodyUpdate> {
+    let list = v.get("Signals")?.as_array()?;
+    let (mut bio, mut geo) = (0u32, 0u32);
+    for s in list {
+        let count = get_i64(s, "Count").unwrap_or(0).clamp(0, 1000) as u32;
+        let t = signal_type(get_str(s, "Type").unwrap_or_default());
+        if t.eq_ignore_ascii_case("Biological") {
+            bio += count;
+        } else if t.eq_ignore_ascii_case("Geological") {
+            geo += count;
+        }
+    }
+    let mut genera: Vec<String> = Vec::new();
+    for g in v.get("Genuses").and_then(Value::as_array).into_iter().flatten() {
+        if let Some(s) = get_text(g, "Genus")
+            && !genera.contains(&s)
+        {
+            genera.push(s);
+        }
+    }
+    Some(BodyUpdate {
+        system_id64: get_id(v, "SystemAddress").filter(|a| *a > 1)?,
+        body_id: get_body_id(v, "BodyID")?,
+        name: get_text(v, "BodyName"),
+        signals: Some(BodySignals { bio, geo, genera }),
+        timestamp: ts,
+        source,
+        ..BodyUpdate::default()
+    })
+}
+
+/// Somebody was on foot on the body: it has been footfalled.
+fn on_foot(
+    v: &Value,
+    ts: i64,
+    source: Source,
+    body_id: Option<u32>,
+    name: Option<String>,
+) -> Vec<Ingest> {
+    let (Some(system_id64), Some(body_id)) =
+        (get_id(v, "SystemAddress").filter(|a| *a > 1), body_id)
+    else {
+        return Vec::new();
+    };
+    vec![Ingest::Body(BodyUpdate {
+        system_id64,
+        body_id,
+        name,
+        was_footfalled: Some(true),
+        timestamp: ts,
+        source,
+        ..BodyUpdate::default()
+    })]
 }
 
 /// A position-only system update when the event carries `StarSystem` + `SystemAddress` + `StarPos`
@@ -749,5 +926,197 @@ pub(crate) mod tests {
     fn raw_expands() {
         let raw = Ingest::Raw(RawIngest::Eddn(eddn_commodity()));
         assert_eq!(raw.expand().len(), 1);
+    }
+
+    fn eddn(schema: &str, gameversion: &str, message: Value) -> Value {
+        json!({"$schemaRef": format!("https://eddn.edcd.io/schemas/{schema}"),
+               "header": {"uploaderID": "x", "softwareName": "E:D Market Connector [Windows]", "softwareVersion": "6.1.2",
+                          "gameversion": gameversion, "gamebuild": "r332841/r0 ", "gatewayTimestamp": "2026-10-12T09:23:12Z"},
+               "message": message})
+    }
+
+    /// A landable planet as EDMC relays it (journal `Scan`, `_Localised` stripped, `StarPos` added).
+    pub(crate) fn eddn_planet_scan() -> Value {
+        eddn(
+            "journal/1",
+            "4.4.1.1",
+            json!({"timestamp": "2026-10-12T09:23:11Z", "event": "Scan", "ScanType": "Detailed",
+                "BodyName": "Swoilz MH-W c17-3 A 4", "BodyID": 6, "Parents": [{"Star": 1}, {"Null": 0}],
+                "StarSystem": "Swoilz MH-W c17-3", "SystemAddress": 908552967066u64, "DistanceFromArrivalLS": 1209.42,
+                "TidalLock": true, "TerraformState": "", "PlanetClass": "High metal content body",
+                "Atmosphere": "thin carbon dioxide atmosphere", "AtmosphereType": "CarbonDioxide",
+                "AtmosphereComposition": [{"Name": "CarbonDioxide", "Percent": 99.009911}, {"Name": "SulphurDioxide", "Percent": 0.990099}],
+                "Volcanism": "", "MassEM": 0.02, "Radius": 1500000.0, "SurfaceGravity": 0.876, "SurfaceTemperature": 165.16,
+                "SurfacePressure": 1107.5, "Landable": true, "Materials": [{"Name": "iron", "Percent": 23.5}],
+                "WasDiscovered": true, "WasMapped": false, "WasFootfalled": false,
+                "horizons": true, "odyssey": true, "StarPos": [-28.8, -112.4, -96.9]}),
+        )
+    }
+
+    #[test]
+    fn eddn_planet_scan_carries_the_footfall_flag() {
+        let out = Ingest::from_eddn(&eddn_planet_scan());
+        let [Ingest::Body(b)] = &out[..] else {
+            panic!("{out:?}")
+        };
+        assert_eq!((b.system_id64, b.body_id), (908552967066, 6));
+        assert_eq!(b.name.as_deref(), Some("Swoilz MH-W c17-3 A 4"));
+        assert_eq!(b.source, Source::Eddn);
+        assert_eq!(b.timestamp, 1_791_796_991);
+        assert_eq!(
+            (b.was_discovered, b.was_mapped, b.was_footfalled),
+            (Some(true), Some(false), Some(false))
+        );
+        let s = b.scan.as_ref().expect("scan");
+        assert_eq!(s.planet_class, "High metal content body");
+        assert_eq!(s.atmosphere_type.as_deref(), Some("CarbonDioxide"));
+        assert_eq!(s.volcanism, None);
+        assert_eq!(s.terraform_state, None);
+        assert!(s.landable);
+        assert!((s.gravity_g.unwrap() - 0.0893).abs() < 1e-3, "{:?}", s.gravity_g);
+        assert!((s.pressure_atm.unwrap() - 0.01093).abs() < 1e-4);
+        assert_eq!(s.distance_ls, Some(1209.42));
+        assert!(b.signals.is_none());
+        // the same event from our own journal
+        let own = Ingest::from_journal_event("Scan", &eddn_planet_scan()["message"]);
+        assert!(matches!(&own[..], [Ingest::Body(b)] if b.source == Source::Journal && b.was_footfalled == Some(false)));
+    }
+
+    #[test]
+    fn scans_that_cannot_matter_are_dropped() {
+        // the belt cluster of eddn.md §3.1 (real EDMC message)
+        let belt = eddn(
+            "journal/1",
+            "4.4.1.1",
+            json!({"timestamp": "2026-10-12T09:23:11Z", "event": "Scan", "ScanType": "AutoScan",
+                "BodyName": "Tucanae Sector JC-U b3-1 A A Belt Cluster 1", "BodyID": 6, "Parents": [{"Ring": 5}, {"Star": 1}, {"Null": 0}],
+                "StarSystem": "Tucanae Sector JC-U b3-1", "SystemAddress": 2871319274977u64, "DistanceFromArrivalLS": 5.571921,
+                "WasDiscovered": true, "WasMapped": false, "WasFootfalled": false, "horizons": true, "odyssey": true,
+                "StarPos": [110.65625, -201.375, 152.84375]}),
+        );
+        assert!(Ingest::from_eddn(&belt).is_empty());
+        let mut star = eddn_planet_scan();
+        let m = star["message"].as_object_mut().unwrap();
+        m.remove("PlanetClass");
+        m.insert("StarType".into(), json!("K"));
+        assert!(Ingest::from_eddn(&star).is_empty());
+        let mut giant = eddn_planet_scan();
+        giant["message"]["PlanetClass"] = json!("Sudarsky class I gas giant");
+        giant["message"]["Landable"] = json!(false);
+        assert!(Ingest::from_eddn(&giant).is_empty());
+        // ...but a terraformable or an ammonia world is kept even though nobody lands there
+        giant["message"]["TerraformState"] = json!("Terraformable");
+        assert_eq!(Ingest::from_eddn(&giant).len(), 1);
+        giant["message"]["TerraformState"] = json!("");
+        giant["message"]["PlanetClass"] = json!("Ammonia world");
+        assert_eq!(Ingest::from_eddn(&giant).len(), 1);
+        // Legacy-galaxy (3.x) clients: their flags belong to another galaxy
+        let mut legacy = eddn_planet_scan();
+        legacy["header"]["gameversion"] = json!("3.8.0.407");
+        assert!(Ingest::from_eddn(&legacy).is_empty());
+    }
+
+    #[test]
+    fn body_signals_from_fss_and_dss() {
+        let fss = eddn(
+            "fssbodysignals/1",
+            "4.4.1.1",
+            json!({"timestamp": "2026-10-12T09:23:10Z", "event": "FSSBodySignals", "BodyName": "Swoilz MH-W c17-3 A 4",
+                "BodyID": 6, "SystemAddress": 908552967066u64, "StarSystem": "Swoilz MH-W c17-3", "StarPos": [-28.8, -112.4, -96.9],
+                "Signals": [{"Type": "$SAA_SignalType_Biological;", "Count": 4}, {"Type": "$SAA_SignalType_Geological;", "Count": 1},
+                            {"Type": "$PlanetaryMiningLocation_Name;", "Count": 12}]}),
+        );
+        let out = Ingest::from_eddn(&fss);
+        let [Ingest::Body(b)] = &out[..] else {
+            panic!("{out:?}")
+        };
+        let s = b.signals.as_ref().expect("signals");
+        assert_eq!((s.bio, s.geo), (4, 1));
+        assert!(s.genera.is_empty());
+        assert!(b.scan.is_none() && b.was_footfalled.is_none());
+        // DSS: genera (journal symbols; EDDN has no `_Localised`), no ring hotspots
+        let dss = json!({"timestamp": "2026-09-28T03:04:04Z", "event": "SAASignalsFound", "BodyName": "Swoilz MH-W c17-3 A 4",
+            "SystemAddress": 908552967066u64, "BodyID": 6,
+            "Signals": [{"Type": "$SAA_SignalType_Biological;", "Type_Localised": "Biological", "Count": 2},
+                        {"Type": "$PlanetaryMiningLocation_Name;", "Count": 12}],
+            "Genuses": [{"Genus": "$Codex_Ent_Bacterial_Genus_Name;", "Genus_Localised": "Bacterium"},
+                        {"Genus": "$Codex_Ent_Stratum_Genus_Name;"}, {"Genus": "$Codex_Ent_Stratum_Genus_Name;"}]});
+        let out = Ingest::from_journal_event("SAASignalsFound", &dss);
+        let [Ingest::Body(b)] = &out[..] else {
+            panic!("{out:?}")
+        };
+        let s = b.signals.as_ref().expect("signals");
+        assert_eq!(s.bio, 2);
+        assert_eq!(
+            s.genera,
+            vec!["$Codex_Ent_Bacterial_Genus_Name;".to_string(), "$Codex_Ent_Stratum_Genus_Name;".to_string()]
+        );
+        // a ring's DSS stays a ring hotspot
+        let ring = json!({"timestamp": "2026-10-12T09:00:00Z", "event": "SAASignalsFound", "BodyName": "HIP 21991 A 1 A Ring",
+            "SystemAddress": 3107509474002u64, "BodyID": 7, "Signals": [{"Type": "Painite", "Count": 2}]});
+        assert!(matches!(&Ingest::from_journal_event("SAASignalsFound", &ring)[..], [Ingest::RingSignals(_)]));
+    }
+
+    #[test]
+    fn being_on_foot_means_footfalled() {
+        let organic = |scan_type: &str| {
+            eddn(
+                "scanorganic/1",
+                "4.4.1.1",
+                json!({"timestamp": "2026-10-12T09:23:10Z", "event": "ScanOrganic", "ScanType": scan_type,
+                    "Genus": "$Codex_Ent_Stratum_Genus_Name;", "Species": "$Codex_Ent_Stratum_07_Name;",
+                    "Variant": "$Codex_Ent_Stratum_07_K_Name;", "SystemAddress": 908552967066u64, "BodyID": 6,
+                    "StarSystem": "Swoilz MH-W c17-3", "StarPos": [-28.8, -112.4, -96.9]}),
+            )
+        };
+        let out = Ingest::from_eddn(&organic("Log"));
+        assert!(
+            matches!(&out[..], [Ingest::Body(b)] if b.was_footfalled == Some(true) && b.body_id == 6 && b.scan.is_none()),
+            "{out:?}"
+        );
+        assert!(Ingest::from_eddn(&organic("Analyse")).is_empty(), "may fire in another system");
+        // our own journal: ScanOrganic uses "Body" for the id
+        let own = json!({"timestamp": "2026-09-28T03:13:55Z", "event": "ScanOrganic", "ScanType": "Log",
+            "Genus": "$Codex_Ent_Stratum_Genus_Name;", "Species": "$Codex_Ent_Stratum_07_Name;", "WasLogged": false,
+            "SystemAddress": 908552967066u64, "Body": 6});
+        assert!(matches!(&Ingest::from_journal_event("ScanOrganic", &own)[..], [Ingest::Body(b)] if b.body_id == 6));
+        let disembark = json!({"timestamp": "2026-09-28T01:11:57Z", "event": "Disembark", "SRV": false, "Taxi": false,
+            "Multicrew": false, "ID": 19, "StarSystem": "Brestla", "SystemAddress": 673101653409u64, "Body": "Brestla A 1",
+            "BodyID": 8, "OnStation": false, "OnPlanet": true});
+        let out = Ingest::from_journal_event("Disembark", &disembark);
+        let [Ingest::Body(b)] = &out[..] else {
+            panic!("{out:?}")
+        };
+        assert_eq!(b.name.as_deref(), Some("Brestla A 1"));
+        assert_eq!((b.was_footfalled, b.source), (Some(true), Source::Journal));
+        let mut at_station = disembark.clone();
+        at_station["OnStation"] = json!(true);
+        assert!(Ingest::from_journal_event("Disembark", &at_station).is_empty());
+    }
+
+    #[test]
+    fn cheap_scan_line_filter() {
+        let line = |s: &str| s.to_string();
+        let planet = line(
+            r#"{ "timestamp":"2026-09-05T01:06:08Z", "event":"Scan", "BodyName":"X 2", "BodyID":2, "SystemAddress":5, "TerraformState":"", "PlanetClass":"High metal content body", "Landable":true }"#,
+        );
+        assert_eq!(Ingest::from_journal_event("Scan", &serde_json::from_str(&planet).expect("json")).len(), 1);
+        let rock = planet.replace("\"Landable\":true", "\"Landable\":false");
+        let tf = rock.replace("\"TerraformState\":\"\"", "\"TerraformState\":\"Terraformable\"");
+        let elw = rock.replace("High metal content body", "Earthlike body");
+        let star = line(r#"{ "event":"Scan", "BodyName":"X", "BodyID":0, "SystemAddress":5, "StarType":"K", "Subclass":3 }"#);
+        let belt = line(r#"{ "event":"Scan", "BodyName":"X A Belt Cluster 1", "BodyID":3, "SystemAddress":5, "WasDiscovered":true }"#);
+        assert!(journal_line_useful("Scan", &planet));
+        assert!(!journal_line_useful("Scan", &rock));
+        assert!(journal_line_useful("Scan", &tf));
+        assert!(journal_line_useful("Scan", &elw));
+        assert!(!journal_line_useful("Scan", &star));
+        assert!(!journal_line_useful("Scan", &belt));
+        assert!(journal_line_useful("FSDJump", &star), "only Scan lines are filtered");
+        // every line the filter drops converts to nothing anyway
+        for l in [&rock, &star, &belt] {
+            let v: Value = serde_json::from_str(l).expect("json");
+            assert!(Ingest::from_journal_event("Scan", &v).is_empty(), "{l}");
+        }
     }
 }

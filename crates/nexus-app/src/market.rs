@@ -22,8 +22,16 @@ use std::time::{Duration, Instant};
 /// Daily Spansh dump of every system with stations: services, pads, markets (about 4.5 GB gzip).
 pub const SPANSH_STATIONS_URL: &str = "https://downloads.spansh.co.uk/galaxy_stations.json.gz";
 
-/// Journal events the galaxy database learns from (plus Market.json as "Market").
-const RELEVANT: [&str; 7] = ["FSDJump", "Location", "CarrierJump", "Docked", "SAASignalsFound", "ApproachSettlement", "Market"];
+/// Journal events the galaxy database learns from (plus Market.json as "Market"). Scan /
+/// FSSBodySignals / SAASignalsFound / Disembark feed the planets (footfall, biology).
+const RELEVANT: [&str; 10] =
+    ["FSDJump", "Location", "CarrierJump", "Docked", "SAASignalsFound", "ApproachSettlement", "Market", "Scan", "FSSBodySignals", "Disembark"];
+
+/// Whether a journal line is worth parsing for the galaxy database. `Scan` is frequent and mostly
+/// stars, belt clusters and planets nobody lands on: those are skipped before they are copied.
+pub(crate) fn relevant(event: &str, line: &str) -> bool {
+    RELEVANT.contains(&event) && nexus_galaxy::journal_line_useful(event, line)
+}
 
 pub struct MarketService {
     pub db: Option<GalaxyDb>,
@@ -80,7 +88,7 @@ impl MarketService {
         let db = self.db.clone()?;
         let tx = ingest_thread(db, "galaxy-history");
         Some(Box::new(move |name: &str, line: &str| {
-            if RELEVANT.contains(&name) {
+            if relevant(name, line) {
                 let _ = tx.send((name.to_string(), line.to_string()));
             }
         }))
@@ -94,7 +102,7 @@ impl MarketService {
             // Ends when the core stops (its senders drop).
             for msg in rx {
                 let (event, text) = match &msg {
-                    LiveMsg::Event(e, _) if RELEVANT.contains(&&*e.raw.name) => (&*e.raw.name, &*e.raw.line),
+                    LiveMsg::Event(e, _) if relevant(&e.raw.name, &e.raw.line) => (&*e.raw.name, &*e.raw.line),
                     LiveMsg::Companion(Companion::Market(_, raw), _) => ("Market", &**raw),
                     _ => continue,
                 };
@@ -478,6 +486,73 @@ mod tests {
         station(db, ("Alpha", 1001, 0.0), "Alpha Port", 5001, json!([good("gold", 0, 0, 61_000, 80)]));
         db.flush().unwrap();
         assert!(rx.recv_timeout(Duration::from_millis(700)).is_err(), "only one alert");
+    }
+
+    /// Start-up history replay into the galaxy database with and without the body events, on this
+    /// PC's journals plus a synthetic heavy explorer (the commander's planet scans repeated across
+    /// many systems). `cargo test -p nexus-app -- --ignored history_replay_cost --nocapture`
+    #[test]
+    #[ignore]
+    fn history_replay_cost() {
+        const OLD: [&str; 7] = ["FSDJump", "Location", "CarrierJump", "Docked", "SAASignalsFound", "ApproachSettlement", "Market"];
+        let Some(dir) = nexus_journal::default_journal_dir() else { return };
+        let files = nexus_journal::list_journal_files(&dir).unwrap_or_default();
+        let mut lines: Vec<(String, String)> = Vec::new();
+        for f in &files {
+            let Ok(text) = std::fs::read_to_string(&f.path) else { continue };
+            for line in text.lines() {
+                if let Some((_, name)) = nexus_journal::raw::scan_line(line) {
+                    lines.push((name.to_string(), line.to_string()));
+                }
+            }
+        }
+        // What the core thread pays in the sink (filter + copy), and what the galaxy-history thread and
+        // the writer pay (parse + convert + commit), for a filter.
+        let replay = |label: &str, input: &[(String, String)], keep: &dyn Fn(&str, &str) -> bool| {
+            let t = TempDb::new(&format!("replay-{label}"));
+            let db = t.db();
+            let started = Instant::now();
+            let sent: Vec<(String, String)> = input.iter().filter(|(n, l)| keep(n, l)).map(|(n, l)| (n.clone(), l.clone())).collect();
+            let sink = started.elapsed();
+            let started = Instant::now();
+            let mut items = 0;
+            for (name, line) in &sent {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+                    items += db.ingest_journal(name, &v);
+                }
+            }
+            let parse = started.elapsed();
+            db.flush().unwrap();
+            let total = started.elapsed();
+            let id64s: rustc_hash::FxHashSet<u64> = sent
+                .iter()
+                .filter_map(|(_, l)| serde_json::from_str::<serde_json::Value>(l).ok()?.get("SystemAddress")?.as_u64())
+                .collect();
+            let bodies: usize = id64s.iter().map(|id| db.bodies_in_system(*id).map(|b| b.len()).unwrap_or(0)).sum();
+            println!(
+                "{label:>14}: {} lines -> {} forwarded ({:.1} ms sink), {items} items, parse+convert {:.0} ms, committed after {:.0} ms; {bodies} body rows",
+                input.len(),
+                sent.len(),
+                sink.as_secs_f64() * 1e3,
+                parse.as_secs_f64() * 1e3,
+                total.as_secs_f64() * 1e3
+            );
+        };
+        replay("before", &lines, &|n, _| OLD.contains(&n));
+        replay("with bodies", &lines, &|n, l| relevant(n, l));
+        replay("no pre-filter", &lines, &|n, _| RELEVANT.contains(&n));
+        // A heavy explorer: every Scan line of this history, repeated in 400 different systems.
+        let scans: Vec<&(String, String)> = lines.iter().filter(|(n, _)| n == "Scan").collect();
+        let mut heavy: Vec<(String, String)> = Vec::new();
+        for k in 0..400u64 {
+            for (n, l) in &scans {
+                let Ok(mut v) = serde_json::from_str::<serde_json::Value>(l) else { continue };
+                let addr = v["SystemAddress"].as_u64().unwrap_or(0) + k * 1_000_003;
+                v["SystemAddress"] = serde_json::json!(addr);
+                heavy.push((n.clone(), v.to_string()));
+            }
+        }
+        replay("heavy explorer", &heavy, &|n, l| relevant(n, l));
     }
 
     /// Streams Spansh's small daily systems dump (~4 MB) through the HTTP reader into a scratch

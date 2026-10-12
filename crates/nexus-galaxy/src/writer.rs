@@ -2,6 +2,7 @@
 //! (one transaction at most every `commit_interval`, 250 ms by default).
 
 use crate::GalaxyOptions;
+use crate::bodies;
 use crate::commodities::{CommodityCache, CommodityMeta, fallback_name, normalize_symbol};
 use crate::error::Result;
 use crate::index::StationIndex;
@@ -747,8 +748,32 @@ impl Ctx {
             Ingest::System(s) => self.apply_system(tx, s),
             Ingest::Station(s) => self.apply_station(tx, s),
             Ingest::RingSignals(r) => self.apply_rings(tx, r),
+            Ingest::Body(b) => self.apply_body(tx, b),
             Ingest::Raw(_) => Ok(()), // expanded before we get here
         }
+    }
+
+    /// Merges one observation of a planet or moon into its row (created only for what
+    /// [`bodies::admits`] keeps); writes only when something changed.
+    fn apply_body(&self, tx: &Transaction, u: &BodyUpdate) -> Result<()> {
+        if u.system_id64 <= 1 || u.system_id64 > i64::MAX as u64 {
+            return Ok(());
+        }
+        let existing = bodies::load(tx, u.system_id64, u.body_id)?;
+        let mut row = match &existing {
+            Some(r) => r.clone(),
+            None if bodies::admits(u, self.opts.all_eddn_bodies) => BodyInfo {
+                system_id64: u.system_id64,
+                body_id: u.body_id,
+                ..BodyInfo::default()
+            },
+            None => return Ok(()),
+        };
+        bodies::merge(&mut row, u);
+        if existing.as_ref() != Some(&row) {
+            bodies::save(tx, &row)?;
+        }
+        Ok(())
     }
 
     fn commodity_id(&self, tx: &Transaction, symbol: &str) -> Result<i64> {

@@ -1,6 +1,7 @@
 //! Local galaxy / market database for Elite Nexus.
 //!
-//! A SQLite (WAL) database of systems, stations, markets, factions and ring hotspots, fed by EDDN
+//! A SQLite (WAL) database of systems, stations, markets, factions, ring hotspots and planets
+//! (footfall / discovery flags, biological signals; see [`BodyUpdate`]), fed by EDDN
 //! ([`Ingest::from_eddn`]), the player's own journal ([`Ingest::from_journal_event`]) and Spansh
 //! dumps ([`GalaxyDb::import_spansh_dump`]).
 //!
@@ -28,6 +29,7 @@
 //! # Ok(()) }
 //! ```
 
+mod bodies;
 mod commodities;
 mod convert;
 mod deals;
@@ -45,7 +47,7 @@ mod util;
 mod writer;
 
 pub use commodities::normalize_symbol;
-pub use convert::eddn_schema_name;
+pub use convert::{eddn_schema_name, journal_line_useful};
 pub use error::{GalaxyError, Result};
 pub use model::*;
 pub use names::clean_station_name;
@@ -80,6 +82,11 @@ pub struct GalaxyOptions {
     pub read_pool_size: usize,
     /// Capacity of each [`GalaxyDb::subscribe_updates`] channel (updates are dropped when full).
     pub update_channel_capacity: usize,
+    /// Also store EDDN scans of landable bodies without biological signals (roughly ten times more
+    /// rows, ~100 000 a day: mostly bare rock whose footfall only earns a tag). Off by default:
+    /// from EDDN the bodies table keeps biology bodies, Earth-like / water / ammonia worlds,
+    /// terraformables and on-foot evidence; the commander's own journal is kept whole.
+    pub all_eddn_bodies: bool,
 }
 
 impl Default for GalaxyOptions {
@@ -91,6 +98,7 @@ impl Default for GalaxyOptions {
             price_history_days: 30,
             read_pool_size: 8,
             update_channel_capacity: 4096,
+            all_eddn_bodies: false,
         }
     }
 }
@@ -332,6 +340,22 @@ impl GalaxyDb {
     /// Factions present in a system, highest influence first.
     pub fn system_factions(&self, system_id64: u64) -> Result<Vec<FactionInfo>> {
         query::system_factions(&*self.inner.pool.get()?, system_id64)
+    }
+
+    /// Planets and moons stored for a system, by body id (what is kept: see [`BodyUpdate`]).
+    pub fn bodies_in_system(&self, system_id64: u64) -> Result<Vec<BodyInfo>> {
+        bodies::in_system(&*self.inner.pool.get()?, system_id64)
+    }
+
+    /// Case-insensitive exact body name (`Synuefe BR-L c24-23 2 a`).
+    pub fn body_by_name(&self, name: &str) -> Result<Option<BodyInfo>> {
+        bodies::by_name(&*self.inner.pool.get()?, name)
+    }
+
+    /// Bodies whose name starts with `prefix` (case-insensitive, used as given: `"Sol "` finds the
+    /// bodies of Sol, not of Solati), in name order.
+    pub fn find_bodies(&self, prefix: &str, limit: usize) -> Result<Vec<BodyInfo>> {
+        bodies::find(&*self.inner.pool.get()?, prefix, limit)
     }
 
     /// Ring hotspots of one commodity near a position.

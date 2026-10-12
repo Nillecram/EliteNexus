@@ -38,6 +38,7 @@ answer in about a millisecond.
 | `system_factions` | `(system_id64, faction)` | influence, state, government, allegiance, happiness, active/pending/recovering states (JSON) |
 | `ring_signals` | `(system_id64, body_name, signal)` | hotspot count, ring type; `signal` is a commodity symbol (`painite`, `lowtemperaturediamond`, `opal`) |
 | `price_history` | `(market_id, commodity_id, ts)` | buy and sell when a live snapshot changes a price (see below); pruned after 30 days |
+| `bodies` | `(system_id64, body_id)` WITHOUT ROWID | planets and moons (see below): name (`COLLATE NOCASE`, indexed), planet class, atmosphere + type, gravity (g), temperature (K), pressure (atm), volcanism, terraform state, `distance_ls`, landable, `was_discovered` / `was_mapped` / `was_footfalled` each with its `*_seen` time, `footfall_source`, bio / geo signal counts, genera (JSON codex symbols), `scan_updated`, `signals_updated`, `updated`, `source`, `checked_online` |
 
 Material trader type comes from the station economies, using FDevIDs' *How to determine MatTrader
 and Broker type*:
@@ -49,12 +50,36 @@ and Broker type*:
 The primary economy decides; the secondary is used only when the primary doesn't match. Technology
 brokers are Guardian at High Tech (primary, else secondary) and Human otherwise.
 
+## Bodies (footfall, biology)
+
+No public site exposes first footfall, so the `bodies` table collects the game's `WasFootfalled`
+(and `WasDiscovered` / `WasMapped`) from journal `Scan` events, plus bio / geo signal counts and DSS
+genera from `FSSBodySignals` / `SAASignalsFound`, and on-foot evidence (`Disembark` in the own
+journal, `ScanOrganic` from EDDN). Every source produces a `BodyUpdate`; the writer merges them:
+
+* physical facts: the newest scan replaces them (a scan is complete); an older one adds nothing;
+* `was_*` flags are monotonic (once `true`, always `true`), each with a time: when `true` was first
+  seen, or while `false` the newest observation that said so ("not footfalled as of …"). For
+  footfall the commander's own journal is authoritative: its `false` overrides an older `true`
+  from elsewhere, and such a `true` arriving later is ignored;
+* signal counts come from the newest signals event; genera are never replaced by an empty list;
+* `checked_online` remembers an on-demand online lookup (the app's EDDN-archive footfall lookup),
+  so it is not repeated within a day.
+
+What is kept: from the own journal every landable body, every body with signals, Earth-like / water /
+ammonia worlds and terraformables. From EDDN (≈200 scans a minute, mostly bare rock) only biology
+bodies, Earth-like / water / ammonia worlds, terraformables and on-foot evidence, which bounds
+growth to explorer biology activity (`GalaxyOptions::all_eddn_bodies` keeps every landable body too:
+roughly ten times more rows). Rows that exist are always updated. Stars, belt clusters and
+non-landable planets are never stored, and body events add no `systems` rows. Queries:
+`bodies_in_system(id64)`, `body_by_name(name)` (case-insensitive), `find_bodies(prefix, limit)`.
+
 ## Feeding it
 
 ```rust
 let db = GalaxyDb::open(data_dir.join("galaxy.db"))?;
-db.ingest_eddn(&envelope);                       // EDDN: commodity/3, journal/1, approachsettlement/1
-db.ingest_journal("FSDJump", &event_json);       // own journal (FSDJump/Location/CarrierJump/Docked/SAASignalsFound/ApproachSettlement)
+db.ingest_eddn(&envelope);                       // EDDN: commodity/3, journal/1, fssbodysignals/1, scanorganic/1, approachsettlement/1
+db.ingest_journal("FSDJump", &event_json);       // own journal (FSDJump/Location/CarrierJump/Docked/SAASignalsFound/ApproachSettlement/Scan/FSSBodySignals/Disembark)
 db.ingest_journal("Market", &market_json_file);  // our Market.json -> full market snapshot
 db.ingest(Ingest::Raw(RawIngest::Eddn(v)));      // or let the writer thread convert
 let rx = db.subscribe_updates();                 // MarketUpdate after each committed live snapshot

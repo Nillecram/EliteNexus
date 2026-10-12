@@ -6,10 +6,35 @@ use serde::Serialize;
 /// Where a piece of data came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize)]
 pub enum Source {
+    /// The live EDDN feed.
     #[default]
     Eddn,
+    /// The commander's own journal.
     Journal,
     Spansh,
+    /// An older EDDN message looked up on demand in an archive (EDGalaxyData's EDDN index).
+    EddnArchive,
+}
+
+impl Source {
+    /// Stable code stored in the database.
+    pub(crate) fn code(self) -> i64 {
+        match self {
+            Source::Eddn => 0,
+            Source::Journal => 1,
+            Source::Spansh => 2,
+            Source::EddnArchive => 3,
+        }
+    }
+
+    pub(crate) fn from_code(code: i64) -> Source {
+        match code {
+            1 => Source::Journal,
+            2 => Source::Spansh,
+            3 => Source::EddnArchive,
+            _ => Source::Eddn,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -29,6 +54,8 @@ pub enum Ingest {
     Station(StationUpdate),
     /// Ring hotspots from `SAASignalsFound` on a ring.
     RingSignals(RingSignalsUpdate),
+    /// What one observation (scan, signal count, being on foot there) says about a planet or moon.
+    Body(BodyUpdate),
     /// Raw JSON converted on the writer thread (via [`Ingest::from_eddn`] / [`Ingest::from_journal_event`]).
     Raw(RawIngest),
 }
@@ -172,6 +199,103 @@ pub struct RingSignalsUpdate {
     /// (signal, count): commodity symbols such as `painite`, `lowtemperaturediamond`, `opal`.
     pub signals: Vec<(String, i64)>,
     pub timestamp: i64,
+}
+
+/// One observation of a planet or moon, from any source: a `Scan`, a signal count
+/// (`FSSBodySignals`, `SAASignalsFound`), evidence that someone was on foot there (`Disembark`,
+/// `ScanOrganic`), or the result of an online lookup. `None` fields say nothing and leave the stored
+/// value alone, so any source (live EDDN, the commander's journal, an EDDN archive lookup, later e.g.
+/// a dump importer) is just one more input to the same merge:
+///
+/// * physical facts (`scan`, a complete scan): the newest scan replaces them; an older one adds
+///   nothing;
+/// * `was_*` flags are monotonic: once `true`, they stay `true`. The stored time is when `true` was
+///   first seen, or while still `false` the newest observation that said `false` ("not footfalled as
+///   of …"). For footfall the commander's own journal is authoritative: its `false` overrides an
+///   older `true` from anywhere else (the game never un-footfalls a body, so that `true` was wrong),
+///   and such a `true` arriving late is ignored;
+/// * signal counts come from the newest signals observation; genera are never replaced by an empty
+///   list.
+///
+/// What may create a row: landable bodies, bodies with biological or geological signals, Earth-like /
+/// water / ammonia worlds, terraformables, on-foot evidence and online lookups. From EDDN (every
+/// commander's scans, ~200 a minute) only bodies with biological signals, Earth-like / water /
+/// ammonia worlds, terraformables and on-foot evidence are kept, unless
+/// [`crate::GalaxyOptions::all_eddn_bodies`] is set; rows that exist are always updated.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BodyUpdate {
+    pub system_id64: u64,
+    /// Journal `BodyID` (unique within the system).
+    pub body_id: u32,
+    /// Full name (`Synuefe BR-L c24-23 2 a`), when the source gives it.
+    pub name: Option<String>,
+    /// Physical facts from a `Scan`.
+    pub scan: Option<BodyScan>,
+    pub was_discovered: Option<bool>,
+    pub was_mapped: Option<bool>,
+    /// Somebody has set foot on the body (first footfall taken).
+    pub was_footfalled: Option<bool>,
+    pub signals: Option<BodySignals>,
+    /// Unix seconds of the observation (0 for a lookup that found nothing).
+    pub timestamp: i64,
+    pub source: Source,
+    /// Unix seconds of the online lookup this came from (recorded even when it found nothing, so
+    /// the lookup isn't repeated soon).
+    pub checked_online: Option<i64>,
+}
+
+/// Physical facts of a planet or moon, in journal spelling.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BodyScan {
+    /// Journal `PlanetClass` (`High metal content body`, `Earthlike body`, `Icy body`).
+    pub planet_class: String,
+    /// Journal `Atmosphere` text (`thin carbon dioxide atmosphere`); `None` when airless.
+    pub atmosphere: Option<String>,
+    /// Journal `AtmosphereType` (`CarbonDioxide`); `None` when airless.
+    pub atmosphere_type: Option<String>,
+    /// Surface gravity in g (`SurfaceGravity` / 9.80665).
+    pub gravity_g: Option<f64>,
+    pub temperature_k: Option<f64>,
+    /// Surface pressure in atmospheres (`SurfacePressure` / 101325).
+    pub pressure_atm: Option<f64>,
+    /// Journal `Volcanism` text (`minor silicate vapour geysers volcanism`); `None` when none.
+    pub volcanism: Option<String>,
+    /// `Terraformable`, `Terraforming`, `Terraformed`; `None` when not terraformable.
+    pub terraform_state: Option<String>,
+    pub distance_ls: Option<f64>,
+    pub landable: bool,
+}
+
+impl BodyScan {
+    /// Earth-like, water or ammonia world, or terraformable: worth keeping even when not landable.
+    pub fn is_notable(&self) -> bool {
+        is_notable_class(&self.planet_class) || is_terraformable(self.terraform_state.as_deref())
+    }
+}
+
+/// Earth-like, water or ammonia world (journal `PlanetClass`).
+pub fn is_notable_class(planet_class: &str) -> bool {
+    ["Earthlike body", "Water world", "Ammonia world"]
+        .iter()
+        .any(|c| c.eq_ignore_ascii_case(planet_class.trim()))
+}
+
+/// `Terraformable`, `Terraforming` or `Terraformed` (not `""` / `Not terraformable`).
+pub fn is_terraformable(state: Option<&str>) -> bool {
+    state.is_some_and(|s| {
+        let s = s.trim().to_ascii_lowercase();
+        s.starts_with("terraform") || s.starts_with("candidate")
+    })
+}
+
+/// Signals of a planet or moon (`FSSBodySignals` after an FSS scan, `SAASignalsFound` after DSS).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BodySignals {
+    pub bio: u32,
+    pub geo: u32,
+    /// Genus codex symbols (`$Codex_Ent_Bacterial_Genus_Name;`) revealed by a DSS scan; empty when
+    /// unknown.
+    pub genera: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -432,6 +556,65 @@ pub struct HotspotHit {
     pub signal: String,
     pub count: i64,
     pub updated_unix: i64,
+}
+
+// ---------------------------------------------------------------------------------------------
+// Bodies
+// ---------------------------------------------------------------------------------------------
+
+/// A `Was*` flag of a body and when it was observed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Seen {
+    pub value: bool,
+    /// Unix seconds. `value == true`: the first observation that reported it (it may have happened
+    /// earlier). `value == false`: the newest observation that reported it, i.e. "still false as of".
+    pub at_unix: i64,
+}
+
+/// A planet or moon as stored (see [`BodyUpdate`] for what is kept and how observations merge).
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct BodyInfo {
+    pub system_id64: u64,
+    pub body_id: u32,
+    pub name: Option<String>,
+    /// Journal `PlanetClass`.
+    pub planet_class: Option<String>,
+    pub atmosphere: Option<String>,
+    pub atmosphere_type: Option<String>,
+    pub gravity_g: Option<f64>,
+    pub temperature_k: Option<f64>,
+    pub pressure_atm: Option<f64>,
+    pub volcanism: Option<String>,
+    pub terraform_state: Option<String>,
+    pub distance_ls: Option<f64>,
+    pub landable: Option<bool>,
+    /// Newest scan that supplied the physical facts (unix seconds).
+    pub scan_unix: Option<i64>,
+    pub was_discovered: Option<Seen>,
+    pub was_mapped: Option<Seen>,
+    pub was_footfalled: Option<Seen>,
+    /// Source of the observation behind `was_footfalled`.
+    pub footfall_source: Option<Source>,
+    pub bio_signals: Option<u32>,
+    pub geo_signals: Option<u32>,
+    /// Genus codex symbols revealed by a DSS scan.
+    pub genera: Vec<String>,
+    /// Newest signals observation (unix seconds).
+    pub signals_unix: Option<i64>,
+    /// Newest observation of any kind (unix seconds).
+    pub updated_unix: i64,
+    /// Source of the newest observation.
+    pub source: Source,
+    /// Last online footfall lookup (unix seconds), whatever it found.
+    pub checked_online_unix: Option<i64>,
+}
+
+impl BodyInfo {
+    /// Earth-like, water or ammonia world, or terraformable.
+    pub fn is_notable(&self) -> bool {
+        self.planet_class.as_deref().is_some_and(is_notable_class)
+            || is_terraformable(self.terraform_state.as_deref())
+    }
 }
 
 // ---------------------------------------------------------------------------------------------

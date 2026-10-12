@@ -6,7 +6,9 @@
 use nexus_galaxy::*;
 use std::time::Instant;
 
-const RELEVANT: [&str; 7] = ["FSDJump", "Location", "CarrierJump", "Docked", "SAASignalsFound", "ApproachSettlement", "Market"];
+/// The app's list (crates/nexus-app/src/market.rs).
+const RELEVANT: [&str; 10] =
+    ["FSDJump", "Location", "CarrierJump", "Docked", "SAASignalsFound", "ApproachSettlement", "Market", "Scan", "FSSBodySignals", "Disembark"];
 
 fn main() -> Result<()> {
     let mut args = std::env::args().skip(1);
@@ -24,7 +26,7 @@ fn main() -> Result<()> {
             lines += 1;
             let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { continue };
             let Some(ev) = v.get("event").and_then(|e| e.as_str()) else { continue };
-            if !RELEVANT.contains(&ev) {
+            if !RELEVANT.contains(&ev) || !journal_line_useful(ev, line) {
                 continue;
             }
             if let Some(p) = v.get("StarPos").and_then(|p| p.as_array()).filter(|p| p.len() == 3) {
