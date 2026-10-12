@@ -184,8 +184,28 @@ pub fn show(ui: &mut Ui, acc: &mut Accounts, st: &mut AccountsUi, cmdr_name: &st
                         );
                     });
                 }
+                // Inara only talks to apps it has approved; say so plainly when it refuses.
+                let refused = s.last_error.as_deref().is_some_and(|e| e.to_ascii_lowercase().contains("no access allowed"));
+                if refused {
+                    g.content(|ui| {
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(format!(
+                                    "{} Inara hasn't approved \"Elite Nexus\" yet, so it refuses every request and sync is paused. Approval comes from Inara's author: send him the app name, what it does, a short description and a download link.",
+                                    icon::WARNING
+                                ))
+                                .color(pal::WARN),
+                            )
+                            .wrap(),
+                        );
+                        ui.hyperlink_to(format!("Contact Inara {}", icon::ARROW_SQUARE_OUT), "https://inara.cz/elite/cmdr/1/");
+                    });
+                }
                 status_row(g, s);
             });
+            if !matches!(status.uplink.inara.last_error.as_deref(), Some(e) if e.to_ascii_lowercase().contains("no access allowed")) {
+                footnote(ui, "Inara accepts uploads only from apps it has approved by name.");
+            }
             // Hidden depth.
             ui.add_space(6.0);
             if widgets::disclosure(ui, &mut st.show_inara_options, "Inara options") {
@@ -193,7 +213,7 @@ pub fn show(ui: &mut Ui, acc: &mut Accounts, st: &mut AccountsUi, cmdr_name: &st
                     changed |= g.switch(
                         &mut acc.inara_dev_mode,
                         "Developer mode",
-                        "Sent to Inara as isBeingDeveloped. Your profile is still updated; Inara only ignores shared data such as community-goal progress. Leave it on until Inara has approved \"Elite Nexus\". Updates are batched every 35+ seconds, so the key is never locked out.",
+                        "Sent to Inara as isBeingDeveloped: Inara then ignores shared data such as community-goal progress. Keep it on for the first weeks after Inara approves \"Elite Nexus\". Updates are batched every 35+ seconds, so the key is never locked out.",
                     );
                 });
             }
