@@ -2396,6 +2396,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nexus-ai"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "nexus-app"
 version = "0.1.0"
 dependencies = [
@@ -2411,6 +2423,7 @@ dependencies = [
  "embed-resource",
  "flate2",
  "image",
+ "nexus-ai",
  "nexus-binds",
  "nexus-data",
  "nexus-eddn",

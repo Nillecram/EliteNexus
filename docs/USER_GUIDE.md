@@ -9,14 +9,23 @@ the game live. Run it before or after the game — order doesn't matter.
 CMDR, ship, system & situation, fuel, credits, and a **LIVE / OFFLINE** badge (LIVE = the game is writing events).
 **EDDN n/min** (green) means the live market feed is connected — click it for the database page; the cloud icon counts
 uploads sent this session (shown once you enable a service; amber = a service is paused or rejecting — click for details).
+When you contribute to EDDN, **Pause EDDN / Resume EDDN** stops and restarts sharing in one click. Market prices are only
+sent when you undock, so pausing while docked keeps a market you just found to yourself.
 The **HUD** button turns the window into a small always-on-top panel for a second monitor or the edge of your
 screen (location, fuel, next star and whether it's scoopable, exobiology sampling radar, system value, last
 alerts). "Full view" switches back.
+
+## Simple first, everything still there
+
+Each page shows the one thing you usually need, with smart defaults (your current system, your ship's jump range and
+landing pad). Every advanced setting the original tools offer, such as Spansh's routing algorithm, neutron/injection
+choices or market filters, is one click away under **› Options**.
 
 ## Pages
 
 | Page | What it's for | Tips |
 |---|---|---|
+| Ask | Your AI co-pilot: ask anything in plain words ("Where can I make the most money in the next hour?", "Where should I sell my cargo?", "Plan an exobiology trip near me") | It answers from your ship, cargo, journal, the live market database and Spansh, plus a built-in knowledge base of game mechanics and this guide. One-time setup: click "Get a free Gemini key", paste it, Connect. Routes it plans appear on the Navigation page. Claude or a local model (Ollama, LM Studio) can be chosen under "Other providers and model". |
 | Dashboard | Everything at a glance | Session card shows earnings since you logged in; transfers to your own carrier are not counted as spending. |
 | Navigation | Your plotted route: scoopable stars, neutron/white-dwarf hazards, longest non-scoopable streak | With "copy next system" on, the next waypoint is on your clipboard after every jump — paste it in the galaxy map. Spansh planners feed the same view. |
 | Exploration | The current system as a tree (stars → planets → moons) with value now vs. value if mapped | Click a body for materials, rings/hotspots, biology, discovery & footfall status. "Not sellable" lists data UC refused in earlier sales. |

@@ -1,6 +1,7 @@
 //! Pages shown in the main content area.
 
 pub mod accounts;
+pub mod ask;
 pub mod bgs;
 pub mod bindings;
 pub mod carrier;
@@ -26,6 +27,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Page {
+    Ask,
     Dashboard,
     Navigation,
     Exploration,
@@ -48,7 +50,7 @@ pub enum Page {
 
 impl Page {
     pub const GROUPS: &'static [(&'static str, &'static [Page])] = &[
-        ("COCKPIT", &[Page::Dashboard, Page::Navigation]),
+        ("COCKPIT", &[Page::Ask, Page::Dashboard, Page::Navigation]),
         ("EXPLORATION", &[Page::Exploration, Page::Exobiology, Page::GalaxyMap]),
         ("ECONOMY", &[Page::Market, Page::Mining, Page::Colonisation, Page::Carrier]),
         ("COMMANDER", &[Page::Engineering, Page::Fleet, Page::Missions, Page::Bgs]),
@@ -58,6 +60,7 @@ impl Page {
 
     pub fn label(self) -> &'static str {
         match self {
+            Page::Ask => "Ask",
             Page::Dashboard => "Dashboard",
             Page::Navigation => "Navigation",
             Page::Exploration => "Exploration",
@@ -81,6 +84,7 @@ impl Page {
 
     pub fn icon(self) -> &'static str {
         match self {
+            Page::Ask => icon::SPARKLE,
             Page::Dashboard => icon::GAUGE,
             Page::Navigation => icon::NAVIGATION_ARROW,
             Page::Exploration => icon::PLANET,

@@ -1042,3 +1042,79 @@ fn spansh_import_plain_cancel_and_truncation() {
     assert_eq!(s.progress.parse_errors, 1);
     assert_eq!(s.progress.systems, 1);
 }
+
+/// (symbol, buy, sell, mean, stock, demand)
+fn priced(mid: u64, sys_name: &str, name: &str, kind: Option<&str>, items: &[(&str, i64, i64, i64, i64, i64)]) -> Ingest {
+    Ingest::Market(MarketSnapshot {
+        market_id: mid,
+        system_name: sys_name.into(),
+        station_name: name.into(),
+        station_type: kind.map(Into::into),
+        timestamp: now() - 30,
+        items: items
+            .iter()
+            .map(|&(s, buy, sell, mean, stock, demand)| MarketItem {
+                symbol: s.into(),
+                buy,
+                sell,
+                mean,
+                stock,
+                stock_bracket: Some(2),
+                demand,
+                demand_bracket: Some(2),
+            })
+            .collect(),
+        ..Default::default()
+    })
+}
+
+#[test]
+fn price_deals_rank_by_value_and_fill_carrier_averages() {
+    let t = TempDb::new("deals");
+    let db = t.db();
+    let carrier = 3_700_000_001u64;
+    db.ingest_many(vec![
+        system(SYS_A, "Alpha", [0.0, 0.0, 0.0]),
+        system(SYS_B, "Beta", [10.0, 0.0, 0.0]),
+        system(SYS_C, "Gamma", [100.0, 0.0, 0.0]),
+        station(11, "Alpha Port", SYS_A, "Alpha", "Coriolis", &["dock", "commodities"], "Industrial"),
+        station(12, "Beta Hub", SYS_B, "Beta", "Coriolis", &["dock", "commodities"], "Industrial"),
+        station(13, "Far Out", SYS_C, "Gamma", "Coriolis", &["dock", "commodities"], "Industrial"),
+        station(carrier, "X9X-99X", SYS_B, "Beta", "FleetCarrier", &["dock", "commodities"], "Carrier"),
+        // Alpha: gold only 20 % over average (below the threshold); painite 50 % over.
+        priced(11, "Alpha", "Alpha Port", Some("Coriolis"), &[("gold", 0, 60_000, 50_000, 0, 1000), ("painite", 0, 600_000, 400_000, 0, 60)]),
+        // Beta: gold 40 % over; silver sold at a fifth of the average; tritium sold slightly cheap.
+        priced(
+            12,
+            "Beta",
+            "Beta Hub",
+            Some("Coriolis"),
+            &[("gold", 0, 70_000, 50_000, 0, 2000), ("silver", 1_000, 0, 5_000, 10_000, 0), ("tritium", 40_000, 0, 50_000, 100, 0)],
+        ),
+        // The carrier pays double for tritium but reports no average (as carriers do).
+        priced(carrier, "Beta", "X9X-99X", Some("FleetCarrier"), &[("tritium", 0, 100_000, 0, 0, 1000)]),
+        // Far away: the best gold price, outside the radius.
+        priced(13, "Gamma", "Far Out", Some("Coriolis"), &[("gold", 0, 200_000, 50_000, 0, 1000)]),
+    ]);
+    db.flush().expect("flush");
+
+    let q = DealQuery { origin: Some([0.0; 3]), max_distance_ly: Some(50.0), cargo_capacity: 500, ..Default::default() };
+    let sell = db.price_deals(&q).expect("deals");
+    let names: Vec<(&str, &str)> = sell.iter().map(|d| (d.commodity.as_str(), d.station.as_str())).collect();
+    assert_eq!(names, vec![("tritium", "X9X-99X"), ("painite", "Alpha Port"), ("gold", "Beta Hub")]);
+    assert_eq!(sell[0].average, 50_000, "carrier row uses the average other stations report");
+    assert_eq!(sell[0].extra_value, 50_000 * 500, "capped by the hold");
+    assert_eq!(sell[1].extra_value, 200_000 * 60, "capped by demand");
+    assert!((sell[2].ratio - 1.4).abs() < 1e-9);
+
+    let no_carriers = db.price_deals(&DealQuery { include_carriers: false, ..q.clone() }).expect("deals");
+    assert!(no_carriers.iter().all(|d| !d.is_carrier));
+
+    let buy = db.price_deals(&DealQuery { mode: TradeMode::BuyFromStation, ..q.clone() }).expect("deals");
+    let names: Vec<&str> = buy.iter().map(|d| d.commodity.as_str()).collect();
+    assert_eq!(names, vec!["silver", "tritium"], "silver at a fifth of the average beats tritium at 80 %");
+    assert_eq!(buy[0].extra_value, 4_000 * 500);
+
+    let anywhere = db.price_deals(&DealQuery { max_distance_ly: None, ..q }).expect("deals");
+    assert_eq!(anywhere[0].station, "Far Out", "150 000 Cr over average beats the carrier when distance does not matter");
+}

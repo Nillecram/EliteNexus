@@ -11,7 +11,7 @@ use nexus_data::exploration::{is_scoopable, star_description};
 use nexus_model::location::distance;
 use nexus_model::GameState;
 use nexus_spansh::{
-    CarrierRouteRequest, ExobiologyRouteRequest, GalaxyRouteRequest, NeutronRouteRequest, RichesRouteRequest, RouteWaypoints, ShipProfile, Spansh,
+    CarrierRouteRequest, ExobiologyRouteRequest, GalaxyAlgorithm, GalaxyRouteRequest, NeutronRouteRequest, RichesRouteRequest, RouteWaypoints, ShipProfile, Spansh,
 };
 
 /// A route waypoint, whichever planner produced it.
@@ -67,8 +67,38 @@ pub struct NavUi {
     pub max_results: u32,
     pub min_value: u64,
     pub use_mapping: bool,
+    /// Exact plotter options (as on spansh.co.uk/exact-plotter).
+    pub exact: ExactOptions,
+    /// The planner's advanced options are shown (hidden by default).
+    pub show_options: bool,
     pub job: Slot<Result<PlannedRoute, String>>,
     pub planned: Option<PlannedRoute>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ExactOptions {
+    pub algorithm: GalaxyAlgorithm,
+    pub use_supercharge: bool,
+    pub use_injections: bool,
+    pub exclude_secondary: bool,
+    pub refuel_every_scoopable: bool,
+    pub already_supercharged: bool,
+    /// Fuel the route must leave in the tank, t.
+    pub reserve: f64,
+}
+
+impl Default for ExactOptions {
+    fn default() -> Self {
+        ExactOptions {
+            algorithm: GalaxyAlgorithm::Optimistic,
+            use_supercharge: true,
+            use_injections: false,
+            exclude_secondary: false,
+            refuel_every_scoopable: true,
+            already_supercharged: false,
+            reserve: 0.0,
+        }
+    }
 }
 
 impl Default for NavUi {
@@ -84,13 +114,25 @@ impl Default for NavUi {
             max_results: 25,
             min_value: 1_000_000,
             use_mapping: true,
+            exact: ExactOptions::default(),
+            show_options: false,
             job: Slot::default(),
             planned: None,
         }
     }
 }
 
-fn from_spansh(w: &nexus_spansh::Waypoint) -> Waypoint {
+fn algorithm_label(a: GalaxyAlgorithm) -> &'static str {
+    match a {
+        GalaxyAlgorithm::Optimistic => "Optimistic (fastest)",
+        GalaxyAlgorithm::Pessimistic => "Pessimistic",
+        GalaxyAlgorithm::Guided => "Neutron-guided",
+        GalaxyAlgorithm::Fuel => "Least fuel",
+        GalaxyAlgorithm::FuelJumps => "Least fuel, fewer jumps",
+    }
+}
+
+pub(crate) fn from_spansh(w: &nexus_spansh::Waypoint) -> Waypoint {
     let mut note = w.note.clone().unwrap_or_default();
     if !w.bodies.is_empty() {
         if !note.is_empty() {
@@ -185,23 +227,75 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut NavUi, auto_copy: &mut bool, s
 
 fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt: &tokio::runtime::Handle) {
     let ship_name = gs.fleet.current().map(|s| s.display_name());
+    // Smart defaults: start here, with the current ship's jump range.
+    if st.range <= 0.0 {
+        st.range = gs.fleet.current().map(|s| (s.max_jump_range * 10.0).round() / 10.0).filter(|r| *r > 0.0).unwrap_or(20.0);
+    }
     card(ui, "Spansh planner", |ui| {
+        // The simple surface: where from, where to, go.
         ui.horizontal_wrapped(|ui| {
             ui.label("From");
-            ui.add(egui::TextEdit::singleline(&mut st.from).desired_width(220.0));
-            if ui.small_button(icon::MAP_PIN).on_hover_text("Current system").clicked() {
-                st.from = gs.location.system.clone();
-            }
+            ui.add(egui::TextEdit::singleline(&mut st.from).hint_text(gs.location.system.as_str()).desired_width(220.0));
             if matches!(st.planner, Planner::Neutron | Planner::Exact | Planner::Carrier) {
                 ui.label("To");
                 ui.add(egui::TextEdit::singleline(&mut st.to).hint_text("destination system").desired_width(220.0));
             }
-            match st.planner {
+            let busy = st.job.busy();
+            let label = if busy { format!("{} Plotting…", icon::HOURGLASS) } else { format!("{} Plot route", icon::PATH) };
+            if ui.add_enabled(!busy, egui::Button::new(RichText::new(label).color(pal::ACCENT))).clicked() {
+                match make_request(gs, st, spansh) {
+                    Some(fut) => st.job.run_async(ui.ctx(), rt, fut),
+                    None => st.job.last = Some(Err("This planner needs your ship's loadout (fly it once) and a destination.".into())),
+                }
+            }
+            if busy {
+                ui.spinner();
+            }
+            let options = format!("{} Options", if st.show_options { icon::CARET_DOWN } else { icon::CARET_RIGHT });
+            if ui.add(egui::Button::new(RichText::new(options).small().color(pal::DIM)).frame(false)).clicked() {
+                st.show_options = !st.show_options;
+            }
+        });
+        let hint = match st.planner {
+            Planner::Exact => ship_name.clone().map(|n| format!("Plans every jump for {n}: its real FSD, mass, fuel and cargo, scooping stops and neutron boosts.")),
+            Planner::Neutron => Some(format!("Follows neutron stars with a {:.1} ly jump range.", st.range)),
+            Planner::Carrier => Some(format!("Tritium in the tank {} t · cargo {} t.", gs.carrier.fuel, gs.carrier.space.cargo)),
+            Planner::Riches => Some(format!("Valuable bodies to scan within {} ly.", st.radius)),
+            Planner::Exobiology => Some(format!("Planets with valuable species within {} ly.", st.radius)),
+            Planner::InGame => None,
+        };
+        if let Some(h) = hint {
+            ui.label(RichText::new(h).small().color(pal::DIM));
+        }
+        // The hidden depth: everything the Spansh website offers, collapsed by default.
+        if st.show_options {
+            ui.add_space(4.0);
+            ui.horizontal_wrapped(|ui| match st.planner {
                 Planner::Neutron => {
                     ui.label("Range");
                     ui.add(egui::DragValue::new(&mut st.range).range(5.0..=120.0).suffix(" ly"));
                     ui.label("Efficiency");
-                    ui.add(egui::DragValue::new(&mut st.efficiency).range(1..=100).suffix(" %"));
+                    ui.add(egui::DragValue::new(&mut st.efficiency).range(1..=100).suffix(" %"))
+                        .on_hover_text("Lower = more neutron detours for fewer jumps; higher = straighter route.");
+                }
+                Planner::Exact => {
+                    let o = &mut st.exact;
+                    egui::ComboBox::from_id_salt("exact-algo")
+                        .selected_text(algorithm_label(o.algorithm))
+                        .show_ui(ui, |ui| {
+                            for a in [GalaxyAlgorithm::Optimistic, GalaxyAlgorithm::Pessimistic, GalaxyAlgorithm::Guided, GalaxyAlgorithm::Fuel, GalaxyAlgorithm::FuelJumps] {
+                                ui.selectable_value(&mut o.algorithm, a, algorithm_label(a));
+                            }
+                        })
+                        .response
+                        .on_hover_text("Spansh routing strategy: Optimistic is usually fastest; Least fuel avoids scooping; Neutron-guided follows a neutron route.");
+                    ui.checkbox(&mut o.use_supercharge, "Neutron boosts");
+                    ui.checkbox(&mut o.use_injections, "FSD injections");
+                    ui.checkbox(&mut o.exclude_secondary, "Skip secondary stars");
+                    ui.checkbox(&mut o.refuel_every_scoopable, "Refuel at every scoopable");
+                    ui.checkbox(&mut o.already_supercharged, "Already supercharged");
+                    ui.label("Reserve");
+                    ui.add(egui::DragValue::new(&mut o.reserve).range(0.0..=64.0).speed(0.1).suffix(" t"));
                 }
                 Planner::Riches | Planner::Exobiology => {
                     if st.planner == Planner::Riches {
@@ -232,27 +326,11 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
                         st.min_value = (mv * 1e6) as u64;
                     }
                 }
-                Planner::Carrier => {
-                    let c = &gs.carrier;
-                    ui.label(RichText::new(format!("Tritium in tank {} t · cargo used {} t", c.fuel, c.space.cargo)).color(pal::DIM));
+                Planner::Carrier | Planner::InGame => {
+                    ui.label(RichText::new("No extra options for this planner.").small().color(pal::FAINT));
                 }
-                Planner::Exact => {
-                    ui.label(RichText::new(ship_name.clone().map(|n| format!("Uses {n}'s real FSD & loadout")).unwrap_or_else(|| "Needs a ship loadout".into())).color(pal::DIM));
-                }
-                Planner::InGame => {}
-            }
-            let busy = st.job.busy();
-            let label = if busy { format!("{} Plotting…", icon::HOURGLASS) } else { format!("{} Plot route", icon::PATH) };
-            if ui.add_enabled(!busy, egui::Button::new(RichText::new(label).color(pal::ACCENT))).clicked() {
-                match make_request(gs, st, spansh) {
-                    Some(fut) => st.job.run_async(ui.ctx(), rt, fut),
-                    None => st.job.last = Some(Err("This planner needs your ship's loadout (fly it once) and a destination.".into())),
-                }
-            }
-            if busy {
-                ui.spinner();
-            }
-        });
+            });
+        }
         if let Some(Err(e)) = &st.job.last {
             ui.label(RichText::new(e).color(pal::BAD));
         }
@@ -264,7 +342,10 @@ type PlanFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Plan
 
 fn make_request(gs: &GameState, st: &NavUi, spansh: &Spansh) -> Option<PlanFuture> {
     let sp = spansh.clone();
-    let from = st.from.trim().to_string();
+    let from = match st.from.trim() {
+        "" => gs.location.system.clone(),
+        f => f.to_string(),
+    };
     let to = st.to.trim().to_string();
     if from.is_empty() {
         return None;
@@ -293,9 +374,18 @@ fn make_request(gs: &GameState, st: &NavUi, spansh: &Spansh) -> Option<PlanFutur
             }
             let json = gs.fleet.current().and_then(|s| s.loadout_json.clone())?;
             let cargo = gs.inventory.cargo.total().max(0) as u32;
+            let o = st.exact;
             Some(Box::pin(async move {
                 let profile = ShipProfile::from_loadout_json(&json).map_err(|e| format!("Ship profile: {e:?}"))?;
-                let req = GalaxyRouteRequest::new(from.as_str(), to.as_str(), &profile).cargo(cargo);
+                let req = GalaxyRouteRequest::new(from.as_str(), to.as_str(), &profile)
+                    .cargo(cargo)
+                    .algorithm(o.algorithm)
+                    .use_supercharge(o.use_supercharge)
+                    .use_injections(o.use_injections, false)
+                    .exclude_secondary(o.exclude_secondary)
+                    .refuel_every_scoopable(o.refuel_every_scoopable)
+                    .already_supercharged(o.already_supercharged)
+                    .reserve(o.reserve);
                 let p = sp.galaxy_route(&req).await.map_err(|e| e.to_string())?;
                 let wps: Vec<Waypoint> = p.route.waypoints().iter().map(from_spansh).collect();
                 Ok(PlannedRoute {

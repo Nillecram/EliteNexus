@@ -19,6 +19,13 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 
 ## What works now
 
+* **Ask** — a built-in AI co-pilot: ask in plain words ("where can I make the most money in the next hour?") and it
+  answers from your ship, cargo, journal, the live market database and Spansh, with a knowledge base compiled into the
+  app. Tools it can use: price deals (stations paying far above the galactic average), sell-my-cargo, trade routes,
+  commodity search, nearest services, mining hotspots, system info, route and money-route planning (routes land on the
+  Navigation page), exobiology here, journal search. Setup is one pasted key (Google Gemini by default; Claude or a
+  local model optional).
+
 * **Dashboard** — commander, ranks & progress, credits, legal state, ship (fuel/hull/cargo/jump range/rebuy), location
   & system politics, session stats, current-system exploration value, holdings, fleet carrier, colonisation, activity feed.
 * **Exploration** — every body as you FSS it: type, distance, value now vs. mapped (MattG formula, Odyssey bonus, first

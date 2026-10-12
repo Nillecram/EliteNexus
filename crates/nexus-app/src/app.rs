@@ -82,6 +82,11 @@ pub struct NexusApp {
     market: crate::market::MarketService,
     market_ui: pages::market::MarketUi,
     colo: pages::colonisation::ColonisationUi,
+    /// The "Ask" assistant and its page state.
+    assistant: crate::assistant::AssistantService,
+    ask_ui: pages::ask::AskUi,
+    /// Routes the assistant planned, moved to the Navigation page each frame.
+    ai_routes: std::sync::Arc<parking_lot::Mutex<Option<pages::navigation::PlannedRoute>>>,
     // Command-line overrides: applied at runtime, never written to settings.json.
     overrides: Overrides,
     shot: Option<ScreenshotJob>,
@@ -136,6 +141,9 @@ impl NexusApp {
             market,
             market_ui,
             colo: Default::default(),
+            assistant: Default::default(),
+            ask_ui: Default::default(),
+            ai_routes: Default::default(),
             overrides: ov,
             shot,
             last_jump_count: None,
@@ -357,7 +365,7 @@ impl NexusApp {
         };
         let (title, subtitle) = page_heading(self.page, gs);
         widgets::page_title(ui, self.page.icon(), &title, &subtitle);
-        let scroll = !matches!(self.page, Page::Exploration | Page::Logbook | Page::GalaxyMap | Page::Fleet | Page::Navigation | Page::Bindings | Page::Market);
+        let scroll = !matches!(self.page, Page::Ask | Page::Exploration | Page::Logbook | Page::GalaxyMap | Page::Fleet | Page::Navigation | Page::Bindings | Page::Market);
         let page = self.page;
         let high_value = self.settings.high_value_threshold;
         let mut settings_changed = false;
@@ -370,6 +378,22 @@ impl NexusApp {
             Page::GalaxyMap => pages::galaxy_map::show(ui, gs, &mut self.map),
             Page::Mining => pages::mining::show(ui, gs),
             Page::Colonisation => pages::colonisation::show(ui, gs, &self.market, &mut self.colo),
+            Page::Ask => match pages::ask::show(ui, &mut self.assistant, &mut self.ask_ui, &mut self.settings.ai) {
+                pages::ask::AskAction::Ask(question) => {
+                    let tools = crate::ai_tools::NexusTools {
+                        model: self.core.model.clone(),
+                        db: self.market.db.clone(),
+                        index: self.core.index.clone(),
+                        spansh: self.spansh.clone(),
+                        rt: self.rt.handle().clone(),
+                        routes: self.ai_routes.clone(),
+                    };
+                    let context = crate::ai_tools::context_line(gs);
+                    self.assistant.ask(question, self.settings.ai.provider(), tools, context, ui.ctx());
+                }
+                pages::ask::AskAction::SettingsChanged => settings_changed = true,
+                pages::ask::AskAction::None => {}
+            },
             Page::Carrier => pages::carrier::show(ui, gs),
             Page::Engineering => settings_changed |= pages::engineering::show(ui, gs, &mut self.eng, &mut self.settings.wishlist),
             Page::Fleet => pages::fleet::show(ui, gs, &mut self.fleet),
@@ -568,11 +592,11 @@ fn service_indicators(
 }
 
 fn nav_item(ui: &mut Ui, page: Page, selected: bool) -> bool {
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 29.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 26.0), Sense::click());
     let p = ui.painter();
     if selected {
         p.rect_filled(rect.shrink2(Vec2::new(6.0, 1.0)), CornerRadius::same(7), pal::ACCENT_BG);
-        p.rect_filled(egui::Rect::from_min_size(rect.left_top() + Vec2::new(6.0, 6.0), Vec2::new(3.0, 17.0)), CornerRadius::same(2), pal::ACCENT);
+        p.rect_filled(egui::Rect::from_min_size(rect.left_top() + Vec2::new(6.0, 5.0), Vec2::new(3.0, 16.0)), CornerRadius::same(2), pal::ACCENT);
     } else if resp.hovered() {
         p.rect_filled(rect.shrink2(Vec2::new(6.0, 1.0)), CornerRadius::same(7), pal::CARD_HI);
     }
@@ -604,6 +628,17 @@ impl eframe::App for NexusApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.screenshot_tick(ctx);
         self.drain_alerts();
+        self.assistant.poll();
+        // A route the assistant planned goes to the Navigation page (and the clipboard flow).
+        if let Some(route) = self.ai_routes.lock().take() {
+            let first = route.waypoints.first().map(|w| w.system.clone());
+            self.toasts.push(Toast {
+                alert: Alert::new(nexus_journal::Timestamp::now(), nexus_model::AlertKind::Navigation, Priority::Low, format!("{} route ready", route.kind))
+                    .detail(first.map(|s| format!("{} · first stop {s} (see Navigation)", route.summary)).unwrap_or_else(|| route.summary.clone())),
+                born: Instant::now(),
+            });
+            self.nav.planned = Some(route);
+        }
         self.auto_copy_next();
         let here = self.core.model.read().active().and_then(|g| g.location.star_pos);
         self.market.set_origin(here);

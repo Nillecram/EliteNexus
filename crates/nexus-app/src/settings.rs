@@ -27,6 +27,31 @@ pub struct Settings {
     pub wishlist: Vec<WishItem>,
     /// Market price alerts, checked against every live market update.
     pub price_watches: Vec<PriceWatch>,
+    /// The "Ask" assistant's model service.
+    pub ai: AiSettings,
+}
+
+/// Which model answers "Ask" questions. The key is DPAPI-sealed (see secrets.rs).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AiSettings {
+    pub provider: nexus_ai::ProviderKind,
+    pub api_key: String,
+    /// Empty = automatic (the cheapest suitable model the service offers).
+    pub model: String,
+    /// Empty = the provider's default address (needed only for "Other").
+    pub base_url: String,
+}
+
+impl AiSettings {
+    /// The provider configuration with the key unsealed (for one request; never logged).
+    pub fn provider(&self) -> nexus_ai::ProviderConfig {
+        nexus_ai::ProviderConfig { kind: self.provider, api_key: crate::secrets::open(&self.api_key), model: self.model.trim().to_string(), base_url: self.base_url.trim().to_string() }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        !self.provider.needs_key() || !self.api_key.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -103,6 +128,7 @@ impl Default for Settings {
             welcomed: false,
             wishlist: Vec::new(),
             price_watches: Vec::new(),
+            ai: AiSettings::default(),
         }
     }
 }

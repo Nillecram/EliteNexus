@@ -29,6 +29,7 @@ Agents/parallel builds: set your own `CARGO_TARGET_DIR` (e.g. `target-agents\<na
 | `nexus-uplink` | **uploads**: EDDN (schema-validated, strictly compliant), EDSM journal sync, Inara, EDAstro; persistent retry queues (`nexus-data\uplink\*.jsonl`), per-service rate limits | journal |
 | `nexus-spansh` | Spansh API client: neutron/galaxy/carrier/riches/exobio/trade plotters, system/station/body search | — |
 | `nexus-binds` | `.binds` parser, conflicts/missing essentials, printable reference card | — |
+| `nexus-ai` | built-in assistant: providers (Gemini via its OpenAI-compatible endpoint, Claude Messages API with prompt caching, local/other OpenAI-compatible), tool-calling loop, embedded knowledge base (`knowledge/*.md` + `docs/USER_GUIDE.md`, BM25 search) | — |
 | `nexus-app` | egui 0.36 / eframe (wgpu) GUI, services wiring, TTS, toasts | everything |
 
 ## Runtime
@@ -46,8 +47,12 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
 ```
 
 * `app.rs` owns the services: `Core` (journal → model), `SyncService` (sync.rs → nexus-uplink),
-  `MarketService` (market.rs → nexus-galaxy + nexus-eddn), Spansh client, TTS. `finder.rs` holds market lookups shared
-  by pages (sell plan, colonisation suppliers).
+  `MarketService` (market.rs → nexus-galaxy + nexus-eddn, price alerts, Spansh import), `AssistantService`
+  (assistant.rs → nexus-ai on a worker thread; `ai_tools.rs` implements its 13 tools over the model, galaxy DB,
+  journal and Spansh), Spansh client, TTS. `finder.rs` holds market lookups shared by pages and tools (sell plan,
+  colonisation suppliers).
+* UI rule: simple surface, hidden depth. Defaults come from the commander's state; advanced options sit behind a
+  collapsed "› Options" disclosure, never removed.
 * History is folded with alerts **disabled**; only live events raise alerts or get uploaded. Never upload history.
   Test runs (`--journal-dir`, `--screenshot`) never upload at all.
 * The UI never blocks: long work (DB queries, HTTP) runs off-thread and results are polled each frame.

@@ -513,6 +513,64 @@ pub struct TradeRoute {
     pub hop_ly: f64,
 }
 
+/// "Deals": stations paying far above the galactic average for a commodity (sell) or selling it
+/// far below the average (buy).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DealQuery {
+    pub mode: TradeMode,
+    pub origin: Option<[f64; 3]>,
+    /// `None` = anywhere (a full scan: slower).
+    pub max_distance_ly: Option<f64>,
+    /// Price / average (sell) or average / price (buy) at least this, e.g. 1.25 = 25 % better.
+    pub min_ratio: f64,
+    pub min_pad: Option<char>,
+    pub include_carriers: bool,
+    pub max_age_hours: Option<f64>,
+    /// Tonnes one trip can move: caps a deal's value.
+    pub cargo_capacity: i64,
+    pub limit: usize,
+}
+
+impl Default for DealQuery {
+    fn default() -> Self {
+        DealQuery {
+            mode: TradeMode::SellToStation,
+            origin: None,
+            max_distance_ly: None,
+            min_ratio: 1.25,
+            min_pad: None,
+            include_carriers: true,
+            max_age_hours: Some(48.0),
+            cargo_capacity: 100,
+            limit: 25,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Deal {
+    pub commodity: String,
+    pub commodity_name: String,
+    pub price: i64,
+    /// The in-game galactic average price.
+    pub average: i64,
+    /// price / average (sell) or average / price (buy).
+    pub ratio: f64,
+    /// Demand (sell) or stock (buy).
+    pub quantity: i64,
+    /// Credits better than average for min(quantity, cargo) tonnes.
+    pub extra_value: i64,
+    /// Credits paid (sell) or spent (buy) for min(quantity, cargo) tonnes.
+    pub trade_value: i64,
+    pub station: String,
+    pub system: String,
+    pub market_id: u64,
+    pub distance_ly: Option<f64>,
+    pub max_pad: Option<char>,
+    pub is_carrier: bool,
+    pub updated_unix: i64,
+}
+
 // ---------------------------------------------------------------------------------------------
 // Misc
 // ---------------------------------------------------------------------------------------------

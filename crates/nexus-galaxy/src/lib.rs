@@ -30,6 +30,7 @@
 
 mod commodities;
 mod convert;
+mod deals;
 mod error;
 mod index;
 mod model;
@@ -344,6 +345,11 @@ impl GalaxyDb {
     /// Best single-hop trade routes near an origin.
     pub fn trade_routes(&self, q: &TradeQuery) -> Result<Vec<TradeRoute>> {
         trade::trade_routes(&self.inner.pool, &self.inner.shared, q)
+    }
+
+    /// Prices far better than the galactic average near an origin, best value for one hold first.
+    pub fn price_deals(&self, q: &DealQuery) -> Result<Vec<Deal>> {
+        deals::price_deals(&self.inner.pool, &self.inner.shared, q)
     }
 
     /// Recorded price changes of one commodity at one station, oldest first.

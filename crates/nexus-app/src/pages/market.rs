@@ -76,6 +76,10 @@ pub struct MarketUi {
     sell_key: (i64, i64, u64),
     /// The rule being composed in "Price alerts".
     pub new_watch: PriceWatch,
+    /// Find commodity: filters shown (hidden by default).
+    pub show_options: bool,
+    /// The pad filter follows the current ship until the user picks one.
+    pub pad_auto: bool,
 }
 
 impl Default for MarketUi {
@@ -106,6 +110,8 @@ impl Default for MarketUi {
             sell_radius: 60.0,
             sell_key: (0, 0, 0),
             new_watch: PriceWatch::default(),
+            show_options: false,
+            pad_auto: true,
         }
     }
 }
@@ -207,49 +213,68 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
     let mut changed = false;
     match st.tab {
         Tab::Commodity => {
+            // Smart default: the landing pad the current ship needs (until the user picks one).
+            if st.pad_auto {
+                st.min_pad = crate::finder::ship_pad(gs);
+            }
+            let mut search = false;
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new(icon::MAGNIFYING_GLASS).color(pal::DIM));
-                ui.add(egui::TextEdit::singleline(&mut st.commodity).hint_text("Commodity (e.g. Tritium, Gold, Painite)").desired_width(220.0));
-                ui.selectable_value(&mut st.mode, TradeMode::BuyFromStation, "I want to buy");
-                ui.selectable_value(&mut st.mode, TradeMode::SellToStation, "I want to sell");
-                ui.label("within");
-                ui.add(egui::DragValue::new(&mut st.max_dist).range(1.0..=1000.0).suffix(" ly"));
-                pad_combo(ui, "mpad", &mut st.min_pad);
-                ui.label("max age");
-                ui.add(egui::DragValue::new(&mut st.max_age_h).range(1.0..=720.0).suffix(" h"));
-                ui.label("min qty");
-                ui.add(egui::DragValue::new(&mut st.min_qty).range(1..=100_000));
-                ui.checkbox(&mut st.carriers, "Carriers");
-                ui.checkbox(&mut st.planetary, "Planetary");
-                egui::ComboBox::from_id_salt("msort")
-                    .selected_text(match st.sort {
-                        Sort::BestPrice => "Best price",
-                        Sort::Nearest => "Nearest",
-                        Sort::Freshest => "Freshest",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut st.sort, Sort::BestPrice, "Best price");
-                        ui.selectable_value(&mut st.sort, Sort::Nearest, "Nearest");
-                        ui.selectable_value(&mut st.sort, Sort::Freshest, "Freshest");
-                    });
-                if ui.button(RichText::new(format!("{} Search", icon::MAGNIFYING_GLASS)).color(pal::ACCENT)).clicked() && !st.commodity.trim().is_empty() {
-                    let q = CommodityQuery {
-                        commodity: st.commodity.trim().to_string(),
-                        mode: st.mode,
-                        origin,
-                        max_distance_ly: origin.map(|_| st.max_dist),
-                        min_pad: st.min_pad,
-                        max_age_hours: Some(st.max_age_h),
-                        min_quantity: st.min_qty,
-                        include_carriers: st.carriers,
-                        include_planetary: st.planetary,
-                        limit: 100,
-                        sort: st.sort,
-                    };
-                    let db = db.clone();
-                    st.hits.run(&ctx, move || db.search_commodity(&q).map_err(|e| e.to_string()));
+                let field = ui.add(egui::TextEdit::singleline(&mut st.commodity).hint_text("Commodity (e.g. Tritium, Gold, Painite)").desired_width(220.0));
+                search |= field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                ui.selectable_value(&mut st.mode, TradeMode::BuyFromStation, "Buy");
+                ui.selectable_value(&mut st.mode, TradeMode::SellToStation, "Sell");
+                search |= ui.button(RichText::new(format!("{} Search", icon::MAGNIFYING_GLASS)).color(pal::ACCENT)).clicked();
+                let caret = if st.show_options { icon::CARET_DOWN } else { icon::CARET_RIGHT };
+                if ui.add(egui::Button::new(RichText::new(format!("{caret} Options")).small().color(pal::DIM)).frame(false)).clicked() {
+                    st.show_options = !st.show_options;
                 }
             });
+            if st.show_options {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("within");
+                    ui.add(egui::DragValue::new(&mut st.max_dist).range(1.0..=1000.0).suffix(" ly"));
+                    let before = st.min_pad;
+                    pad_combo(ui, "mpad", &mut st.min_pad);
+                    if st.min_pad != before {
+                        st.pad_auto = false;
+                    }
+                    ui.label("max age");
+                    ui.add(egui::DragValue::new(&mut st.max_age_h).range(1.0..=720.0).suffix(" h"));
+                    ui.label("min qty");
+                    ui.add(egui::DragValue::new(&mut st.min_qty).range(1..=100_000));
+                    ui.checkbox(&mut st.carriers, "Carriers");
+                    ui.checkbox(&mut st.planetary, "Planetary");
+                    egui::ComboBox::from_id_salt("msort")
+                        .selected_text(match st.sort {
+                            Sort::BestPrice => "Best price",
+                            Sort::Nearest => "Nearest",
+                            Sort::Freshest => "Freshest",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut st.sort, Sort::BestPrice, "Best price");
+                            ui.selectable_value(&mut st.sort, Sort::Nearest, "Nearest");
+                            ui.selectable_value(&mut st.sort, Sort::Freshest, "Freshest");
+                        });
+                });
+            }
+            if search && !st.commodity.trim().is_empty() {
+                let q = CommodityQuery {
+                    commodity: st.commodity.trim().to_string(),
+                    mode: st.mode,
+                    origin,
+                    max_distance_ly: origin.map(|_| st.max_dist),
+                    min_pad: st.min_pad,
+                    max_age_hours: Some(st.max_age_h),
+                    min_quantity: st.min_qty,
+                    include_carriers: st.carriers,
+                    include_planetary: st.planetary,
+                    limit: 100,
+                    sort: st.sort,
+                };
+                let db = db.clone();
+                st.hits.run(&ctx, move || db.search_commodity(&q).map_err(|e| e.to_string()));
+            }
             results_commodity(ui, &st.hits, st.mode);
         }
         Tab::Routes => {
