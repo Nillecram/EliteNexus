@@ -180,11 +180,12 @@ impl NexusTools {
         let q = DealQuery {
             mode: if buy { TradeMode::BuyFromStation } else { TradeMode::SellToStation },
             origin: Some(origin),
-            max_distance_ly: Some(arg_f64(a, "max_distance_ly").unwrap_or(80.0)),
+            // 0 = anywhere: the whole-database abnormal-price scan.
+            max_distance_ly: Some(arg_f64(a, "max_distance_ly").unwrap_or(80.0)).filter(|d| *d > 0.0),
             min_ratio: arg_f64(a, "min_ratio").unwrap_or(1.3),
             min_pad: me.pad,
             include_carriers: arg_bool(a, "include_carriers").unwrap_or(true),
-            max_age_hours: Some(48.0),
+            max_age_hours: Some(arg_f64(a, "max_age_hours").unwrap_or(48.0).clamp(1.0, 720.0)),
             cargo_capacity: cargo,
             limit: arg_f64(a, "limit").map(|v| v as usize).unwrap_or(10).clamp(1, 25),
         };
@@ -1405,13 +1406,14 @@ pub fn specs() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "price_deals",
-            description: "Best deals right now: stations paying far above the galactic average for any commodity (mode sell) or selling far below it (mode buy), ranked by what one full hold of the commander's ship earns. The fastest way to find unusually profitable trades, including fleet-carrier buy orders.",
+            description: "Best deals and abnormal prices right now: stations and fleet carriers paying far above the galactic average for any commodity (mode sell) or selling far below it (mode buy), ranked by what one full hold of the commander's ship earns. The fastest way to find unusually profitable trades. For abnormal prices anywhere (most are fleet-carrier orders, e.g. a carrier paying 100× the normal price), use max_distance_ly 0 and min_ratio 2 or more.",
             parameters: schema(
                 json!({
                     "mode": { "type": "string", "enum": ["sell", "buy"] },
                     "near_system": { "type": "string", "description": NEAR },
-                    "max_distance_ly": { "type": "number", "description": "Default 80." },
-                    "min_ratio": { "type": "number", "description": "How much better than average, e.g. 1.3 = 30 % (default)." },
+                    "max_distance_ly": { "type": "number", "description": "Default 80. 0 = anywhere in the galaxy." },
+                    "min_ratio": { "type": "number", "description": "How much better than average, e.g. 1.3 = 30 % (default); 2 = double; 10 = ten times." },
+                    "max_age_hours": { "type": "number", "description": "Only prices reported in the last N hours. Default 48." },
                     "include_carriers": { "type": "boolean" },
                     "limit": { "type": "integer" }
                 }),

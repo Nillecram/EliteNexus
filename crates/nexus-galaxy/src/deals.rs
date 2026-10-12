@@ -43,7 +43,24 @@ struct Cand {
     trade: i64,
 }
 
+/// Partial indexes over exactly the rows an abnormal-price scan reads: prices already 1.5× off
+/// their galactic average, and every unpriced order (fleet carriers report no average, and most
+/// abnormal prices are carrier orders). SQLite keeps them current on every write, so a whole-galaxy
+/// scan touches only these rows. Created by `schema::open_writer`.
+pub(crate) const ANOMALY_INDEXES: &str = "
+CREATE INDEX IF NOT EXISTS market_sell_high ON market(updated) WHERE mean > 0 AND sell > 0 AND demand > 0 AND sell * 2 >= mean * 3;
+CREATE INDEX IF NOT EXISTS market_buy_low ON market(updated) WHERE mean > 0 AND buy > 0 AND stock > 0 AND buy * 3 <= mean * 2;
+CREATE INDEX IF NOT EXISTS market_unpriced_buyers ON market(updated) WHERE mean <= 0 AND sell > 0 AND demand > 0;
+CREATE INDEX IF NOT EXISTS market_unpriced_sellers ON market(updated) WHERE mean <= 0 AND buy > 0 AND stock > 0;
+";
+
+/// The multiple from which the anomaly indexes hold every qualifying row.
+const INDEXED_RATIO: f64 = 1.5;
+
 pub(crate) fn price_deals(pool: &ReadPool, shared: &Shared, q: &DealQuery) -> Result<Vec<Deal>> {
+    if q.min_ratio >= INDEXED_RATIO {
+        return abnormal_prices(pool, shared, q);
+    }
     let cutoff = match q.max_age_hours {
         Some(h) if h.is_finite() && h > 0.0 => now_unix() - (h * 3600.0) as i64,
         _ => 1,
@@ -186,11 +203,126 @@ pub(crate) fn price_deals(pool: &ReadPool, shared: &Shared, q: &DealQuery) -> Re
     cands.truncate(q.limit.clamp(1, 500));
 
     // 5. names and station details for the winners
+    finish(&conn, shared, &rows, cands)
+}
+
+/// Whole-database scan for prices at least `min_ratio` (≥ 1.5) off their galactic average, read
+/// through the anomaly indexes. Unpriced rows (fleet carriers) are compared with the average the
+/// stations report for that commodity.
+fn abnormal_prices(pool: &ReadPool, shared: &Shared, q: &DealQuery) -> Result<Vec<Deal>> {
+    let cutoff = match q.max_age_hours {
+        Some(h) if h.is_finite() && h > 0.0 => now_unix() - (h * 3600.0) as i64,
+        _ => 1,
+    };
+    let filter = StationFilter {
+        min_pad: match q.min_pad.and_then(Pad::from_char) {
+            Some(Pad::Medium) => 2,
+            Some(Pad::Large) => 3,
+            _ => 0,
+        },
+        carriers: q.include_carriers,
+        planetary: true,
+        max_dist_ls: -1.0,
+    };
+    let radius = q.max_distance_ly.filter(|d| d.is_finite() && *d >= 0.0);
+    // The WHERE clauses repeat the index conditions word for word, so SQLite uses the indexes.
+    let (priced, unpriced) = match q.mode {
+        TradeMode::SellToStation => (
+            "SELECT market_id, commodity_id, buy, sell, mean, stock, demand, updated FROM market              WHERE mean > 0 AND sell > 0 AND demand > 0 AND sell * 2 >= mean * 3 AND updated >= ?1",
+            "SELECT market_id, commodity_id, buy, sell, mean, stock, demand, updated FROM market              WHERE mean <= 0 AND sell > 0 AND demand > 0 AND updated >= ?1",
+        ),
+        TradeMode::BuyFromStation => (
+            "SELECT market_id, commodity_id, buy, sell, mean, stock, demand, updated FROM market              WHERE mean > 0 AND buy > 0 AND stock > 0 AND buy * 3 <= mean * 2 AND updated >= ?1",
+            "SELECT market_id, commodity_id, buy, sell, mean, stock, demand, updated FROM market              WHERE mean <= 0 AND buy > 0 AND stock > 0 AND updated >= ?1",
+        ),
+    };
+    let conn = pool.get()?;
+    let mut rows: Vec<Row> = Vec::new();
+    {
+        let idx = shared.stations.read();
+        for sql in [priced, unpriced] {
+            let mut stmt = conn.prepare_cached(sql)?;
+            let mut it = stmt.query([cutoff])?;
+            while let Some(r) = it.next()? {
+                let market: i64 = r.get(0)?;
+                // Station filters and distance from the in-memory index (no extra queries).
+                let Some(s) = idx.get(market) else { continue };
+                if !filter.passes(s) {
+                    continue;
+                }
+                let d = match (q.origin, s.pos) {
+                    (Some(o), Some(p)) => Some(dist(o, p)),
+                    _ => None,
+                };
+                if let Some(rad) = radius
+                    && !d.is_some_and(|d| d <= rad)
+                {
+                    continue;
+                }
+                rows.push(Row {
+                    market,
+                    dist: d,
+                    cid: r.get(1)?,
+                    buy: r.get(2)?,
+                    sell: r.get(3)?,
+                    mean: r.get(4)?,
+                    stock: r.get(5)?,
+                    demand: r.get(6)?,
+                    updated: r.get(7)?,
+                });
+            }
+        }
+    }
+    // Averages for unpriced rows, one lookup per commodity.
+    let mut reference: FxHashMap<i64, Option<i64>> = FxHashMap::default();
+    let cap = q.cargo_capacity.max(1);
+    let mut cands: Vec<Cand> = Vec::new();
+    for (i, r) in rows.iter().enumerate() {
+        let average = if r.mean > 0 {
+            r.mean
+        } else {
+            let avg = match reference.get(&r.cid) {
+                Some(a) => *a,
+                None => {
+                    let a = global_average(&conn, r.cid)?;
+                    reference.insert(r.cid, a);
+                    a
+                }
+            };
+            match avg {
+                Some(a) if a > 0 => a,
+                _ => continue,
+            }
+        };
+        match q.mode {
+            TradeMode::SellToStation => {
+                if (r.sell as f64) < average as f64 * q.min_ratio {
+                    continue;
+                }
+                let t = r.demand.min(cap);
+                cands.push(Cand { row: i, price: r.sell, average, ratio: r.sell as f64 / average as f64, quantity: r.demand, extra: (r.sell - average) * t, trade: r.sell * t });
+            }
+            TradeMode::BuyFromStation => {
+                if (r.buy as f64) * q.min_ratio > average as f64 {
+                    continue;
+                }
+                let t = r.stock.min(cap);
+                cands.push(Cand { row: i, price: r.buy, average, ratio: average as f64 / r.buy as f64, quantity: r.stock, extra: (average - r.buy) * t, trade: r.buy * t });
+            }
+        }
+    }
+    cands.sort_by_key(|c| std::cmp::Reverse(c.extra));
+    cands.truncate(q.limit.clamp(1, 500));
+    finish(&conn, shared, &rows, cands)
+}
+
+/// Names and station details for the winning rows.
+fn finish(conn: &Connection, shared: &Shared, rows: &[Row], cands: Vec<Cand>) -> Result<Vec<Deal>> {
     let commodities = shared.commodities.read();
     let mut out = Vec::with_capacity(cands.len());
     for c in cands {
         let r = &rows[c.row];
-        let Some(st) = station(&conn, r.market as u64)? else { continue };
+        let Some(st) = station(conn, r.market as u64)? else { continue };
         let (symbol, name) = commodities
             .meta(r.cid)
             .map(|m| (m.symbol.clone(), m.name.clone()))

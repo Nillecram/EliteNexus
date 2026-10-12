@@ -224,6 +224,8 @@ pub(crate) fn open_writer(path: &std::path::Path) -> Result<Connection> {
         conn.execute_batch(DROP_ALL)?;
     }
     conn.execute_batch(TABLES)?;
+    // Abnormal-price scans (built once on an existing database, then maintained by SQLite).
+    conn.execute_batch(crate::deals::ANOMALY_INDEXES)?;
     add_missing_columns(&conn)?;
     conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION}"))?;
     seed_commodities(&conn)?;
