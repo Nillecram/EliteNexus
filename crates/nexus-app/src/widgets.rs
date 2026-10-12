@@ -310,14 +310,19 @@ pub fn footnote(ui: &mut Ui, text: &str) {
 // ---------------------------------------------------------------------------------------------
 // Text and figures
 
-/// Large number with a small caption underneath.
+/// Large number with a small caption underneath. Never breaks inside: measured first, so in a
+/// wrapping row the whole figure moves to the next line.
 pub fn stat(ui: &mut Ui, caption: &str, value: impl Into<String>, color: Color32) -> Response {
-    ui.vertical(|ui| {
-        ui.spacing_mut().item_spacing.y = 0.0;
-        ui.label(RichText::new(value.into()).font(display(24.0)).color(color));
-        ui.label(RichText::new(caption).size(size::FOOTNOTE).color(pal::DIM));
-    })
-    .response
+    let v = ui.painter().layout_no_wrap(value.into(), display(24.0), color);
+    let c = ui.painter().layout_no_wrap(caption.to_owned(), FontId::proportional(size::FOOTNOTE), pal::DIM);
+    let size = Vec2::new(v.size().x.max(c.size().x), v.size().y + c.size().y);
+    let (rect, resp) = ui.allocate_exact_size(size, Sense::hover());
+    if ui.is_rect_visible(rect) {
+        let vh = v.size().y;
+        ui.painter().galley(rect.min, v, color);
+        ui.painter().galley(rect.min + Vec2::new(0.0, vh), c, pal::DIM);
+    }
+    resp
 }
 
 /// Key/value line for inside a `Grid`.

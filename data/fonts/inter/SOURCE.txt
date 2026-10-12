@@ -1,0 +1,12 @@
+Source:    https://github.com/rsms/inter  (release v4.1, 2024-11-16)
+Retrieved: 2026-10-12 via https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip
+Files:     extras/ttf/Inter-Regular.ttf, Inter-SemiBold.ttf, Inter-Bold.ttf (static) and LICENSE.txt.
+Modified:  the character map no longer lists Private Use Area code points (U+E000..U+F8FF): Inter maps
+           745 of them to stylistic alternates, which would shadow the Phosphor icon font that uses the
+           same range. Done with tools/fonts/strip_private_use.py; outlines, metrics and every other
+           table are unchanged. The licence declares no Reserved Font Name, so the name is kept.
+LICENSE:   SIL Open Font License 1.1 (LICENSE.txt). Bundling the fonts inside the program is allowed;
+           the licence text must ship with it (it is in this folder and in NOTICE.md). The fonts are
+           not sold on their own and their names are unchanged.
+Used for:  all interface text (theme.rs embeds them with include_bytes!), the closest open match to
+           Apple's SF Pro.

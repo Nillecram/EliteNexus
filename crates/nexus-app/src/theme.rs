@@ -2,7 +2,7 @@
 //!
 //! Charcoal layers rather than pure black, Apple's system colours for meaning, one accent (Elite
 //! orange, which is also Apple's system orange), hairline separators instead of boxes, and a clear
-//! type scale. Text uses Segoe UI on Windows; Inter or SF Pro are used instead when installed.
+//! type scale set in Inter (bundled; the open typeface closest to Apple's SF Pro).
 
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Margin, Shadow, Stroke, TextStyle};
 use std::sync::Arc;
@@ -96,21 +96,29 @@ fn find_font(names: &[&str]) -> Option<Vec<u8>> {
     names.iter().find_map(|n| dirs.iter().find_map(|d| std::fs::read(d.join(n)).ok()))
 }
 
-/// Font files per weight: SF Pro or Inter when installed, else Segoe UI (on every Windows PC).
-const REGULAR: &[&str] = &["SF-Pro-Text-Regular.otf", "Inter-Regular.ttf", "Inter-Regular.otf", "segoeui.ttf"];
-const SEMIBOLD: &[&str] = &["SF-Pro-Text-Semibold.otf", "Inter-SemiBold.ttf", "Inter-SemiBold.otf", "seguisb.ttf", "segoeuib.ttf"];
-const BOLD: &[&str] = &["SF-Pro-Display-Bold.otf", "Inter-Bold.ttf", "Inter-Bold.otf", "segoeuib.ttf", "seguisb.ttf"];
-const LIGHT: &[&str] = &["SF-Pro-Display-Light.otf", "Inter-Light.ttf", "Inter-Light.otf", "segoeuil.ttf", "segoeuisl.ttf"];
-const MONO: &[&str] = &["SF-Mono-Regular.otf", "CascadiaMono.ttf", "consola.ttf"];
+/// Inter (SIL OFL 1.1, data/fonts/inter): the closest open match to Apple's SF Pro, compiled in so
+/// every PC gets the same type.
+const INTER_REGULAR: &[u8] = include_bytes!("../../../data/fonts/inter/Inter-Regular.ttf");
+const INTER_SEMIBOLD: &[u8] = include_bytes!("../../../data/fonts/inter/Inter-SemiBold.ttf");
+const INTER_BOLD: &[u8] = include_bytes!("../../../data/fonts/inter/Inter-Bold.ttf");
+/// Monospace from the system (Cascadia Mono on Windows 11, Consolas everywhere).
+const MONO: &[&str] = &["CascadiaMono.ttf", "consola.ttf"];
 
 pub fn install(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
     egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
 
-    if let Some(bytes) = find_font(REGULAR) {
-        fonts.font_data.insert("ui".into(), Arc::new(FontData::from_owned(bytes)));
+    fonts.font_data.insert("ui".into(), Arc::new(FontData::from_static(INTER_REGULAR)));
+    if let Some(f) = fonts.families.get_mut(&FontFamily::Proportional) {
+        // Inter first for text. Its private-use mappings were removed (tools/fonts), so icon code
+        // points fall through to Phosphor.
+        f.insert(0, "ui".into());
+    }
+    // Segoe UI as a fallback for glyphs Inter lacks, then emoji.
+    if let Some(bytes) = find_font(&["segoeui.ttf"]) {
+        fonts.font_data.insert("segoe".into(), Arc::new(FontData::from_owned(bytes)));
         if let Some(f) = fonts.families.get_mut(&FontFamily::Proportional) {
-            f.insert(0, "ui".into());
+            f.push("segoe".into());
         }
     }
     if let Some(bytes) = find_font(&["seguiemj.ttf"]) {
@@ -127,12 +135,9 @@ pub fn install(ctx: &egui::Context) {
     }
     // Each weight falls back to the regular stack (icons, emoji, missing glyphs).
     let proportional = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
-    for (family, files) in [("semibold", SEMIBOLD), ("bold", BOLD), ("light", LIGHT)] {
-        let mut stack = Vec::new();
-        if let Some(bytes) = find_font(files) {
-            fonts.font_data.insert(family.into(), Arc::new(FontData::from_owned(bytes)));
-            stack.push(family.to_string());
-        }
+    for (family, bytes) in [("semibold", INTER_SEMIBOLD), ("bold", INTER_BOLD)] {
+        fonts.font_data.insert(family.into(), Arc::new(FontData::from_static(bytes)));
+        let mut stack = vec![family.to_string()];
         stack.extend(proportional.iter().cloned());
         fonts.families.insert(FontFamily::Name(family.into()), stack);
     }

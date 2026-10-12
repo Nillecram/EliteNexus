@@ -14,6 +14,7 @@ Each source's licence text and exact commit are kept next to the data in `data/*
 | MattG's exploration value formulae (Frontier forums) | cartographic value estimates | facts only | |
 | Spansh, EDSM, Inara, EDDN, EDAstro | live services the app talks to (uploads opt-in) | their own terms | See `docs/research/` for each API's usage rules. The optional Spansh station import streams Spansh's public daily dump into the local database. |
 | EDDN JSON schemas + READMEs (EDCD/EDDN, `docs/research/eddn-schemas`) | validating every upload in tests | BSD-3-Clause | Test-only; not in the binary. Add EDDN's `LICENSE` file there before sharing the source. |
+| Inter by Rasmus Andersson (`data/fonts/inter`) | interface typeface, compiled into the exe | SIL Open Font License 1.1 | Licence text in `data/fonts/inter/LICENSE.txt`; ship it with binaries (the release zip includes this NOTICE). |
 | Phosphor Icons (egui-phosphor) | UI icons | MIT | |
 | SQLite (via rusqlite, bundled) | local galaxy/market database | public domain | |
 | zeromq (zmq.rs) | EDDN relay subscriber | MIT | |
