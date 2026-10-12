@@ -1,5 +1,6 @@
 # Push a tag like v0.1.0 (GitHub Desktop: History → right-click a commit → Create Tag, then Push)
-# and this builds EliteNexus.exe and publishes it as a GitHub Release.
+# and this builds EliteNexus.exe and publishes it as a GitHub Release, with that version's section of
+# CHANGELOG.md as the release notes. See AGENTS.md › Releases.
 name: Release
 
 on:
@@ -27,7 +28,27 @@ jobs:
           # The bundled Inter font's licence (SIL OFL) travels with the program.
           Copy-Item data\fonts\inter\LICENSE.txt "out\$name\Inter-LICENSE.txt"
           Compress-Archive -Path "out\$name\*" -DestinationPath "out\$name.zip"
+      - name: Release notes
+        shell: pwsh
+        run: |
+          # This version's "## [x.y.z]" section of CHANGELOG.md, up to the next "## " heading.
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $lines = @(Get-Content CHANGELOG.md)
+          $heading = "^## \[$([regex]::Escape($version))\]"
+          $notes = @()
+          $inside = $false
+          foreach ($l in $lines) {
+            if ($l -match '^## ') { if ($inside) { break }; $inside = $l -match $heading; continue }
+            if (-not $inside) { continue }
+            # The file is hard-wrapped, but release pages turn every newline into a line break: join a
+            # wrapped line onto the one before unless it starts a list item, a heading or a paragraph.
+            $continues = $notes.Count -gt 0 -and $notes[-1].Trim() -and $l.Trim() -and $l -notmatch '^\s*(#|[-*]\s|\d+\.\s)'
+            if ($continues) { $notes[-1] = $notes[-1] + ' ' + $l.Trim() } else { $notes += $l }
+          }
+          if (-not ($notes -join '').Trim()) { $notes = @('See CHANGELOG.md for what changed.') }
+          $notes | Set-Content out\notes.md -Encoding utf8NoBOM
       - uses: softprops/action-gh-release@v2
         with:
           files: out/*.zip
+          body_path: out/notes.md
           generate_release_notes: true

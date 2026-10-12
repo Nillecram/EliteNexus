@@ -14,11 +14,15 @@ cargo build --release -p nexus-app    # → target\release\EliteNexus.exe
 cargo test --workspace
 ```
 
+On the dev machine the game is often running: build through `tools\dev\cargo.ps1` (BelowNormal priority, logs in
+`target\cc\`) and check the UI with `tools\dev\shot.ps1`; `AGENTS.md` has the rules for agents and contributors.
 Agents/parallel builds: set your own `CARGO_TARGET_DIR` (e.g. `target-agents\<name>`) to avoid lock contention.
 `EliteNexus.exe --page Exploration --screenshot out.png` renders a page after loading and saves a PNG (used for UI checks;
 the window is placed off-screen and never takes focus). `--size 1000x700` tests responsive layouts, `--tab <name>` opens
-a Market section (`abnormal`, `database`, …) or the whole-galaxy map (`galaxy`), `--demo` adds a sample Ask conversation
-and an alert banner, `--shot-delay 8` waits longer (the galaxy image paints in the background).
+a Market section (`abnormal`, `database`, …), the whole-galaxy map (`galaxy`), an Exploration tab (`find`, `history`,
+`unsold`) or Exobiology › Find planets (`untouched`, `known`; these three searches start on the first frame of a
+screenshot run), `--demo` adds a sample Ask conversation and an alert banner, `--shot-delay 8` waits longer (the galaxy
+image paints in the background, Spansh searches take 5–20 s).
 
 ## Crates
 
@@ -54,8 +58,17 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
   (assistant.rs → nexus-ai on a worker thread; `ai_tools.rs` implements its 15 tools over the model, galaxy DB,
   journal and Spansh), Spansh client, TTS. `finder.rs` holds market lookups shared by pages and tools (sell plan,
   colonisation suppliers).
+* Routes and tours: Navigation holds one `PlannedRoute` (pages/navigation.rs) that drives the "next system →
+  clipboard" automation and the galaxy map. It tracks progress by arrival (`advance`), so a loop that starts here isn't
+  finished at once. Navigation plans travel itself (neutron, exact, carrier); scan tours are planned on the page they
+  serve and handed over: `tours.rs` wraps Spansh's Road to Riches (Exploration › Find valuable bodies) and exobiology
+  planner (Exobiology › Find planets › Sure value), widening the radius while Spansh answers with nothing (it skips
+  populated systems), builds nearest-first tours through planets found here, and holds Spansh's own limits
+  (`tours::limits`). `untouched.rs` is the bonus hunt: a Spansh body search classified by the evidence of someone
+  having been there (genera = mapped, biology landmarks = sampled, footfall), with every exclusion counted in `Stats`
+  so the page can say why planets were left out.
 * UI rule: simple surface, hidden depth. Defaults come from the commander's state; advanced options sit behind a
-  collapsed "› Options" disclosure, never removed.
+  collapsed "› Options" disclosure, never removed. Say where data comes from and what it can't show.
 * Design system (macOS 26 dark, Liquid-Glass sidebar and toolbar): `theme.rs` holds the palette (`pal`), the type scale
   (`size`, nothing below 12 pt) and the egui style; `widgets.rs` the components: `card`/`card_tinted` (Health-style
   headers), `cards` (responsive grid with equal-height rows), `split`, `group` rows with switches (System Settings
@@ -84,7 +97,9 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
 
 ## Licensing notes
 
-* EDCD/FDevIDs CSVs (data/fdevids) have **no licence file** — fine for a private build; ask EDCD before distributing binaries.
+* The repository and its GitHub releases are public, but there is no `LICENSE` yet: the owner's decision.
+* EDCD/FDevIDs CSVs (data/fdevids) have **no licence file**; releases now distribute binaries, so ask EDCD.
+* EDGalaxyData (online footfall lookups, `ai_tools::ONLINE_FOOTFALL_LOOKUP`) publishes no terms: ask its operator.
 * EDEngineer data (MIT), EDDiscovery sources (Apache-2.0), ed-journal-schemas (Apache-2.0): attribution in data/*/SOURCE.txt.
 * coriolis-data / EDSY data are Frontier IP / CC BY-NC: link to the sites, don't bundle their data.
 * Exobiology dataset is a factual compilation incl. facts from GPL tools — no GPL code is copied.

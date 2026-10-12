@@ -5,7 +5,7 @@ There is no single best method; it depends on the ship, the time available and w
 - Exobiology (Odyssey, on foot or in an SRV): the most reliable high earner for explorers. Single species are worth up to about 20M Cr, and five times that when the commander is the first to log the species on that body. A good planet with several valuable species can pay 50–100M Cr, and a planned exobiology trip can reach a billion credits.
 - Mining: laser mining Platinum or Painite in overlapping hotspots, or core mining Void Opals and Low Temperature Diamonds, can pay over 100M Cr per hour in a large ship when sell prices are high. Prices move a lot; check the best sell price before mining.
 - Trading: buy low and sell high on a route; large-pad ships with 700 t of cargo make tens of millions per loop on a good route. Fleet-carrier buy orders and unusual station prices ("deals") can pay far more than normal markets.
-- Exploration (scanning): Earth-like worlds, water worlds, ammonia worlds and terraformable planets are worth the most, especially with first-discovery and first-mapped bonuses. A Road to Riches route lists valuable unexplored bodies nearby.
+- Exploration (scanning): Earth-like worlds, water worlds, ammonia worlds and terraformable planets are worth the most, especially with first-discovery and first-mapped bonuses. A Road to Riches route (Exploration › Find valuable bodies in Elite Nexus) lists valuable bodies to scan in unpopulated systems nearby; from the bubble it has to look 250 ly or more out, since Spansh skips populated systems.
 - Missions: stacking massacre missions for the same target faction is a strong combat income; passenger and delivery missions suit traders.
 - Selling cargo you already carry: always check where it sells best before selling at the nearest station; salvage such as Thargoid parts can fetch extreme prices on carrier buy orders.
 
@@ -20,7 +20,7 @@ Data comes from EDDN in real time; Market > Database & feed in Elite Nexus offer
 
 ## Billion-credit goals
 Realistic routes to a billion credits:
-- Exobiology trips: plan a route of planets with high-value species (Spansh exobiology route), land, sample three times per species, sell at Vista Genomics. First-logged bonuses multiply value by five.
+- Exobiology trips: plan a route of planets with high-value species, land, sample three times per species, sell at Vista Genomics. The Spansh exobiology route visits species already on record (certain, base value); a bonus hunt targets planets nobody has a record of sampling, where the first-logged bonus multiplies the value by five.
 - Mining runs in a large ship (Type-9, Type-10, Cutter, Anaconda, Panther Clipper Mk II) in Platinum, Painite or Void Opal hotspots, selling at the best station within reach.
 - Fleet carrier trading and carrier buy orders for rare salvage.
 - Large trade loops on proven routes, using the whole cargo hold every trip.

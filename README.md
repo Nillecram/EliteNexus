@@ -36,8 +36,9 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 * **Ask** — a built-in AI co-pilot: ask in plain words ("where can I make the most money in the next hour?") and it
   answers from your ship, cargo, journal, the live market database and Spansh, with a knowledge base compiled into the
   app. Tools it can use: price deals (stations paying far above the galactic average), sell-my-cargo, trade routes,
-  commodity search, nearest services, mining hotspots, system info, route and money-route planning (routes land on the
-  Navigation page), exobiology here, journal search. Setup is one pasted key (Google Gemini by default; Claude or a
+  commodity search, nearest services, mining hotspots, system info, a system's planets (with who has set foot on them),
+  untouched biology, route and money-route planning (routes land on the Navigation page), exobiology here, journal
+  search. Setup is one pasted key (Google Gemini by default; Claude or a
   local model optional).
 
 * **Dashboard** — commander, ranks & progress, credits, legal state, ship (fuel/hull/cargo/jump range/rebuy), location
@@ -45,12 +46,15 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 * **Exploration** — every body as you FSS it: type, distance, value now vs. mapped (MattG formula, Odyssey bonus, first
   discovery/mapping, efficiency), gravity/temp/atmosphere, bio/geo signals, and Observatory-style highlights (ELW/WW/AW,
   terraformable, landable atmosphere, first footfall, close/wide rings, shepherd & nested moons, fast rotation/orbit,
-  jumponium…). Unsold data, data the game refused to buy, codex history.
+  jumponium…). **Find valuable bodies** plans a scan tour (Spansh's Road to Riches) and widens the search out of the
+  bubble by itself; **History** shows every system you scanned and whether its data was sold, refused or lost; codex.
 * **Exobiology** — live **sampling radar**: previous sample points around you (oriented to your heading) with colony-range
   circles and a big "OK to sample / too close" readout; bio bodies with DSS genera; unsold Vista Genomics data with
   first-logged bonus (5×). **Species predictions** from the body's atmosphere, gravity, temperature, volcanism and parent
   stars before you land, with expected value (checked against your own history: for 15 of the 16 species you sampled,
-  the top prediction for that genus was the right one).
+  the top prediction for that genus was the right one). **Find planets**, two ways: a **bonus hunt** for planets where
+  a valuable species should grow and nobody has a record of sampling it (first-logged bonus, ×5), which explains what
+  it found and what the data can't prove, or **sure value**: planets where the species are already on record.
 * **Market** — a local galaxy database fed live by EDDN, your own journal and (optionally) Spansh's daily dump:
   find the best/nearest place to buy or sell any commodity, **sell my cargo** (best single stop for the whole hold),
   trade routes for your ship and capital, nearest material traders / brokers / Interstellar Factors / Vista Genomics,
@@ -58,7 +62,7 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
   matches your rule, and the full price list of the station you're docked at.
 * **Navigation** — in-game route with scoopable/neutron/white-dwarf flags, non-scoopable streak warning, and **next
   system auto-copied to the clipboard after every jump**. Spansh planners built in: neutron, exact galaxy plotter
-  (your ship's real FSD), fleet carrier (tritium), road to riches, exobiology.
+  (your ship's real FSD), fleet carrier (tritium); scan tours from Exploration and Exobiology land here too.
 * **Fleet** — all ships, where they are (incl. in-transit), full loadouts with engineering & modifier deltas; one-click
   **Open in EDSY / Coriolis** with the exact build.
 * **Engineering** — blueprint planner with a wishlist (or "upgrade to G5" from your ship), shopping list, material-trader
@@ -91,7 +95,8 @@ cargo build --release -p nexus-app     # target\release\EliteNexus.exe
 ```
 
 On the original dev machine the toolchain is not on PATH: run `. .\tools\env.ps1` first. Pushing a tag such as `v0.1.0`
-makes GitHub Actions build the exe and publish a Release (`.github/workflows/release.yml`).
+makes GitHub Actions build the exe and publish a Release (`.github/workflows/release.yml`), with that version's
+`CHANGELOG.md` section as the notes. Working on the code, as a person or an AI agent? Read `AGENTS.md` first.
 
 Command-line options: `--page <name>`, `--tab <name>`, `--journal-dir <dir>`, `--mute`,
 `--screenshot <png> [--shot-delay <s>] [--size <w>x<h>] [--demo]`. A screenshot run renders off-screen, saves the PNG
@@ -120,6 +125,9 @@ Keys are stored encrypted with Windows DPAPI.
 
 ## Docs
 
+* `AGENTS.md` — how to work on this repo: machine rules, build/test/UI checks, parallel work, releases, open decisions.
+* `CHANGELOG.md` — what changed in each release.
+* `docs/USER_GUIDE.md` — every page explained (also the in-app assistant's knowledge).
 * `docs/ARCHITECTURE.md` — crates, threads, conventions.
 * `docs/research/` — verified specs: EDDN (live service differs from GitHub!), EDSM, Inara, CAPI, Spansh, websites,
   journal format, engineering data, exploration/exobiology science, and a 167-feature competitive matrix.

@@ -19,7 +19,7 @@ The game records whether anyone has set foot on a body (first footfall), and sin
 Each genus needs specific conditions: atmosphere type (thin carbon dioxide, ammonia, sulphur dioxide, argon, methane, nitrogen, neon, water…), surface gravity, temperature range, volcanism, and sometimes the parent star's class or the galactic region. A detailed surface scan (DSS) reveals which genera are present; before that, Elite Nexus predicts likely species and their value for every body with biological signals, from the scan data. Planets with several biological signals and a thin atmosphere are the most valuable targets.
 
 ## Planning an exobiology trip
-1. Find targets: Spansh's exobiology route lists nearby bodies with valuable predicted species (in the assistant: money routes, kind exobiology).
+1. Find targets, one of two ways (Exobiology › Find planets in Elite Nexus). Sure value: Spansh's exobiology route lists nearby planets where commanders have already logged valuable species, so the species are certain but someone logged them first: expect the base value (in the assistant: money routes, kind exobiology). Bonus hunt: planets where a valuable species should grow and nobody has a record of sampling it, for the five-times bonus; the species there is predicted, not certain (in the assistant: untouched biology). Both tours go to the Navigation page.
 2. Use a ship with good jump range that lands easily; an SRV helps cover distance between samples on rough terrain.
 3. On each body: DSS-map it to reveal the genera, land near the biological zone, sample each species three times.
 4. Sell regularly at Vista Genomics; check the unsold value on the Exobiology page.
@@ -27,10 +27,14 @@ Each genus needs specific conditions: atmosphere type (thin carbon dioxide, ammo
 ## Finding untouched planets (first-logged bonus)
 
 Nothing proves a planet is untouched; only the opposite can be proven. Evidence that someone was there: Spansh lists the
-planet's genera (someone DSS-mapped it with a tool that uploads to EDDN), biology landmarks (someone logged samples, on
-foot), `WasMapped` true (someone mapped it and sold the data; this lags until they sell), `WasFootfalled` true.
-A planet with biological signals and none of that has never been mapped or sampled by a commander who shares data
-(EDMC, EDDiscovery…). The `untouched_biology` tool and Exobiology › Find untouched planets search for exactly that
-around a system for a chosen species (Stratum Tectonicas by default) and rank by expected first-logged value and
-distance. "Mapped, never sampled" planets have the genus confirmed. Near the bubble almost everything is mapped and
-sampled; a few thousand light years out, a third or more of the planets with the right conditions show no trace.
+planet's genera (someone DSS-mapped it with a tool that uploads to EDDN), biology landmarks (someone's sample added a
+codex entry, uploaded by their tool), `WasMapped` true (someone mapped it and sold the data; this lags until they sell),
+`WasFootfalled` true. A planet with biological signals and none of that has never been mapped or sampled by a commander
+who shares data (EDMC, EDDiscovery…). Two blind spots remain: players without such tools, and samples of a species the
+commander already had in their codex for that region (the game writes no codex entry then, so no landmark appears).
+The `untouched_biology` tool and Exobiology › Find planets › Bonus hunt search for exactly that around a system for a
+chosen species (Stratum Tectonicas by default), say how many planets were left out and why (samples on record, mapped
+without the genus, populated system, landed on), and rank the rest by expected first-logged value and distance.
+"No record" planets are the best bets; "Mapped, no samples" planets have the genus confirmed, but someone was there and
+may have sampled without a trace, so the bonus may be gone. Near the bubble almost everything is mapped and sampled; a
+few thousand light years out, a third or more of the planets with the right conditions show no trace.
