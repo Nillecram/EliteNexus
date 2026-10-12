@@ -227,11 +227,17 @@ pub fn simulated_response(req: &HttpRequest) -> Result<HttpResponse, TransportEr
         return Ok(HttpResponse::new(200, json!({"msgnum": 100, "msg": "OK", "events": events}).to_string()));
     }
     if url.contains("inara.cz") {
-        let n = serde_json::from_str::<Value>(&req.body_text())
+        let sent: Vec<Value> = serde_json::from_str::<Value>(&req.body_text())
             .ok()
-            .and_then(|v| v.get("events").and_then(Value::as_array).map(Vec::len))
-            .unwrap_or(0);
-        let events: Vec<Value> = (0..n).map(|_| json!({"eventStatus": 200})).collect();
+            .and_then(|v| v.get("events").and_then(Value::as_array).cloned())
+            .unwrap_or_default();
+        let events: Vec<Value> = sent
+            .iter()
+            .map(|e| match e.get("eventName").and_then(Value::as_str) {
+                Some("getCommanderProfile") => json!({"eventStatus": 200, "eventData": {"userID": 1, "userName": "Test", "commanderName": "Jameson", "inaraURL": "https://inara.cz/elite/cmdr/1/"}}),
+                _ => json!({"eventStatus": 200}),
+            })
+            .collect();
         return Ok(HttpResponse::new(
             200,
             json!({"header": {"eventStatus": 200, "eventData": {"userID": 1, "userName": "Test"}}, "events": events}).to_string(),

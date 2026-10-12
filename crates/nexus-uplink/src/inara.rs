@@ -1168,6 +1168,29 @@ pub enum InaraOutcome {
     Retry(String),
 }
 
+/// Inara's answer to `getCommanderProfile`: who the key belongs to. A header-level problem (bad
+/// key, app not accepted, rate limit) comes back as that outcome; an answer without a profile as
+/// `Done` with the event's status.
+pub fn profile_response(resp: &HttpResponse) -> Result<crate::status::Account, InaraOutcome> {
+    match classify_response(resp) {
+        InaraOutcome::Done(_) => {}
+        other => return Err(other),
+    }
+    let body: Value = serde_json::from_str(&resp.body).unwrap_or(Value::Null);
+    let ev = body.pointer("/events/0");
+    let status = ev.and_then(|e| e.get("eventStatus")).and_then(Value::as_i64).unwrap_or(0);
+    let text = ev.and_then(|e| e.get("eventStatusText")).and_then(Value::as_str).map(str::to_string);
+    let data = ev.and_then(|e| e.get("eventData"));
+    let name = data.and_then(|d| d.get("commanderName").or_else(|| d.get("userName"))).and_then(Value::as_str).filter(|s| !s.is_empty());
+    match name {
+        Some(name) if (200..300).contains(&status) => Ok(crate::status::Account {
+            name: name.to_string(),
+            url: data.and_then(|d| d.get("inaraURL")).and_then(Value::as_str).map(str::to_string),
+        }),
+        _ => Err(InaraOutcome::Done(vec![(status, text)])),
+    }
+}
+
 pub fn classify_response(resp: &HttpResponse) -> InaraOutcome {
     if !resp.is_success() {
         return InaraOutcome::Retry(format!("HTTP {}", resp.status));

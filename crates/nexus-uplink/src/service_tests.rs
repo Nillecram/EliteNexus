@@ -551,3 +551,101 @@ fn eddn_pause_while_docked_keeps_the_market_private() {
     h.send(FSDJUMP);
     assert!(h.wait_for(|r| eddn_bodies(r).len() > before), "sending resumes");
 }
+
+// ---- Inara: who is this key, and syncing the current profile -------------------------------
+
+fn wait_status(h: &Harness, pred: impl Fn(&ServiceStatus) -> bool) -> ServiceStatus {
+    for _ in 0..500 {
+        let st = h.uplink().status().inara;
+        if pred(&st) {
+            return st;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    h.uplink().status().inara
+}
+
+#[test]
+fn inara_check_rides_along_with_the_first_batch() {
+    let mut h = Harness::new(inara_cfg(), RecordingTransport::simulated());
+    assert!(h.uplink().status().inara.checking, "a configured key is confirmed every run");
+    h.session();
+    h.uplink().flush();
+    let st = wait_status(&h, |s| s.account.is_some());
+    let account = st.account.clone().expect("account confirmed");
+    assert_eq!(account.name, "Jameson");
+    assert_eq!(account.url.as_deref(), Some("https://inara.cz/elite/cmdr/1/"));
+    assert!(!st.checking);
+    let posts = h.transport.requests_to(inara::API_URL);
+    assert_eq!(posts.len(), 1, "no extra request for the check");
+    let body: Value = serde_json::from_str(&posts[0].body_text()).unwrap();
+    assert_eq!(body["events"][0]["eventName"], "getCommanderProfile");
+    assert_eq!(st.failed, 0);
+    assert!(st.sent > 0 && st.last_error.is_none(), "{st:?}");
+}
+
+#[test]
+fn inara_new_key_is_checked_at_once() {
+    let h = Harness::new(UplinkConfig::default(), RecordingTransport::simulated());
+    h.uplink().set_config(inara_cfg());
+    let st = wait_status(&h, |s| s.account.is_some());
+    assert_eq!(st.account.map(|a| a.name), Some("Jameson".into()));
+    let body: Value = serde_json::from_str(&h.transport.requests_to(inara::API_URL)[0].body_text()).unwrap();
+    assert_eq!(body["events"].as_array().map(Vec::len), Some(1), "just the check");
+    // Removing the key forgets the account.
+    h.uplink().set_config(UplinkConfig::default());
+    assert!(h.uplink().status().inara.account.is_none());
+}
+
+#[test]
+fn inara_rejected_key_is_reported() {
+    let t = RecordingTransport::new(|r| {
+        if r.url == inara::API_URL {
+            Ok(HttpResponse::new(200, r#"{"header":{"eventStatus":400,"eventStatusText":"Invalid API key."}}"#))
+        } else {
+            simulated_response(r)
+        }
+    });
+    let h = Harness::new(UplinkConfig::default(), t);
+    h.uplink().set_config(inara_cfg());
+    let st = wait_status(&h, |s| s.paused.is_some());
+    assert!(st.paused.unwrap_or_default().contains("Invalid API key"));
+    assert!(st.account.is_none() && !st.checking);
+}
+
+#[test]
+fn inara_profile_snapshot_sends_current_state_only() {
+    let h = Harness::new(inara_cfg(), RecordingTransport::simulated());
+    // A session that started three hours ago (live syncing would refuse events that old).
+    let then = Timestamp(Timestamp::now().0 - 3 * 3600);
+    let bodies = [
+        FILEHEADER,
+        LOADGAME,
+        r#""event":"Rank", "Combat":1, "Trade":4, "Explore":6, "Soldier":0, "Exobiologist":2, "Empire":7, "Federation":1, "CQC":0"#,
+        r#""event":"Progress", "Combat":30, "Trade":46, "Explore":78, "Soldier":0, "Exobiologist":35, "Empire":37, "Federation":100, "CQC":0"#,
+        FSDJUMP,
+        r#""event":"Cargo", "Vessel":"Ship", "Count":0, "Inventory":[ ]"#,
+    ];
+    let events: Vec<RawEvent> = bodies.iter().map(|b| live_event(b, then).raw).collect();
+    let mut tracker = ContextTracker::new();
+    for e in &events {
+        tracker.apply(e);
+    }
+    h.uplink().sync_inara_profile(events, tracker.context());
+    assert!(h.wait_for(|r| r.iter().any(|q| q.url == inara::API_URL)));
+    h.settle();
+    let names: Vec<String> = h
+        .transport
+        .requests_to(inara::API_URL)
+        .iter()
+        .flat_map(|p| {
+            let v: Value = serde_json::from_str(&p.body_text()).unwrap();
+            v["events"].as_array().cloned().unwrap_or_default()
+        })
+        .filter_map(|e| e["eventName"].as_str().map(str::to_string))
+        .filter(|n| n != "getCommanderProfile")
+        .collect();
+    assert!(names.contains(&"setCommanderRankPilot".to_string()), "{names:?}");
+    assert!(names.iter().all(|n| n.starts_with("set")), "only current state, no past activity: {names:?}");
+    assert!(h.transport.requests().iter().all(|r| r.url == inara::API_URL), "nothing goes to EDDN or EDSM");
+}

@@ -21,6 +21,18 @@ pub struct ServiceStatus {
     pub last_success: Option<Timestamp>,
     /// Set while sending is suspended (bad credentials, blocked software, rate limit, backoff).
     pub paused: Option<String>,
+    /// The account the service confirmed for the key (Inara: the commander and its profile).
+    pub account: Option<Account>,
+    /// A connection check is waiting for its turn (rate limits apply to checks too).
+    pub checking: bool,
+}
+
+/// Who a service says the API key belongs to.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct Account {
+    pub name: String,
+    /// Public profile page.
+    pub url: Option<String>,
 }
 
 /// Snapshot of every service, from [`crate::Uplink::status`].

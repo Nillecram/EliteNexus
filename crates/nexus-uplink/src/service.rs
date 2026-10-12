@@ -19,7 +19,7 @@ use crate::inara::{self, InaraEvent, InaraItem, InaraMapper, InaraOutcome};
 use crate::json::{Obj, form_urlencode, gzip, parse_object};
 use crate::queue::DiskQueue;
 use crate::session::Session;
-use crate::status::{Counters, UplinkStatus};
+use crate::status::{Counters, ServiceStatus, UplinkStatus};
 use crate::transport::{FailingTransport, HttpRequest, ReqwestTransport, Transport};
 use crossbeam_channel::{Receiver, Sender};
 use nexus_journal::{Companion, CompanionKind, LiveEvent, RawEvent, Timestamp};
@@ -139,6 +139,8 @@ pub(crate) struct EddnItem {
 enum Input {
     Event(RawEvent, Box<UploadContext>),
     Companion(Companion, Box<UploadContext>),
+    /// The current session for an Inara profile update (see [`Uplink::sync_inara_profile`]).
+    InaraSnapshot(Vec<RawEvent>, Box<UploadContext>),
     Config(Box<UplinkConfig>),
     Flush,
     Stop,
@@ -210,6 +212,12 @@ struct Shared {
     edastro: Service<EdastroItem>,
     edsm_discard: RwLock<EventList>,
     edastro_accepting: RwLock<EventList>,
+    /// Ask Inara who the key belongs to (inside the next batch).
+    inara_check: AtomicBool,
+    /// ... or on its own if nothing else is waiting (after a key was entered or changed).
+    inara_check_now: AtomicBool,
+    /// What Inara answered to the last check.
+    inara_account: Mutex<Option<crate::status::Account>>,
 }
 
 impl Shared {
@@ -350,6 +358,10 @@ impl Uplink {
             edsm_discard: RwLock::new(EventList::new(&edsm::DEFAULT_DISCARD, edsm_cache)),
             edastro_accepting: RwLock::new(EventList::new(&edastro::DEFAULT_ACCEPTING, edastro_cache)),
             dir,
+            // Confirm the key once per run.
+            inara_check: AtomicBool::new(cfg.inara_enabled()),
+            inara_check_now: AtomicBool::new(false),
+            inara_account: Mutex::new(None),
         });
         // Consent may have been withdrawn while the app was closed.
         clear_disabled_queues(&shared, &cfg);
@@ -382,6 +394,14 @@ impl Uplink {
     /// any change resumes services that were stopped by a rejection.
     pub fn set_config(&self, cfg: UplinkConfig) {
         clear_disabled_queues(&self.shared, &cfg);
+        // A new or changed Inara key: find out again who it belongs to.
+        let inara_key = |c: &UplinkConfig| c.inara_credentials().map(|i| fingerprint(&[&i.api_key]));
+        let new_key = inara_key(&cfg);
+        if new_key != inara_key(&self.shared.config.read()) {
+            *self.shared.inara_account.lock() = None;
+            self.shared.inara_check.store(new_key.is_some(), Ordering::Relaxed);
+            self.shared.inara_check_now.store(new_key.is_some(), Ordering::Relaxed);
+        }
         *self.shared.config.write() = cfg.clone();
         self.shared.epoch.fetch_add(1, Ordering::Relaxed);
         let _ = self.tx.send(Input::Config(Box::new(cfg)));
@@ -399,9 +419,30 @@ impl Uplink {
         UplinkStatus {
             eddn: s.eddn.counters.snapshot(cfg.eddn_enabled(), s.eddn.queue.lock().len()),
             edsm: s.edsm.counters.snapshot(cfg.edsm_enabled(), s.edsm.queue.lock().len()),
-            inara: s.inara.counters.snapshot(cfg.inara_enabled(), s.inara.queue.lock().len()),
+            inara: ServiceStatus {
+                account: s.inara_account.lock().clone(),
+                checking: cfg.inara_enabled() && s.inara_check.load(Ordering::Relaxed),
+                ..s.inara.counters.snapshot(cfg.inara_enabled(), s.inara.queue.lock().len())
+            },
             edastro: s.edastro.counters.snapshot(cfg.edastro_enabled(), s.edastro.queue.lock().len()),
         }
+    }
+
+    /// Asks Inara again who the key belongs to (answer in [`Uplink::status`]).
+    pub fn check_inara(&self) {
+        if self.shared.config.read().inara_enabled() {
+            self.shared.inara_check.store(true, Ordering::Relaxed);
+            self.shared.inara_check_now.store(true, Ordering::Relaxed);
+            self.shared.inara.wake();
+        }
+    }
+
+    /// Brings the Inara profile up to date from the current game session: journal lines from the
+    /// session's start (`Fileheader`/`LoadGame`) to now. Only "set" events (current state: credits,
+    /// ranks, reputation, ship, loadout, materials, cargo, location, …) are sent, so repeating it
+    /// is harmless; nothing goes to EDDN, EDSM or EDAstro.
+    pub fn sync_inara_profile(&self, session: Vec<RawEvent>, ctx: &UploadContext) {
+        let _ = self.tx.send(Input::InaraSnapshot(session, Box::new(ctx.clone())));
     }
 
     /// Closes pending batches and sends everything queued as soon as each service's rate
@@ -536,6 +577,7 @@ impl Processor {
                 // Anything queued under the old configuration for a now-disabled service goes.
                 clear_disabled_queues(&self.shared, &self.cfg);
             }
+            Input::InaraSnapshot(events, ctx) => self.inara_snapshot(&events, &ctx),
             Input::Flush => {
                 self.release_stub();
                 let now = Timestamp::now();
@@ -692,6 +734,29 @@ impl Processor {
     fn release_held(&mut self, now: Timestamp) {
         let held = std::mem::take(&mut self.held);
         self.queue_eddn_inner(held, now, false);
+    }
+
+    /// Replays the current session through a fresh mapper and queues its "set" events: the
+    /// commander's present state, sent at once (the "add" events of past activity are left out).
+    fn inara_snapshot(&mut self, events: &[RawEvent], ctx: &UploadContext) {
+        if self.cfg.inara_credentials().is_none() {
+            return;
+        }
+        let mut session = Session::new();
+        let mut mapper = InaraMapper::new();
+        let mut out: Vec<InaraEvent> = Vec::new();
+        for raw in events {
+            let Some(ev) = parse_object(&raw.line) else { continue };
+            session.apply(&raw.name, &ev);
+            out.extend(mapper.on_event(&raw.name, &ev, &session, ctx).into_iter().filter(|e| e.name.starts_with("set")));
+        }
+        // The same rules as live syncing: Live galaxy only, no beta, not as someone's crew.
+        if out.is_empty() || session.is_beta(ctx) || !session.is_live_galaxy(ctx) || session.blocked(None).is_some() {
+            return;
+        }
+        self.queue_inara(out, ctx, Timestamp::now());
+        self.shared.inara.flush.store(true, Ordering::Relaxed);
+        self.shared.inara.wake();
     }
 
     fn queue_inara(&mut self, events: Vec<InaraEvent>, ctx: &UploadContext, now: Timestamp) {
@@ -1116,6 +1181,54 @@ async fn run_inara(shared: Arc<Shared>) {
             idle(&svc.notify, d).await;
             continue;
         }
+        // "Who is this key?": normally asked inside the next batch (no extra request); on its own
+        // only right after the key was entered or changed and nothing else is waiting.
+        if shared.inara_check_now.load(Ordering::Relaxed) && svc.queue.lock().is_empty() {
+            shared.inara_check_now.store(false, Ordering::Relaxed);
+            if let Some(t) = last_post
+                && t.elapsed() < timing().inara_min_gap
+            {
+                tokio::time::sleep(timing().inara_min_gap - t.elapsed()).await;
+                continue;
+            }
+            let header = json!({
+                "appName": software, "appVersion": version, "isBeingDeveloped": creds.is_being_developed, "APIkey": creds.api_key.trim(),
+            });
+            let event = json!({ "eventName": "getCommanderProfile", "eventTimestamp": Timestamp::now().to_iso(), "eventData": {} });
+            let body = json!({ "header": header, "events": [event] }).to_string();
+            let req = HttpRequest::post(inara::API_URL, body.into_bytes(), Duration::from_secs(20)).header("Content-Type", "application/json");
+            last_post = Some(Instant::now());
+            pacing.last_post = Some(Timestamp::now());
+            pacing.save(&shared);
+            match shared.transport.send(req).await {
+                Err(e) => gate.retry(&INARA_BACKOFF, &svc.counters, format!("Inara: {e}")),
+                Ok(resp) => match inara::profile_response(&resp) {
+                    Ok(account) => {
+                        shared.inara_check.store(false, Ordering::Relaxed);
+                        *shared.inara_account.lock() = Some(account);
+                        gate.success();
+                    }
+                    Err(InaraOutcome::RateLimited(text)) => {
+                        let lock = timing().inara_lockout;
+                        pacing.locked_until = Some(Timestamp(Timestamp::now().0 + lock.as_secs() as i64));
+                        pacing.save(&shared);
+                        gate.pause(lock, &svc.counters, format!("Inara rate limit: {text}"));
+                    }
+                    Err(InaraOutcome::Rejected(text)) => {
+                        shared.inara_check.store(false, Ordering::Relaxed);
+                        gate.stop(epoch, &svc.counters, text);
+                    }
+                    // The key works, but Inara returned no profile for it.
+                    Err(InaraOutcome::Done(statuses)) => {
+                        shared.inara_check.store(false, Ordering::Relaxed);
+                        let text = statuses.first().and_then(|(_, t)| t.clone()).unwrap_or_else(|| "no commander profile".into());
+                        svc.counters.error(format!("Inara profile: {text}"));
+                    }
+                    Err(InaraOutcome::Retry(text)) => gate.retry(&INARA_BACKOFF, &svc.counters, format!("Inara: {text}")),
+                },
+            }
+            continue;
+        }
         let key = fingerprint(&[&creds.api_key]);
         let now = Timestamp::now();
         let batch: Vec<(u64, InaraItem)> = {
@@ -1163,7 +1276,13 @@ async fn run_inara(shared: Arc<Shared>) {
         if !first.fid.is_empty() {
             header.insert("commanderFrontierID".into(), json!(first.fid));
         }
-        let events: Vec<&InaraEvent> = batch.iter().map(|(_, i)| &i.event).collect();
+        // A pending "who is this key?" rides along as the first event.
+        let check = shared.inara_check.load(Ordering::Relaxed);
+        let mut events: Vec<Value> = Vec::with_capacity(batch.len() + 1);
+        if check {
+            events.push(json!({ "eventName": "getCommanderProfile", "eventTimestamp": Timestamp::now().to_iso(), "eventData": {} }));
+        }
+        events.extend(batch.iter().map(|(_, i)| serde_json::to_value(&i.event).unwrap_or(Value::Null)));
         let body = json!({"header": header, "events": events}).to_string();
         let req = HttpRequest::post(inara::API_URL, body.into_bytes(), Duration::from_secs(20)).header("Content-Type", "application/json");
         last_post = Some(Instant::now());
@@ -1173,7 +1292,22 @@ async fn run_inara(shared: Arc<Shared>) {
         match shared.transport.send(req).await {
             Err(e) => gate.retry(&INARA_BACKOFF, &svc.counters, format!("Inara: {e}")),
             Ok(resp) => match inara::classify_response(&resp) {
-                InaraOutcome::Done(statuses) => {
+                InaraOutcome::Done(mut statuses) => {
+                    if check {
+                        shared.inara_check.store(false, Ordering::Relaxed);
+                        shared.inara_check_now.store(false, Ordering::Relaxed);
+                        match inara::profile_response(&resp) {
+                            Ok(account) => *shared.inara_account.lock() = Some(account),
+                            Err(InaraOutcome::Done(st)) => {
+                                let text = st.first().and_then(|(_, t)| t.clone()).unwrap_or_else(|| "no commander profile".into());
+                                svc.counters.error(format!("Inara profile: {text}"));
+                            }
+                            Err(_) => {}
+                        }
+                        if !statuses.is_empty() {
+                            statuses.remove(0);
+                        }
+                    }
                     remove_all(&svc.queue, &ids);
                     gate.success();
                     let mut ok = 0u64;

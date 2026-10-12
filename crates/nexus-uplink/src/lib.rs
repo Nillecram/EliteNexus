@@ -33,5 +33,5 @@ pub mod transport;
 pub use config::{EdsmCredentials, InaraCredentials, UplinkConfig};
 pub use context::{ContextTracker, UploadContext};
 pub use service::Uplink;
-pub use status::{ServiceStatus, UplinkStatus};
+pub use status::{Account, ServiceStatus, UplinkStatus};
 pub use transport::{HttpRequest, HttpResponse, Method, RecordingTransport, ReqwestTransport, Transport, TransportError};
