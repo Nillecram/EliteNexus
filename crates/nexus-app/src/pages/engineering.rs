@@ -76,14 +76,10 @@ fn inventory_map(gs: &GameState) -> HashMap<String, i64> {
 /// Returns true when the wishlist changed (so settings get saved).
 pub fn show(ui: &mut Ui, gs: &GameState, st: &mut EngineeringUi, wishlist: &mut Vec<WishItem>) -> bool {
     let mut changed = false;
-    ui.horizontal(|ui| {
-        for (t, label) in [(Tab::Planner, "Blueprint planner"), (Tab::Materials, "Materials"), (Tab::Engineers, "Engineers"), (Tab::Odyssey, "Suits & weapons"), (Tab::Synthesis, "Synthesis")] {
-            if ui.selectable_label(st.tab == t, label).clicked() {
-                st.tab = t;
-            }
-        }
-    });
-    ui.add_space(6.0);
+    if let Some(t) = crate::widgets::tabs(ui, st.tab, &[(Tab::Planner, "Blueprint planner"), (Tab::Materials, "Materials"), (Tab::Engineers, "Engineers"), (Tab::Odyssey, "Suits & weapons"), (Tab::Synthesis, "Synthesis")]) {
+        st.tab = t;
+    }
+    ui.add_space(crate::widgets::GAP);
     match st.tab {
         Tab::Planner => changed |= planner(ui, gs, st, wishlist),
         Tab::Materials => materials(ui, gs, st),
@@ -103,9 +99,9 @@ fn ingredient_line(ui: &mut Ui, ing: &Ingredient, have: i64) {
 fn planner(ui: &mut Ui, gs: &GameState, st: &mut EngineeringUi, wishlist: &mut Vec<WishItem>) -> bool {
     let mut changed = false;
     let inv = inventory_map(gs);
-    ui.columns(2, |c| {
+    crate::widgets::cards(ui, 2, 380.0, |c| {
         // ---------------- left: browse blueprints
-        let ui = &mut c[0];
+        c.add(|ui| {
         card(ui, "Blueprints", |ui| {
             ui.horizontal(|ui| {
                 egui::ComboBox::from_id_salt("modtype").width(220.0).selected_text(nexus_data::names::split_camel(&st.module)).show_ui(ui, |ui| {
@@ -121,7 +117,7 @@ fn planner(ui: &mut Ui, gs: &GameState, st: &mut EngineeringUi, wishlist: &mut V
             let bps = eng::blueprints_for_module(&st.module);
             ui.horizontal_wrapped(|ui| {
                 for bp in &bps {
-                    if ui.selectable_label(st.blueprint.as_deref() == Some(bp.symbol.as_str()), &bp.name).clicked() {
+                    if crate::widgets::pill(ui, st.blueprint.as_deref() == Some(bp.symbol.as_str()), &bp.name).clicked() {
                         st.blueprint = Some(bp.symbol.clone());
                     }
                 }
@@ -149,7 +145,7 @@ fn planner(ui: &mut Ui, gs: &GameState, st: &mut EngineeringUi, wishlist: &mut V
                     }
                 });
             }
-            if ui.button(RichText::new(format!("{} Add to wishlist", icon::PLUS)).color(pal::ACCENT)).clicked() {
+            if crate::widgets::primary_button(ui, &format!("{} Add to wishlist", icon::PLUS)).clicked() {
                 wishlist.push(WishItem {
                     label: format!("{} — {}", nexus_data::names::split_camel(&st.module), bp.name),
                     blueprint: bp.symbol.clone(),
@@ -198,7 +194,8 @@ fn planner(ui: &mut Ui, gs: &GameState, st: &mut EngineeringUi, wishlist: &mut V
         });
 
         // ---------------- right: wishlist + shopping
-        let ui = &mut c[1];
+        });
+        c.add(|ui| {
         card(ui, &format!("Wishlist ({})", wishlist.len()), |ui| {
             if wishlist.is_empty() {
                 ui.label(RichText::new("Add blueprints on the left — the shopping list below adds everything up.").color(pal::DIM));
@@ -261,7 +258,7 @@ fn planner(ui: &mut Ui, gs: &GameState, st: &mut EngineeringUi, wishlist: &mut V
                 }
             });
             ui.add_space(6.0);
-            ui.checkbox(&mut st.cross_category, "Allow cross-category trades (costs 6× more)");
+            crate::widgets::toggle(ui, &mut st.cross_category, "Allow cross-category trades (costs 6× more)");
             let plan = plan_shopping_with(&merged, &inv, &ShoppingOptions { cross_category: st.cross_category, ..Default::default() });
             if !plan.trades.is_empty() {
                 ui.label(RichText::new("MATERIAL TRADER PLAN").small().color(pal::ACCENT));
@@ -284,6 +281,7 @@ fn planner(ui: &mut Ui, gs: &GameState, st: &mut EngineeringUi, wishlist: &mut V
                 }
             }
         });
+            });
     });
     changed
 }
@@ -331,15 +329,15 @@ fn blueprint_detail(ui: &mut Ui, gs: &GameState, bp: &Blueprint, inv: &HashMap<S
 
 fn materials(ui: &mut Ui, gs: &GameState, st: &mut EngineeringUi) {
     ui.horizontal(|ui| {
-        ui.label(RichText::new(icon::MAGNIFYING_GLASS).color(pal::DIM));
-        ui.add(egui::TextEdit::singleline(&mut st.filter).hint_text("Filter materials…").desired_width(240.0));
+        crate::widgets::search_field(ui, &mut st.filter, "Filter materials", 280.0);
     });
     ui.add_space(6.0);
     let filter = st.filter.to_ascii_lowercase();
     let m = &gs.inventory.materials;
-    ui.columns(3, |c| {
+    crate::widgets::cards(ui, 3, 280.0, |c| {
         for (i, cat) in [MaterialCategory::Raw, MaterialCategory::Manufactured, MaterialCategory::Encoded].into_iter().enumerate() {
-            card(&mut c[i], &format!("{} ({})", cat.label(), m.total(cat)), |ui| {
+            c.add(|ui| {
+                card(ui, &format!("{} ({})", cat.label(), m.total(cat)), |ui| {
                 // Show every known material of this kind, including ones you have none of.
                 let kind = match cat {
                     MaterialCategory::Raw => MaterialKind::Raw,
@@ -370,6 +368,7 @@ fn materials(ui: &mut Ui, gs: &GameState, st: &mut EngineeringUi) {
                     }
                 });
             });
+            });
         }
     });
 }
@@ -388,17 +387,18 @@ fn engineers(ui: &mut Ui, gs: &GameState) {
     });
     TableBuilder::new(ui)
         .striped(true)
-        .resizable(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
         .column(Column::initial(190.0))
         .column(Column::initial(80.0))
         .column(Column::initial(200.0))
         .column(Column::initial(80.0))
         .column(Column::initial(120.0))
         .column(Column::remainder())
-        .header(22.0, |mut h| {
+        .header(30.0, |mut h| {
             for t in ["Engineer", "Type", "Location", "Distance", "Your status", "Unlock / specialities"] {
                 h.col(|ui| {
-                    ui.label(RichText::new(t).color(pal::DIM).strong());
+                    crate::widgets::th(ui, t);
                 });
             }
         })
@@ -417,7 +417,7 @@ fn engineers(ui: &mut Ui, gs: &GameState) {
                         if ui.link(&e.system).on_hover_text("Click to copy").clicked() {
                             ui.ctx().copy_text(e.system.clone());
                         }
-                        ui.label(RichText::new(&e.base).small().color(pal::FAINT));
+                        ui.label(RichText::new(&e.base).small().color(pal::DIM));
                     });
                 });
                 row.col(|ui| {
@@ -454,10 +454,10 @@ fn odyssey(ui: &mut Ui, gs: &GameState) {
         empty(ui, icon::BACKPACK, "No Odyssey data", "");
         return;
     }
-    ui.columns(2, |c| {
-        for (col, kind, title) in [(0usize, OdysseyKind::Suit, "Suits"), (1, OdysseyKind::Weapon, "Weapons")] {
-            let ui = &mut c[col];
-            card(ui, title, |ui| {
+    crate::widgets::cards(ui, 2, 360.0, |c| {
+        for (kind, title) in [(OdysseyKind::Suit, "Suits"), (OdysseyKind::Weapon, "Weapons")] {
+            c.add(|ui| {
+                card(ui, title, |ui| {
                 for item in eng::odyssey_items().iter().filter(|i| i.kind == kind) {
                     egui::CollapsingHeader::new(RichText::new(item.name).color(pal::TEXT)).id_salt(item.symbol).show(ui, |ui| {
                         for g in 2..=5u8 {
@@ -484,6 +484,7 @@ fn odyssey(ui: &mut Ui, gs: &GameState) {
                         }
                     });
                 }
+            });
             });
         }
     });

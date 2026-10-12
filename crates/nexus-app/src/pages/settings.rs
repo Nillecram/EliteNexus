@@ -1,8 +1,10 @@
+//! Settings, laid out like System Settings: grouped rows with the control on the right.
+
 use crate::core::{CoreStatus, Phase};
 use crate::settings::Settings;
-use crate::theme::pal;
-use crate::widgets::{card, kv};
-use egui::{Grid, RichText, Ui};
+use crate::theme::{pal, size};
+use crate::widgets::{self, cards, footnote, group, section};
+use egui::{RichText, Ui};
 
 pub struct SettingsCtx<'a> {
     pub settings: &'a mut Settings,
@@ -13,77 +15,108 @@ pub struct SettingsCtx<'a> {
     pub restart_core: bool,
 }
 
+/// A slider with its value shown on the right, sized for a settings row.
+fn slider(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, decimals: usize, suffix: &str) -> bool {
+    ui.add_sized([64.0, 20.0], egui::Label::new(RichText::new(format!("{:.*}{suffix}", decimals, *value)).color(pal::DIM)));
+    ui.add(egui::Slider::new(value, range).show_value(false)).changed()
+}
+
 pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
-    ui.columns(2, |c| {
-        card(&mut c[0], "Journal", |ui| {
-            let st = cx.status;
-            Grid::new("jgrid").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
-                kv(ui, "Folder", st.journal_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "not found".into()));
-                kv(ui, "Journal files", st.files.to_string());
-                kv(ui, "Size", format!("{:.1} MB", st.bytes as f64 / 1e6));
-                kv(ui, "History load time", format!("{:.0} ms", st.load_ms));
-                kv(ui, "Tailing", st.current_file.clone().unwrap_or_default());
-                kv(ui, "Live events this run", st.live_events.to_string());
-                let phase = match &st.phase {
-                    Phase::Starting => "starting".to_string(),
-                    Phase::Loading { done, total } => format!("loading {done}/{total}"),
-                    Phase::Live => "live".to_string(),
-                    Phase::Error(e) => format!("error: {e}"),
-                };
-                kv(ui, "State", phase);
-            });
-            ui.add_space(6.0);
-            ui.label(RichText::new("Custom journal folder (leave empty to auto-detect):").color(pal::DIM));
-            let mut text = cx.settings.journal_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default();
-            if ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY)).changed() {
-                cx.settings.journal_dir = if text.trim().is_empty() { None } else { Some(text.trim().into()) };
-                cx.changed = true;
-            }
-            if ui.button("Reload journals").clicked() {
-                cx.restart_core = true;
-            }
-            if !st.errors.is_empty() {
-                ui.add_space(4.0);
-                for e in st.errors.iter().rev().take(5) {
-                    ui.label(RichText::new(e).small().color(pal::BAD));
-                }
-            }
-        });
-        card(&mut c[1], "Voice & alerts", |ui| {
+    cards(ui, 2, 420.0, |c| {
+        c.add(|ui| {
             let s = &mut *cx.settings;
-            cx.changed |= ui.checkbox(&mut s.tts_enabled, "Speak alerts (text-to-speech)").changed();
-            ui.horizontal(|ui| {
-                ui.label("Speak from priority");
-                egui::ComboBox::from_id_salt("ttsprio")
-                    .selected_text(["Low", "Normal", "High", "Critical"][s.tts_min_priority.min(3) as usize])
-                    .show_ui(ui, |ui| {
+            section(ui, "Voice and alerts");
+            group(ui, |g| {
+                cx.changed |= g.switch(&mut s.tts_enabled, "Speak alerts", "Text-to-speech for jumps, scans, missions and price alerts.");
+                g.row("Speak from priority", "", |ui| {
+                    egui::ComboBox::from_id_salt("ttsprio").selected_text(["Low", "Normal", "High", "Critical"][s.tts_min_priority.min(3) as usize]).show_ui(ui, |ui| {
                         for (i, n) in ["Low", "Normal", "High", "Critical"].iter().enumerate() {
                             cx.changed |= ui.selectable_value(&mut s.tts_min_priority, i as u8, *n).changed();
                         }
                     });
+                });
+                g.row("Speech rate", "", |ui| cx.changed |= slider(ui, &mut s.tts_rate, 0.5..=2.0, 2, "×"));
+                g.row("Volume", "", |ui| {
+                    let mut pct = s.tts_volume * 100.0;
+                    if slider(ui, &mut pct, 0.0..=100.0, 0, " %") {
+                        s.tts_volume = pct / 100.0;
+                        cx.changed = true;
+                    }
+                });
+                g.row("Banners stay for", "", |ui| cx.changed |= slider(ui, &mut s.toast_seconds, 2.0..=30.0, 0, " s"));
+                g.content(|ui| {
+                    if widgets::button(ui, "Test voice").clicked() {
+                        cx.test_voice = true;
+                    }
+                });
             });
-            cx.changed |= ui.add(egui::Slider::new(&mut s.tts_rate, 0.5..=2.0).text("speech rate")).changed();
-            cx.changed |= ui.add(egui::Slider::new(&mut s.tts_volume, 0.0..=1.0).text("volume")).changed();
-            cx.changed |= ui.add(egui::Slider::new(&mut s.toast_seconds, 2.0..=30.0).text("toast seconds")).changed();
-            if ui.button("Test voice").clicked() {
-                cx.test_voice = true;
-            }
-            ui.add_space(8.0);
-            ui.label(RichText::new("Exploration").color(pal::ACCENT));
-            let mut hv = s.high_value_threshold as f64 / 1e6;
-            if ui.add(egui::Slider::new(&mut hv, 0.1..=10.0).text("high-value threshold (M Cr)")).changed() {
-                s.high_value_threshold = (hv * 1e6) as i64;
-                cx.changed = true;
-            }
-            ui.add_space(8.0);
-            ui.label(RichText::new("Display").color(pal::ACCENT));
-            cx.changed |= ui.add(egui::Slider::new(&mut s.ui_scale, 0.75..=1.75).text("UI scale")).changed();
+            section(ui, "Exploration");
+            group(ui, |g| {
+                g.row("High-value body", "Bodies worth at least this much are highlighted and announced.", |ui| {
+                    let mut hv = s.high_value_threshold as f32 / 1e6;
+                    if slider(ui, &mut hv, 0.1..=10.0, 1, " M Cr") {
+                        s.high_value_threshold = (hv * 1e6) as i64;
+                        cx.changed = true;
+                    }
+                });
+            });
+            section(ui, "Display");
+            group(ui, |g| {
+                g.row("Text and controls size", "", |ui| cx.changed |= slider(ui, &mut s.ui_scale, 0.75..=1.75, 2, "×"));
+            });
         });
-    });
-    ui.add_space(10.0);
-    card(ui, "About", |ui| {
-        ui.label(RichText::new(format!("Elite Nexus {} — native Rust, no Python, no Node.js.", env!("CARGO_PKG_VERSION"))).color(pal::TEXT));
-        ui.label(RichText::new(format!("Data folder: {}", cx.data_dir.display())).color(pal::DIM));
-        ui.label(RichText::new("Elite Dangerous is a trademark of Frontier Developments plc. Elite Nexus is an unofficial community tool.").small().color(pal::FAINT));
+        c.add(|ui| {
+            let st = cx.status;
+            section(ui, "Journal");
+            group(ui, |g| {
+                let phase = match &st.phase {
+                    Phase::Starting => "Starting".to_string(),
+                    Phase::Loading { done, total } => format!("Loading {done} of {total}"),
+                    Phase::Live => "Live".to_string(),
+                    Phase::Error(e) => format!("Error: {e}"),
+                };
+                g.value("State", phase);
+                g.row("Folder", "", |ui| {
+                    let folder = st.journal_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "Not found".into());
+                    ui.add(egui::Label::new(RichText::new(folder.clone()).color(pal::DIM)).truncate()).on_hover_text(folder);
+                });
+                g.value("Journal files", format!("{} · {:.1} MB", st.files, st.bytes as f64 / 1e6));
+                g.value("History load time", format!("{:.0} ms", st.load_ms));
+                g.row("Following", "", |ui| {
+                    ui.add(egui::Label::new(RichText::new(st.current_file.clone().unwrap_or_default()).color(pal::DIM)).truncate());
+                });
+                g.value("Live events this run", st.live_events.to_string());
+                g.content(|ui| {
+                    ui.label(RichText::new("Custom journal folder").size(size::FOOTNOTE).color(pal::DIM));
+                    let mut text = cx.settings.journal_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default();
+                    ui.horizontal(|ui| {
+                        let w = (ui.available_width() - 150.0).max(160.0);
+                        if ui.add(egui::TextEdit::singleline(&mut text).hint_text("Empty: found automatically").desired_width(w).margin(egui::Margin::symmetric(10, 6))).changed() {
+                            cx.settings.journal_dir = if text.trim().is_empty() { None } else { Some(text.trim().into()) };
+                            cx.changed = true;
+                        }
+                        if widgets::button(ui, "Reload journals").clicked() {
+                            cx.restart_core = true;
+                        }
+                    });
+                });
+                if !st.errors.is_empty() {
+                    g.content(|ui| {
+                        for e in st.errors.iter().rev().take(5) {
+                            ui.add(egui::Label::new(RichText::new(e).size(size::FOOTNOTE).color(pal::BAD)).wrap());
+                        }
+                    });
+                }
+            });
+            section(ui, "About");
+            group(ui, |g| {
+                g.value("Version", format!("Elite Nexus {}", env!("CARGO_PKG_VERSION")));
+                g.row("Data folder", "", |ui| {
+                    let d = cx.data_dir.display().to_string();
+                    ui.add(egui::Label::new(RichText::new(d.clone()).color(pal::DIM)).truncate()).on_hover_text(d);
+                });
+            });
+            footnote(ui, "Elite Dangerous is a trademark of Frontier Developments plc. Elite Nexus is an unofficial community tool, written in Rust.");
+        });
     });
 }

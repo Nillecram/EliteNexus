@@ -1,4 +1,4 @@
-use crate::theme::{display, pal};
+use crate::theme::{display, pal, size};
 use crate::widgets::{card, short_credits};
 use egui::{Grid, RichText, Ui};
 use egui_plot::{Bar, BarChart, Line, Plot, PlotPoints};
@@ -6,13 +6,16 @@ use nexus_journal::Timestamp;
 use nexus_model::GameState;
 
 pub fn show(ui: &mut Ui, gs: &GameState) {
-    ui.columns(2, |c| {
-        card(&mut c[0], "Credits over time", |ui| {
+    crate::widgets::cards(ui, 2, 360.0, |c| {
+        c.add(|ui| {
+            card(ui, "Credits over time", |ui| {
             let pts: Vec<[f64; 2]> = gs.history.credit_samples.iter().map(|(t, v)| [t.0 as f64 / 86_400.0, *v as f64 / 1e6]).collect();
             if pts.len() < 2 {
                 ui.label(RichText::new("Not enough data yet.").color(pal::DIM));
             } else {
                 Plot::new("credits")
+                    .show_background(false)
+                    .show_grid([false, true])
                     .height(240.0)
                     .allow_scroll(false)
                     .x_axis_formatter(|m, _| Timestamp((m.value * 86_400.0) as i64).to_local_string("%d %b"))
@@ -23,7 +26,9 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                     });
             }
         });
-        card(&mut c[1], "Income & spending by category", |ui| {
+        });
+        c.add(|ui| {
+            card(ui, "Income & spending by category", |ui| {
             let totals = gs.history.totals_since(Timestamp::ZERO);
             let bars: Vec<Bar> = totals
                 .iter()
@@ -37,6 +42,8 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                 .collect();
             let labels: Vec<String> = totals.iter().map(|(c, _, _)| c.label().to_string()).collect();
             Plot::new("ledger")
+                    .show_background(false)
+                    .show_grid([false, true])
                 .height(240.0)
                 .allow_scroll(false)
                 .y_axis_label("M Cr")
@@ -46,10 +53,12 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                 })
                 .show(ui, |p| p.bar_chart(BarChart::new("ledger", bars)));
         });
+        });
     });
     ui.add_space(10.0);
-    ui.columns(2, |c| {
-        card(&mut c[0], "Jumps per day", |ui| {
+    crate::widgets::cards(ui, 2, 360.0, |c| {
+        c.add(|ui| {
+            card(ui, "Jumps per day", |ui| {
             let mut per_day: std::collections::BTreeMap<i64, (u32, f64)> = Default::default();
             for j in &gs.history.jumps {
                 let e = per_day.entry(j.ts.0 / 86_400).or_default();
@@ -58,14 +67,18 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
             }
             let bars: Vec<Bar> = per_day.iter().map(|(d, (n, ly))| Bar::new(*d as f64, *n as f64).width(0.8).fill(pal::CYAN).name(format!("{n} jumps, {ly:.0} ly"))).collect();
             Plot::new("jumpsday")
+                    .show_background(false)
+                    .show_grid([false, true])
                 .height(200.0)
                 .allow_scroll(false)
                 .x_axis_formatter(|m, _| Timestamp((m.value * 86_400.0) as i64).to_local_string("%d %b"))
                 .show(ui, |p| p.bar_chart(BarChart::new("jumps", bars)));
         });
-        card(&mut c[1], "Totals", |ui| {
+        });
+        c.add(|ui| {
+            card(ui, "Totals", |ui| {
             let h = &gs.history;
-            Grid::new("totals").num_columns(2).spacing([12.0, 4.0]).striped(true).show(ui, |ui| {
+            Grid::new("totals").max_col_width(ui.available_width()).num_columns(2).spacing([12.0, 4.0]).striped(true).show(ui, |ui| {
                 for (cat, inc, exp) in h.totals_since(Timestamp::ZERO) {
                     ui.label(RichText::new(cat.label()).color(pal::DIM));
                     ui.horizontal(|ui| {
@@ -83,11 +96,12 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                 ui.end_row();
             });
         });
+        });
     });
     if let Some(stats) = &gs.cmdr.statistics {
         ui.add_space(10.0);
         card(ui, "In-game statistics (last Statistics event)", |ui| {
-            ui.columns(3, |c| {
+            crate::widgets::cards(ui, 3, 260.0, |c| {
                 let sections: [(&str, &serde_json::Value); 9] = [
                     ("Bank account", &stats.bank_account),
                     ("Combat", &stats.combat),
@@ -100,10 +114,10 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                     ("Fleet carrier", &stats.fleetcarrier),
                 ];
                 for (i, (title, v)) in sections.iter().enumerate() {
-                    let ui = &mut c[i % 3];
-                    egui::CollapsingHeader::new(RichText::new(*title).color(pal::ACCENT)).id_salt(("stat", i)).show(ui, |ui| {
+                    c.add(|ui| {
+                    egui::CollapsingHeader::new(RichText::new(*title).font(display(size::CALLOUT)).color(pal::TEXT)).id_salt(("stat", i)).show(ui, |ui| {
                         if let Some(obj) = v.as_object() {
-                            Grid::new(("statgrid", i)).num_columns(2).striped(true).show(ui, |ui| {
+                            Grid::new(("statgrid", i)).max_col_width(ui.available_width()).num_columns(2).striped(true).show(ui, |ui| {
                                 for (k, val) in obj {
                                     ui.label(RichText::new(k.replace('_', " ")).small().color(pal::DIM));
                                     let txt = match val {
@@ -115,6 +129,7 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                                 }
                             });
                         }
+                    });
                     });
                 }
             });

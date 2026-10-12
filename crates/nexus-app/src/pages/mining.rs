@@ -36,15 +36,15 @@ fn session(ui: &mut Ui, s: &MiningSession, live: bool) {
             crate::widgets::stat(ui, "high / med / low", format!("{h} / {m} / {l}"), pal::CYAN);
         });
         ui.add_space(4.0);
-        ui.columns(2, |c| {
-            Grid::new(("refined", s.start.0)).num_columns(2).striped(true).show(&mut c[0], |ui| {
+        crate::widgets::split(ui, 0.5, 260.0, |ui| {
+            Grid::new(("refined", s.start.0)).max_col_width(ui.available_width()).num_columns(2).striped(true).show(ui, |ui| {
                 for (name, n) in &s.refined {
                     ui.label(name);
                     ui.label(RichText::new(format!("{n} t")).color(pal::ACCENT_SOFT));
                     ui.end_row();
                 }
             });
-            let ui = &mut c[1];
+        }, |ui| {
             if !s.motherlodes.is_empty() {
                 ui.horizontal_wrapped(|ui| {
                     for (m, n) in &s.motherlodes {

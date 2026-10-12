@@ -35,7 +35,7 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                         ui.end_row();
                     }
                 });
-                ui.label(RichText::new("Each kill counts once for every issuing faction (its oldest open mission). The stack is done after the largest per-faction requirement.").small().color(pal::FAINT));
+                ui.label(RichText::new("Each kill counts once for every issuing faction (its oldest open mission). The stack is done after the largest per-faction requirement.").small().color(pal::DIM));
             });
             ui.add_space(8.0);
         }
@@ -51,22 +51,23 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
         list.sort_by_key(|m| m.expiry.map(|e| e.0).unwrap_or(i64::MAX));
         TableBuilder::new(ui)
             .striped(true)
-            .resizable(true)
+            .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
             .column(Column::initial(300.0))
             .column(Column::initial(180.0))
             .column(Column::initial(200.0))
             .column(Column::initial(100.0))
             .column(Column::initial(90.0))
             .column(Column::remainder())
-            .header(22.0, |mut h| {
+            .header(30.0, |mut h| {
                 for t in ["Mission", "Faction", "Destination", "Reward", "Expires", "Progress"] {
                     h.col(|ui| {
-                        ui.label(RichText::new(t).color(pal::DIM).strong());
+                        crate::widgets::th(ui, t);
                     });
                 }
             })
             .body(|body| {
-                body.rows(26.0, list.len(), |mut row| {
+                body.rows(32.0, list.len(), |mut row| {
                     let m = list[row.index()];
                     row.col(|ui| {
                         ui.horizontal(|ui| {

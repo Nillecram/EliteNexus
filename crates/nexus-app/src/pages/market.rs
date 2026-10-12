@@ -4,14 +4,14 @@ use crate::finder::{self, SellPlan};
 use crate::jobs::Slot;
 use crate::market::{ImportJob, ImportSource, MarketService, SPANSH_STATIONS_URL};
 use crate::settings::PriceWatch;
-use crate::theme::{display, pal};
+use crate::theme::{display, pal, size};
 use crate::widgets::{badge, bar, card, duration, empty, short_credits};
 use egui::{Grid, RichText, Ui};
 use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular as icon;
 use nexus_galaxy::{
-    CommodityHit, GalaxyDb, CommodityQuery, HotspotHit, HotspotQuery, MaterialTrader, Services, Sort, StationHit, StationQuery, TechBroker,
-    TradeMode, TradeQuery, TradeRoute,
+    CommodityHit, CommodityQuery, Deal, DealQuery, GalaxyDb, HotspotHit, HotspotQuery, MaterialTrader, Services, Sort, StationHit, StationQuery,
+    TechBroker, TradeMode, TradeQuery, TradeRoute,
 };
 use nexus_model::GameState;
 
@@ -19,6 +19,7 @@ use nexus_model::GameState;
 pub enum Tab {
     #[default]
     Commodity,
+    Abnormal,
     Sell,
     Routes,
     Services,
@@ -33,6 +34,7 @@ impl Tab {
     pub fn from_name(name: &str) -> Option<Tab> {
         Some(match name.to_ascii_lowercase().as_str() {
             "commodity" => Tab::Commodity,
+            "abnormal" => Tab::Abnormal,
             "sell" => Tab::Sell,
             "routes" => Tab::Routes,
             "services" => Tab::Services,
@@ -46,6 +48,8 @@ impl Tab {
 }
 
 type Res<T> = Result<Vec<T>, String>;
+/// Abnormal-price filters: mode, ratio ×100, radius, age, carriers, pad.
+type AbnKey = (TradeMode, u64, Option<u64>, u64, bool, Option<char>);
 
 pub struct MarketUi {
     pub tab: Tab,
@@ -80,6 +84,16 @@ pub struct MarketUi {
     pub show_options: bool,
     /// The pad filter follows the current ship until the user picks one.
     pub pad_auto: bool,
+    /// Abnormal prices: stations paying far above (or selling far below) the galactic average.
+    pub abn_mode: TradeMode,
+    pub abn_ratio: f64,
+    /// `None` = the whole galaxy.
+    pub abn_radius: Option<f64>,
+    pub abn_age_h: f64,
+    pub abn_carriers: bool,
+    pub abn: Slot<Res<Deal>>,
+    /// The filters the shown results were found with (a change re-runs the scan).
+    abn_key: Option<AbnKey>,
 }
 
 impl Default for MarketUi {
@@ -112,6 +126,13 @@ impl Default for MarketUi {
             new_watch: PriceWatch::default(),
             show_options: false,
             pad_auto: true,
+            abn_mode: TradeMode::SellToStation,
+            abn_ratio: 2.0,
+            abn_radius: None,
+            abn_age_h: 72.0,
+            abn_carriers: true,
+            abn: Slot::default(),
+            abn_key: None,
         }
     }
 }
@@ -184,12 +205,14 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
     st.hotspots.tick();
     st.hotspot_prices.tick();
     st.sell.tick();
+    st.abn.tick();
 
-    feed_header(ui, svc);
-    ui.add_space(6.0);
-    ui.horizontal(|ui| {
-        for (t, label) in [
+    if let Some(t) = crate::widgets::tabs(
+        ui,
+        st.tab,
+        &[
             (Tab::Commodity, "Find commodity"),
+            (Tab::Abnormal, "Abnormal prices"),
             (Tab::Sell, "Sell my cargo"),
             (Tab::Routes, "Trade routes"),
             (Tab::Services, "Services"),
@@ -197,13 +220,13 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
             (Tab::Alerts, "Price alerts"),
             (Tab::Docked, "This station"),
             (Tab::Database, "Database & feed"),
-        ] {
-            if ui.selectable_label(st.tab == t, label).clicked() {
-                st.tab = t;
-            }
-        }
-    });
-    ui.add_space(6.0);
+        ],
+    ) {
+        st.tab = t;
+    }
+    ui.add_space(8.0);
+    feed_header(ui, svc);
+    ui.add_space(12.0);
     let Some(db) = svc.db.clone() else {
         empty(ui, icon::DATABASE, "Market database unavailable", svc.db_error.as_deref().unwrap_or("Starting…"));
         return false;
@@ -219,16 +242,12 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
             }
             let mut search = false;
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new(icon::MAGNIFYING_GLASS).color(pal::DIM));
-                let field = ui.add(egui::TextEdit::singleline(&mut st.commodity).hint_text("Commodity (e.g. Tritium, Gold, Painite)").desired_width(220.0));
+                ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
+                let field = crate::widgets::search_field(ui, &mut st.commodity, "Commodity, e.g. Tritium, Gold, Painite", 320.0);
                 search |= field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-                ui.selectable_value(&mut st.mode, TradeMode::BuyFromStation, "Buy");
-                ui.selectable_value(&mut st.mode, TradeMode::SellToStation, "Sell");
-                search |= ui.button(RichText::new(format!("{} Search", icon::MAGNIFYING_GLASS)).color(pal::ACCENT)).clicked();
-                let caret = if st.show_options { icon::CARET_DOWN } else { icon::CARET_RIGHT };
-                if ui.add(egui::Button::new(RichText::new(format!("{caret} Options")).small().color(pal::DIM)).frame(false)).clicked() {
-                    st.show_options = !st.show_options;
-                }
+                crate::widgets::segmented(ui, &mut st.mode, &[(TradeMode::BuyFromStation, "Buy"), (TradeMode::SellToStation, "Sell")]);
+                search |= crate::widgets::primary_button(ui, "Search").clicked();
+                crate::widgets::disclosure(ui, &mut st.show_options, "Options");
             });
             if st.show_options {
                 ui.horizontal_wrapped(|ui| {
@@ -243,8 +262,8 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
                     ui.add(egui::DragValue::new(&mut st.max_age_h).range(1.0..=720.0).suffix(" h"));
                     ui.label("min qty");
                     ui.add(egui::DragValue::new(&mut st.min_qty).range(1..=100_000));
-                    ui.checkbox(&mut st.carriers, "Carriers");
-                    ui.checkbox(&mut st.planetary, "Planetary");
+                    crate::widgets::toggle(ui, &mut st.carriers, "Carriers");
+                    crate::widgets::toggle(ui, &mut st.planetary, "Planetary");
                     egui::ComboBox::from_id_salt("msort")
                         .selected_text(match st.sort {
                             Sort::BestPrice => "Best price",
@@ -286,8 +305,8 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
                 ui.add(egui::DragValue::new(&mut st.hop).range(1.0..=200.0).suffix(" ly"));
                 pad_combo(ui, "rpad", &mut st.min_pad);
                 ui.label(format!("cargo {cargo} t, capital {}", short_credits(gs.cmdr.credits)));
-                ui.checkbox(&mut st.carriers, "Carriers");
-                if ui.button(RichText::new(format!("{} Find routes", icon::ARROWS_LEFT_RIGHT)).color(pal::ACCENT)).clicked()
+                crate::widgets::toggle(ui, &mut st.carriers, "Carriers");
+                if crate::widgets::primary_button(ui, "Find routes").clicked()
                     && let Some(o) = origin {
                         let q = TradeQuery {
                             origin: o,
@@ -309,8 +328,9 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
         }
         Tab::Services => {
             ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
                 for (i, (label, _)) in SERVICES.iter().enumerate() {
-                    if ui.selectable_label(st.service == i, *label).clicked() {
+                    if crate::widgets::pill(ui, st.service == i, label).clicked() {
                         st.service = i;
                         if let Some(o) = origin {
                             let q = service_query(SERVICES[i].1, o, st.min_pad);
@@ -333,7 +353,7 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
                 ui.add(egui::DragValue::new(&mut st.hotspot_min).range(1..=6));
                 ui.label("hotspots within");
                 ui.add(egui::DragValue::new(&mut st.max_dist).range(1.0..=1000.0).suffix(" ly"));
-                if ui.button(RichText::new(format!("{} Find", icon::DIAMONDS_FOUR)).color(pal::ACCENT)).clicked()
+                if crate::widgets::primary_button(ui, "Find hotspots").clicked()
                     && let Some(o) = origin {
                         let q = HotspotQuery { origin: o, signal: st.hotspot_signal.clone(), max_distance_ly: Some(st.max_dist), min_count: st.hotspot_min, limit: 50 };
                         let db2 = db.clone();
@@ -351,12 +371,19 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
                         st.hotspot_prices.run(&ctx, move || db3.search_commodity(&pq).map_err(|e| e.to_string()));
                     }
             });
-            ui.label(RichText::new("Hotspots come from DSS ring scans shared over EDDN (and your own). For galaxy-wide searches use Navigation → Spansh.").small().color(pal::FAINT));
-            ui.columns(2, |c| {
-                results_hotspots(&mut c[0], &st.hotspots);
-                card(&mut c[1], "Best places to sell nearby", |ui| results_commodity(ui, &st.hotspot_prices, TradeMode::SellToStation));
-            });
+            ui.add(egui::Label::new(RichText::new("Hotspots come from DSS ring scans shared over EDDN, and your own. For galaxy-wide searches use Navigation › Spansh.").small().color(pal::DIM)).wrap());
+            ui.add_space(8.0);
+            crate::widgets::split(
+                ui,
+                0.5,
+                360.0,
+                |ui| results_hotspots(ui, &st.hotspots),
+                |ui| {
+                    card(ui, "Best places to sell nearby", |ui| results_commodity(ui, &st.hotspot_prices, TradeMode::SellToStation));
+                },
+            );
         }
+        Tab::Abnormal => abnormal_tab(ui, gs, &db, st),
         // Card-style tabs scroll as a whole (the page itself does not scroll: tables scroll on their own).
         Tab::Sell => {
             egui::ScrollArea::vertical().id_salt("msell").auto_shrink([false, false]).show(ui, |ui| sell_tab(ui, gs, &db, st));
@@ -370,6 +397,143 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
         }
     }
     changed
+}
+
+/// Abnormal prices: anything a station pays far above the galactic average, or sells far below it,
+/// across the whole database (or within a radius). The scan re-runs whenever a filter changes.
+fn abnormal_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) {
+    let origin = gs.location.star_pos;
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
+        crate::widgets::segmented(ui, &mut st.abn_mode, &[(TradeMode::SellToStation, "Paying far above average"), (TradeMode::BuyFromStation, "Selling far below average")]);
+        ui.label(RichText::new("at least").color(pal::DIM));
+        let ratios: &[(u32, &str)] = &[(150, "1.5×"), (200, "2×"), (300, "3×"), (500, "5×"), (1000, "10×")];
+        let mut r = (st.abn_ratio * 100.0).round() as u32;
+        if crate::widgets::segmented(ui, &mut r, ratios) {
+            st.abn_ratio = f64::from(r) / 100.0;
+        }
+        let scopes: &[(u32, &str)] = &[(0, "Whole galaxy"), (100, "Within 100 ly"), (500, "Within 500 ly")];
+        let mut scope = st.abn_radius.map_or(0, |d| d as u32);
+        if crate::widgets::segmented(ui, &mut scope, scopes) {
+            st.abn_radius = (scope > 0).then_some(f64::from(scope));
+        }
+    });
+    ui.add_space(4.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(14.0, 8.0);
+        crate::widgets::toggle(ui, &mut st.abn_carriers, "Fleet carriers");
+        ui.label(RichText::new("Prices from the last").color(pal::DIM));
+        ui.add(egui::DragValue::new(&mut st.abn_age_h).range(1.0..=720.0).suffix(" h"));
+        pad_combo(ui, "abnpad", &mut st.min_pad);
+        if crate::widgets::button(ui, &format!("{} Refresh", icon::ARROW_CLOCKWISE)).clicked() {
+            st.abn_key = None;
+        }
+    });
+    let key = (st.abn_mode, (st.abn_ratio * 100.0) as u64, st.abn_radius.map(|r| r as u64), st.abn_age_h as u64, st.abn_carriers, st.min_pad);
+    if st.abn_key != Some(key) && !st.abn.busy() && (st.abn_radius.is_none() || origin.is_some()) {
+        st.abn_key = Some(key);
+        let q = DealQuery {
+            mode: st.abn_mode,
+            origin,
+            max_distance_ly: st.abn_radius,
+            min_ratio: st.abn_ratio,
+            min_pad: st.min_pad,
+            include_carriers: st.abn_carriers,
+            max_age_hours: Some(st.abn_age_h),
+            cargo_capacity: gs.fleet.current().map(|s| i64::from(s.cargo_capacity.max(1))).unwrap_or(100),
+            limit: 200,
+        };
+        let db = db.clone();
+        st.abn.run(ui.ctx(), move || db.price_deals(&q).map_err(|e| e.to_string()));
+    }
+    ui.add_space(8.0);
+    let explain = match st.abn_mode {
+        TradeMode::SellToStation => "Stations and carriers buying a commodity for far more than its galactic average: sell there.",
+        TradeMode::BuyFromStation => "Stations and carriers selling a commodity for far less than its galactic average: buy there.",
+    };
+    ui.add(egui::Label::new(RichText::new(explain).size(size::FOOTNOTE).color(pal::DIM)).wrap());
+    if !status(ui, &st.abn) {
+        return;
+    }
+    let Some(Ok(deals)) = &st.abn.last else { return };
+    if deals.is_empty() {
+        empty(ui, icon::MAGNIFYING_GLASS, "Nothing abnormal right now", "No price in range is that far from its galactic average. Try a lower multiple or older prices.");
+        return;
+    }
+    let sell = st.abn_mode == TradeMode::SellToStation;
+    // Narrow windows drop the average and quantity columns rather than spilling off the page.
+    let wide = ui.available_width() >= 1040.0;
+    let mut table = TableBuilder::new(ui)
+        .id_salt("abnormal")
+        .striped(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+        .column(Column::initial(180.0).at_least(110.0).clip(true))
+        .column(Column::initial(118.0));
+    if wide {
+        table = table.column(Column::initial(100.0)).column(Column::initial(70.0)).column(Column::initial(84.0));
+    } else {
+        table = table.column(Column::initial(64.0));
+    }
+    let mut headers = vec!["Commodity", if sell { "They pay" } else { "They sell for" }];
+    if wide {
+        headers.extend(["Average", "×", if sell { "Demand" } else { "Stock" }]);
+    } else {
+        headers.push("×");
+    }
+    headers.extend(["Station", "Distance", "Updated"]);
+    table
+        .column(Column::remainder().at_least(140.0).clip(true))
+        .column(Column::initial(76.0))
+        .column(Column::initial(76.0))
+        .header(30.0, |mut h| {
+            for t in &headers {
+                h.col(|ui| crate::widgets::th(ui, t));
+            }
+        })
+        .body(|body| {
+            body.rows(34.0, deals.len(), |mut row| {
+                let d = &deals[row.index()];
+                row.col(|ui| {
+                    ui.label(RichText::new(&d.commodity_name).color(pal::TEXT));
+                });
+                row.col(|ui| {
+                    ui.label(RichText::new(format!("{} Cr", nexus_data::names::group_digits(d.price))).font(display(size::CALLOUT)).color(if sell { pal::GOOD } else { pal::CYAN }));
+                });
+                if wide {
+                    row.col(|ui| {
+                        ui.label(RichText::new(format!("{} Cr", nexus_data::names::group_digits(d.average))).color(pal::DIM));
+                    });
+                }
+                row.col(|ui| {
+                    let col = if d.ratio >= 10.0 { pal::PINK } else if d.ratio >= 3.0 { pal::ACCENT } else { pal::GOLD };
+                    ui.label(RichText::new(format!("{:.1}×", d.ratio)).font(display(size::CALLOUT)).color(col))
+                        .on_hover_text(format!("Galactic average {} Cr · {} {}", nexus_data::names::group_digits(d.average), nexus_data::names::group_digits(d.quantity), if sell { "wanted" } else { "in stock" }));
+                });
+                if wide {
+                    row.col(|ui| {
+                        ui.label(RichText::new(nexus_data::names::group_digits(d.quantity)).color(pal::DIM));
+                    });
+                }
+                row.col(|ui| {
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing.y = 0.0;
+                        let name = if d.is_carrier { format!("{} {}", icon::ANCHOR, d.station) } else { d.station.clone() };
+                        ui.add(egui::Label::new(RichText::new(name).color(pal::TEXT)).truncate());
+                        if ui.add(egui::Label::new(RichText::new(&d.system).size(size::CAPTION).color(pal::DIM)).truncate().sense(egui::Sense::click())).on_hover_text("Click to copy the system").clicked() {
+                            ui.ctx().copy_text(d.system.clone());
+                        }
+                    });
+                });
+                row.col(|ui| {
+                    ui.label(RichText::new(d.distance_ly.map(|x| format!("{x:.0} ly")).unwrap_or_default()).color(pal::DIM));
+                });
+                row.col(|ui| {
+                    let (a, col) = age(d.updated_unix);
+                    ui.label(RichText::new(format!("{a} ago")).color(col));
+                });
+            });
+        });
 }
 
 fn service_query(kind: &str, origin: [f64; 3], pad: Option<char>) -> StationQuery {
@@ -395,20 +559,20 @@ fn feed_header(ui: &mut Ui, svc: &mut MarketService) {
     ui.horizontal_wrapped(|ui| {
         match svc.feed_summary() {
             Some((connected, line)) => {
-                badge(ui, if connected { "EDDN LIVE" } else { "EDDN CONNECTING" }, if connected { pal::GOOD } else { pal::WARN });
+                badge(ui, if connected { "Live" } else { "Connecting" }, if connected { pal::GOOD } else { pal::WARN });
                 ui.label(RichText::new(line).color(pal::DIM));
             }
             None => {
-                badge(ui, "EDDN OFF", pal::FAINT);
-                ui.label(RichText::new("Enable the live feed in Accounts & sync for real-time prices.").color(pal::FAINT));
+                badge(ui, "Feed off", pal::GRAY);
+                ui.label(RichText::new("Turn on the live feed in Accounts & sync for real-time prices.").color(pal::DIM));
             }
         }
         if let Some(s) = svc.db_summary() {
-            ui.label(RichText::new(s).small().color(pal::FAINT));
+            ui.label(RichText::new(s).small().color(pal::DIM));
         }
     });
     for l in svc.recent_headlines(4) {
-        ui.label(RichText::new(format!("{} {l}", icon::BROADCAST)).small().color(pal::FAINT));
+        ui.label(RichText::new(format!("{} {l}", icon::BROADCAST)).small().color(pal::DIM));
     }
 }
 
@@ -428,7 +592,7 @@ fn status<T>(ui: &mut Ui, slot: &Slot<Res<T>>) -> bool {
         }
         Some(Ok(v)) => {
             if let Some(t) = slot.took {
-                ui.label(RichText::new(format!("{} results in {:.1} ms", v.len(), t.as_secs_f64() * 1e3)).small().color(pal::FAINT));
+                ui.label(RichText::new(format!("{} results in {:.1} ms", v.len(), t.as_secs_f64() * 1e3)).small().color(pal::DIM));
             }
             true
         }
@@ -436,6 +600,10 @@ fn status<T>(ui: &mut Ui, slot: &Slot<Res<T>>) -> bool {
 }
 
 fn results_commodity(ui: &mut Ui, slot: &Slot<Res<CommodityHit>>, mode: TradeMode) {
+    if slot.last.is_none() && !slot.busy() {
+        empty(ui, icon::MAGNIFYING_GLASS, "Find the best price for anything", "Type a commodity and press Search: stations and carriers near you, best price first.");
+        return;
+    }
     if !status(ui, slot) {
         return;
     }
@@ -447,7 +615,8 @@ fn results_commodity(ui: &mut Ui, slot: &Slot<Res<CommodityHit>>, mode: TradeMod
     TableBuilder::new(ui)
         .id_salt(("chits", mode as u8))
         .striped(true)
-        .resizable(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
         .column(Column::initial(90.0))
         .column(Column::initial(80.0))
         .column(Column::initial(230.0))
@@ -456,15 +625,15 @@ fn results_commodity(ui: &mut Ui, slot: &Slot<Res<CommodityHit>>, mode: TradeMod
         .column(Column::initial(50.0))
         .column(Column::initial(60.0))
         .column(Column::remainder())
-        .header(22.0, |mut h| {
+        .header(30.0, |mut h| {
             for t in [if mode == TradeMode::BuyFromStation { "Buy at" } else { "Sell at" }, if mode == TradeMode::BuyFromStation { "Stock" } else { "Demand" }, "Station", "System", "Distance", "Pad", "Age", ""] {
                 h.col(|ui| {
-                    ui.label(RichText::new(t).color(pal::DIM).strong());
+                    crate::widgets::th(ui, t);
                 });
             }
         })
         .body(|body| {
-            body.rows(24.0, hits.len(), |mut row| {
+            body.rows(32.0, hits.len(), |mut row| {
                 let h = &hits[row.index()];
                 row.col(|ui| {
                     ui.label(RichText::new(nexus_data::names::group_digits(h.price)).font(display(14.0)).color(pal::GOLD));
@@ -481,7 +650,7 @@ fn results_commodity(ui: &mut Ui, slot: &Slot<Res<CommodityHit>>, mode: TradeMod
                         }
                         ui.label(&h.station);
                         if let Some(ls) = h.dist_ls {
-                            ui.label(RichText::new(format!("{ls:.0} ls")).small().color(pal::FAINT));
+                            ui.label(RichText::new(format!("{ls:.0} ls")).small().color(pal::DIM));
                         }
                     });
                 });
@@ -516,22 +685,23 @@ fn results_routes(ui: &mut Ui, slot: &Slot<Res<TradeRoute>>) {
     }
     TableBuilder::new(ui)
         .striped(true)
-        .resizable(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
         .column(Column::initial(170.0))
         .column(Column::initial(90.0))
         .column(Column::initial(100.0))
         .column(Column::initial(260.0))
         .column(Column::initial(260.0))
         .column(Column::remainder())
-        .header(22.0, |mut h| {
+        .header(30.0, |mut h| {
             for t in ["Commodity", "Profit/t", "Trip profit", "Buy at", "Sell at", "Hop"] {
                 h.col(|ui| {
-                    ui.label(RichText::new(t).color(pal::DIM).strong());
+                    crate::widgets::th(ui, t);
                 });
             }
         })
         .body(|body| {
-            body.rows(36.0, routes.len(), |mut row| {
+            body.rows(44.0, routes.len(), |mut row| {
                 let r = &routes[row.index()];
                 row.col(|ui| {
                     ui.label(&r.commodity_name);
@@ -565,22 +735,23 @@ fn results_stations(ui: &mut Ui, slot: &Slot<Res<StationHit>>) {
     let Some(Ok(list)) = &slot.last else { return };
     TableBuilder::new(ui)
         .striped(true)
-        .resizable(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
         .column(Column::initial(260.0))
         .column(Column::initial(220.0))
         .column(Column::initial(80.0))
         .column(Column::initial(80.0))
         .column(Column::initial(50.0))
         .column(Column::remainder())
-        .header(22.0, |mut h| {
+        .header(30.0, |mut h| {
             for t in ["Station", "System", "Distance", "From star", "Pad", "Economy"] {
                 h.col(|ui| {
-                    ui.label(RichText::new(t).color(pal::DIM).strong());
+                    crate::widgets::th(ui, t);
                 });
             }
         })
         .body(|body| {
-            body.rows(24.0, list.len(), |mut row| {
+            body.rows(32.0, list.len(), |mut row| {
                 let s = &list[row.index()];
                 row.col(|ui| {
                     ui.label(&s.station.name);
@@ -638,22 +809,23 @@ fn docked_market(ui: &mut Ui, gs: &GameState) {
     items.sort_by(|a, b| a.category_localised.cmp(&b.category_localised).then(a.name_localised.cmp(&b.name_localised)));
     TableBuilder::new(ui)
         .striped(true)
-        .resizable(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
         .column(Column::initial(240.0))
         .column(Column::initial(160.0))
         .column(Column::initial(90.0))
         .column(Column::initial(90.0))
         .column(Column::initial(90.0))
         .column(Column::remainder())
-        .header(22.0, |mut h| {
+        .header(30.0, |mut h| {
             for t in ["Commodity", "Category", "Buy", "Sell", "Stock", "Demand"] {
                 h.col(|ui| {
-                    ui.label(RichText::new(t).color(pal::DIM).strong());
+                    crate::widgets::th(ui, t);
                 });
             }
         })
         .body(|body| {
-            body.rows(22.0, items.len(), |mut row| {
+            body.rows(32.0, items.len(), |mut row| {
                 let i = items[row.index()];
                 row.col(|ui| {
                     ui.label(i.name_localised.clone().unwrap_or_else(|| i.symbol()));
@@ -687,11 +859,11 @@ fn mb(bytes: u64) -> String {
 
 fn database_tab(ui: &mut Ui, svc: &mut MarketService, st: &mut MarketUi, rt: &tokio::runtime::Handle) {
     let digits = |n: u64| nexus_data::names::group_digits(n as i64);
-    ui.columns(2, |c| {
-        let ui = &mut c[0];
+    crate::widgets::cards(ui, 2, 380.0, |c| {
+      c.add(|ui| {
         card(ui, "Local galaxy database", |ui| match svc.db_stats().cloned() {
             Some(s) => {
-                egui::Grid::new("dbstats").num_columns(2).spacing([16.0, 3.0]).show(ui, |ui| {
+                egui::Grid::new("dbstats").max_col_width(ui.available_width()).num_columns(2).spacing([16.0, 3.0]).show(ui, |ui| {
                     for (k, v) in [
                         ("Stations", digits(s.stations)),
                         ("Markets", digits(s.stations_with_market)),
@@ -718,8 +890,7 @@ fn database_tab(ui: &mut Ui, svc: &mut MarketService, st: &mut MarketUi, rt: &to
                 });
                 ui.label(
                     RichText::new(format!("{} snapshots stored this session, {} older than what was already known", digits(s.market_snapshots), digits(s.stale_markets)))
-                        .small()
-                        .color(pal::FAINT),
+                        .small().color(pal::DIM),
                 );
             }
             None => {
@@ -730,7 +901,7 @@ fn database_tab(ui: &mut Ui, svc: &mut MarketService, st: &mut MarketUi, rt: &to
         card(ui, "Live feed (EDDN)", |ui| match svc.feed_snapshot() {
             Some(f) => {
                 ui.horizontal(|ui| {
-                    badge(ui, if f.connected { "CONNECTED" } else { "CONNECTING" }, if f.connected { pal::GOOD } else { pal::WARN });
+                    badge(ui, if f.connected { "Connected" } else { "Connecting" }, if f.connected { pal::GOOD } else { pal::WARN });
                     ui.label(RichText::new(format!("{} msgs/min", f.messages_per_minute)).font(display(15.0)).color(pal::ACCENT_SOFT));
                 });
                 ui.label(
@@ -755,7 +926,7 @@ fn database_tab(ui: &mut Ui, svc: &mut MarketService, st: &mut MarketUi, rt: &to
                     ui.horizontal(|ui| {
                         ui.label(RichText::new(schema).small().color(pal::DIM));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(RichText::new(digits(*n)).small().color(pal::FAINT));
+                            ui.label(RichText::new(digits(*n)).small().color(pal::DIM));
                         });
                     });
                 }
@@ -764,8 +935,8 @@ fn database_tab(ui: &mut Ui, svc: &mut MarketService, st: &mut MarketUi, rt: &to
                 ui.label(RichText::new("Off. Turn on \"Receive the live market feed\" in Accounts & sync.").color(pal::DIM));
             }
         });
-
-        let ui = &mut c[1];
+      });
+      c.add(|ui| {
         card(ui, "Baseline import (Spansh)", |ui| {
             ui.label(
                 RichText::new(
@@ -780,13 +951,12 @@ fn database_tab(ui: &mut Ui, svc: &mut MarketService, st: &mut MarketUi, rt: &to
                      Takes from a few minutes to half an hour depending on your connection. The live feed keeps running meanwhile, \
                      and newer EDDN prices are never overwritten.",
                 )
-                .small()
-                .color(pal::FAINT),
+                .small().color(pal::DIM),
             );
             ui.add_space(6.0);
             let running = svc.import().is_some_and(|j| j.running());
             ui.add_enabled_ui(!running, |ui| {
-                if ui.button(RichText::new(format!("{} Download & import all stations", icon::DOWNLOAD_SIMPLE)).color(pal::ACCENT)).clicked() {
+                if crate::widgets::primary_button(ui, &format!("{} Download and import all stations", icon::DOWNLOAD_SIMPLE)).clicked() {
                     let ctx = ui.ctx().clone();
                     svc.start_import(ImportSource::Url(SPANSH_STATIONS_URL.into()), &ctx, rt);
                 }
@@ -811,16 +981,17 @@ fn database_tab(ui: &mut Ui, svc: &mut MarketService, st: &mut MarketUi, rt: &to
                 "Your own journal: every station you dock at and every market you open.",
                 "Spansh dump: the daily baseline above.",
             ] {
-                ui.label(RichText::new(format!("• {line}")).small().color(pal::DIM));
+                ui.add(egui::Label::new(RichText::new(format!("• {line}")).small().color(pal::DIM)).wrap());
             }
         });
+      });
     });
 }
 
 fn import_progress(ui: &mut Ui, job: &ImportJob) {
     let digits = |n: u64| nexus_data::names::group_digits(n as i64);
     let s = job.status.lock();
-    ui.label(RichText::new(format!("{} {}", icon::DATABASE, s.source)).small().color(pal::FAINT));
+    ui.label(RichText::new(format!("{} {}", icon::DATABASE, s.source)).small().color(pal::DIM));
     let p = &s.progress;
     let frac = s.total_bytes.map(|t| (p.bytes_read as f64 / t.max(1) as f64).clamp(0.0, 1.0) as f32);
     let elapsed = s.started.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
@@ -856,7 +1027,7 @@ fn import_progress(ui: &mut Ui, job: &ImportJob) {
             let what = if sum.cancelled { "Cancelled" } else if sum.stream_error.is_some() { "Stopped early" } else { "Done" };
             ui.label(RichText::new(format!("{} {what} after {}", icon::CHECK_CIRCLE, duration(sum.progress.elapsed.as_secs() as i64))).color(pal::GOOD));
             if sum.stale_markets > 0 {
-                ui.label(RichText::new(format!("{} markets kept from newer live data", digits(sum.stale_markets))).small().color(pal::FAINT));
+                ui.label(RichText::new(format!("{} markets kept from newer live data", digits(sum.stale_markets))).small().color(pal::DIM));
             }
             if let Some(e) = &sum.stream_error {
                 ui.label(RichText::new(format!("Download interrupted ({e}). Everything before it was imported; run it again to finish.")).small().color(pal::WARN));
@@ -910,7 +1081,7 @@ fn sell_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) {
         None => return,
     };
     if let Some(t) = st.sell.took {
-        ui.label(RichText::new(format!("planned in {:.1} ms", t.as_secs_f64() * 1e3)).small().color(pal::FAINT));
+        ui.label(RichText::new(format!("planned in {:.1} ms", t.as_secs_f64() * 1e3)).small().color(pal::DIM));
     }
     if plan.stops.is_empty() {
         ui.label(RichText::new("No known buyers in range. Widen the radius, or fill the database (Market → Database & feed).").color(pal::DIM));
@@ -920,7 +1091,8 @@ fn sell_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) {
         TableBuilder::new(ui)
             .id_salt("sellstops")
             .striped(true)
-            .resizable(true)
+            .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
             .vscroll(false)
             .column(Column::initial(250.0))
             .column(Column::initial(190.0))
@@ -928,15 +1100,15 @@ fn sell_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) {
             .column(Column::initial(110.0))
             .column(Column::initial(90.0))
             .column(Column::remainder())
-            .header(22.0, |mut h| {
+            .header(30.0, |mut h| {
                 for t in ["Station", "System", "Distance", "Pays", "Buys", "Age"] {
                     h.col(|ui| {
-                        ui.label(RichText::new(t).color(pal::DIM).strong());
+                        crate::widgets::th(ui, t);
                     });
                 }
             })
             .body(|body| {
-                body.rows(24.0, plan.stops.len(), |mut row| {
+                body.rows(32.0, plan.stops.len(), |mut row| {
                     let s = &plan.stops[row.index()];
                     let h = &s.hit;
                     row.col(|ui| {
@@ -948,7 +1120,7 @@ fn sell_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) {
                             }
                             ui.label(&h.station);
                             if let Some(ls) = h.dist_ls {
-                                ui.label(RichText::new(format!("{ls:.0} ls")).small().color(pal::FAINT));
+                                ui.label(RichText::new(format!("{ls:.0} ls")).small().color(pal::DIM));
                             }
                         });
                     });
@@ -1036,15 +1208,14 @@ fn alerts_tab(ui: &mut Ui, svc: &MarketService, st: &mut MarketUi, watches: &mut
         let w = &mut st.new_watch;
         ui.horizontal_wrapped(|ui| {
             ui.add(egui::TextEdit::singleline(&mut w.commodity).hint_text("Commodity").desired_width(190.0));
-            ui.selectable_value(&mut w.sell, true, "sells for at least");
-            ui.selectable_value(&mut w.sell, false, "can be bought for at most");
+            crate::widgets::segmented(ui, &mut w.sell, &[(true, "sells for at least"), (false, "can be bought for at most")]);
             ui.add(egui::DragValue::new(&mut w.price).range(1..=100_000_000).speed(100.0).suffix(" Cr"));
             ui.label("within");
             ui.add(egui::DragValue::new(&mut w.max_ly).range(0.0..=20_000.0).suffix(" ly")).on_hover_text("0 = anywhere");
             pad_combo(ui, "wpad", &mut w.min_pad);
             ui.label(if w.sell { "min demand" } else { "min stock" });
             ui.add(egui::DragValue::new(&mut w.min_qty).range(1..=1_000_000).suffix(" t"));
-            ui.checkbox(&mut w.carriers, "Fleet carriers");
+            crate::widgets::toggle(ui, &mut w.carriers, "Fleet carriers");
         });
         let known = !w.commodity.trim().is_empty() && svc.resolves(w.commodity.trim());
         ui.horizontal(|ui| {
@@ -1069,7 +1240,7 @@ fn alerts_tab(ui: &mut Ui, svc: &MarketService, st: &mut MarketUi, watches: &mut
         let mut remove = None;
         for (i, w) in watches.iter_mut().enumerate() {
             ui.horizontal(|ui| {
-                changed |= ui.checkbox(&mut w.enabled, "").on_hover_text("Enabled").changed();
+                changed |= crate::widgets::switch(ui, &mut w.enabled).on_hover_text("Enabled").changed();
                 let col = if w.enabled { pal::TEXT } else { pal::FAINT };
                 ui.label(RichText::new(describe_watch(w)).color(col));
                 if !svc.resolves(&w.commodity) {

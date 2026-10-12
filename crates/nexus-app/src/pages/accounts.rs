@@ -1,9 +1,10 @@
-//! Website/service connections (EDDN, EDSM, Inara, EDAstro, Frontier CAPI). All opt-in.
+//! Website/service connections (EDDN, EDSM, Inara, EDAstro, Frontier CAPI). All opt-in. Laid out
+//! like System Settings: grouped rows, switches on the right, details folded away.
 
 use crate::secrets;
 use crate::settings::Accounts;
-use crate::theme::{display, pal};
-use crate::widgets::{ago, badge, card};
+use crate::theme::{pal, size};
+use crate::widgets::{self, Group, ago, badge, cards, footnote, group, section};
 use egui::{RichText, Ui};
 use egui_phosphor::regular as icon;
 use nexus_uplink::{ServiceStatus, UplinkStatus};
@@ -20,45 +21,57 @@ pub struct StatusView {
 pub struct AccountsUi {
     edsm_key_input: String,
     inara_key_input: String,
+    show_inara_options: bool,
+    /// "Check again" was clicked (the app asks the uplink).
+    pub check_inara: bool,
 }
 
-fn status_line(ui: &mut Ui, s: &ServiceStatus) {
-    if !s.enabled && s.queued == 0 && s.sent == 0 && s.failed == 0 {
+fn has_status(s: &ServiceStatus) -> bool {
+    s.enabled || s.queued > 0 || s.sent > 0 || s.failed > 0 || s.paused.is_some() || s.last_error.is_some()
+}
+
+/// Sent / queued / failed counts, pause reason and last error, as a row of the group.
+fn status_row(g: &mut Group, s: &ServiceStatus) {
+    if !has_status(s) {
         return;
     }
-    ui.horizontal_wrapped(|ui| {
-        badge(ui, &format!("{} sent", s.sent), pal::GOOD);
-        if s.queued > 0 {
-            badge(ui, &format!("{} queued", s.queued), pal::CYAN);
+    g.content(|ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+            badge(ui, &format!("{} sent", s.sent), pal::GOOD);
+            if s.queued > 0 {
+                badge(ui, &format!("{} queued", s.queued), pal::CYAN);
+            }
+            if s.failed > 0 {
+                badge(ui, &format!("{} failed", s.failed), pal::BAD);
+            }
+            if let Some(t) = s.last_success {
+                ui.label(RichText::new(format!("Last accepted {}", ago(t))).size(size::FOOTNOTE).color(pal::DIM));
+            }
+        });
+        if let Some(p) = &s.paused {
+            ui.add(egui::Label::new(RichText::new(format!("{} Paused: {p}", icon::PAUSE_CIRCLE)).size(size::FOOTNOTE).color(pal::WARN)).wrap());
         }
-        if s.failed > 0 {
-            badge(ui, &format!("{} failed", s.failed), pal::BAD);
-        }
-        if let Some(t) = s.last_success {
-            ui.label(RichText::new(format!("last accepted {}", ago(t))).small().color(pal::DIM));
+        if let Some(e) = &s.last_error {
+            ui.add(egui::Label::new(RichText::new(e).size(size::FOOTNOTE).color(pal::BAD)).wrap());
         }
     });
-    if let Some(p) = &s.paused {
-        ui.label(RichText::new(format!("{} Paused: {p}", icon::PAUSE_CIRCLE)).small().color(pal::WARN));
-    }
-    if let Some(e) = &s.last_error {
-        ui.label(RichText::new(e).small().color(pal::BAD));
-    }
 }
 
-/// Masked secret editor. Returns true when the stored (sealed) value changed.
-fn secret_field(ui: &mut Ui, stored: &mut String, input: &mut String, hint: &str) -> bool {
+/// An API key row: a masked field and Save (and Remove once a key is stored). Returns true when
+/// the stored (sealed) value changed.
+fn key_row(g: &mut Group, stored: &mut String, input: &mut String, hint: &str) -> bool {
     let mut changed = false;
-    ui.horizontal(|ui| {
-        if !stored.is_empty() && input.is_empty() {
-            ui.label(RichText::new(format!("{} key saved (encrypted)", icon::LOCK_KEY)).color(pal::GOOD));
-            if ui.small_button("Remove").clicked() {
-                stored.clear();
-                changed = true;
-            }
+    let detail = if stored.is_empty() { "Not set" } else { "Saved and encrypted on this PC" };
+    g.row("API key", detail, |ui| {
+        // Right to left: the buttons, then the field.
+        if !stored.is_empty() && widgets::button(ui, "Remove").clicked() {
+            stored.clear();
+            changed = true;
         }
-        let resp = ui.add(egui::TextEdit::singleline(input).password(true).hint_text(hint).desired_width(300.0));
-        if (resp.lost_focus() || ui.button("Save").clicked()) && !input.trim().is_empty() {
+        let save = ui.add_enabled_ui(!input.trim().is_empty(), |ui| widgets::button(ui, "Save")).inner;
+        let field = ui.add(egui::TextEdit::singleline(input).password(true).hint_text(if stored.is_empty() { hint } else { "Paste a new key to replace it" }).desired_width(200.0).margin(egui::Margin::symmetric(10, 6)));
+        if (save.clicked() || field.lost_focus()) && !input.trim().is_empty() {
             *stored = secrets::seal(input.trim());
             input.clear();
             changed = true;
@@ -67,68 +80,124 @@ fn secret_field(ui: &mut Ui, stored: &mut String, input: &mut String, hint: &str
     changed
 }
 
+fn link_row(g: &mut Group, text: &str, url: &str) {
+    g.content(|ui| {
+        ui.hyperlink_to(format!("{text} {}", icon::ARROW_SQUARE_OUT), url);
+    });
+}
+
 /// Returns true if settings changed.
 pub fn show(ui: &mut Ui, acc: &mut Accounts, st: &mut AccountsUi, cmdr_name: &str, status: &StatusView) -> bool {
     let mut changed = false;
-    ui.label(RichText::new("Connect your commander to the community services. Everything is opt-in — nothing leaves this PC until you switch it on. Keys are encrypted with Windows DPAPI.").color(pal::DIM));
-    ui.add_space(8.0);
-    ui.columns(2, |c| {
-        let ui = &mut c[0];
-        card(ui, "EDDN — Elite Dangerous Data Network", |ui| {
-            changed |= ui.checkbox(&mut acc.eddn_listen, "Receive the live market feed (all commanders' station data, in real time)").changed();
-            if let Some(f) = &status.eddn_feed {
-                ui.label(RichText::new(f).small().color(pal::CYAN));
-            }
-            ui.add_space(4.0);
-            changed |= ui.checkbox(&mut acc.eddn_upload, "Contribute my market, outfitting, shipyard and exploration data").changed();
-            ui.label(RichText::new("What you send is what EDMC/EDD send: station prices and services, system & body scans, routes. No credits, cargo or personal data. EDDN republishes it without your name. It keeps Inara, Spansh, EDSM and everyone else (including this app) up to date.").small().color(pal::FAINT));
-            if acc.eddn_upload {
-                changed |= ui
-                    .checkbox(&mut acc.eddn_paused, "Paused: send nothing until I resume (also a button in the header)")
-                    .on_hover_text("Market prices are only sent when you undock, so pausing while docked keeps a market you just found to yourself.")
-                    .changed();
-            }
-            changed |= ui.checkbox(&mut acc.eddn_test_mode, "Test mode (send to EDDN's /test schemas only)").changed();
-            status_line(ui, &status.uplink.eddn);
-        });
-        ui.add_space(8.0);
-        card(ui, "EDAstro", |ui| {
-            changed |= ui.checkbox(&mut acc.edastro_enabled, "Send the events EDAstro asks for (carrier jumps/stats, docking, organic scans)").changed();
-            ui.label(RichText::new("Feeds EDAstro's galaxy maps and statistics. No key needed.").small().color(pal::FAINT));
-            status_line(ui, &status.uplink.edastro);
-        });
-        ui.add_space(8.0);
-        card(ui, "Frontier Companion API", |ui| {
-            ui.label(RichText::new("Optional. Adds fleet-carrier market/crew data and remote shipyard info. It needs a client ID that Frontier approves for this app (Developer Zone at user.frontierstore.net); the journal already covers almost everything.").color(pal::DIM));
-            ui.horizontal(|ui| badge(ui, "not configured", pal::FAINT));
-        });
-
-        let ui = &mut c[1];
-        card(ui, "EDSM — flight log & star map", |ui| {
-            changed |= ui.checkbox(&mut acc.edsm_enabled, "Sync my journal to EDSM").changed();
-            ui.horizontal(|ui| {
-                ui.label("Commander name");
-                if acc.edsm_commander.is_empty() && !cmdr_name.is_empty() {
-                    acc.edsm_commander = cmdr_name.to_string();
-                    changed = true;
+    footnote(ui, "Connect your commander to the community services. Everything is off until you switch it on, keys are encrypted on this PC, and history is never uploaded: only what happens while Elite Nexus is running.");
+    ui.add_space(4.0);
+    if acc.edsm_commander.is_empty() && !cmdr_name.is_empty() {
+        acc.edsm_commander = cmdr_name.to_string();
+        changed = true;
+    }
+    cards(ui, 2, 420.0, |c| {
+        c.add(|ui| {
+            section(ui, "EDDN · Elite Dangerous Data Network");
+            group(ui, |g| {
+                changed |= g.switch(&mut acc.eddn_listen, "Receive the live market feed", "Every commander's station data, in real time.");
+                if let Some(f) = &status.eddn_feed {
+                    g.content(|ui| {
+                        ui.label(RichText::new(format!("{} {f}", icon::BROADCAST)).size(size::FOOTNOTE).color(pal::CYAN));
+                    });
                 }
-                changed |= ui.add(egui::TextEdit::singleline(&mut acc.edsm_commander).desired_width(220.0)).changed();
+                changed |= g.switch(
+                    &mut acc.eddn_upload,
+                    "Share my market, outfitting, shipyard and exploration data",
+                    "The same data EDMC and EDDiscovery send: station prices and services, system and body scans, routes. No credits, cargo or personal data, and no name. It keeps Inara, Spansh, EDSM and everyone else up to date.",
+                );
+                if acc.eddn_upload {
+                    changed |= g.switch(&mut acc.eddn_paused, "Pause sharing", "Send nothing until you resume (also in the toolbar). Prices are only sent when you undock, so pausing while docked keeps a market you just found to yourself.");
+                }
+                changed |= g.switch(&mut acc.eddn_test_mode, "Test mode", "Send to EDDN's test schemas only.");
+                status_row(g, &status.uplink.eddn);
             });
-            changed |= secret_field(ui, &mut acc.edsm_api_key, &mut st.edsm_key_input, "EDSM API key");
-            ui.hyperlink_to(format!("{} Get your EDSM API key", icon::ARROW_SQUARE_OUT), "https://www.edsm.net/en/settings/api");
-            status_line(ui, &status.uplink.edsm);
+            section(ui, "EDAstro");
+            group(ui, |g| {
+                changed |= g.switch(&mut acc.edastro_enabled, "Send the events EDAstro asks for", "Carrier jumps and stats, docking and organic scans. Feeds EDAstro's galaxy maps and statistics. No key needed.");
+                status_row(g, &status.uplink.edastro);
+            });
+            section(ui, "Frontier Companion API");
+            group(ui, |g| {
+                g.row(
+                    "Fleet-carrier market, crew and remote shipyard data",
+                    "Needs a client ID that Frontier approves for this app (Developer Zone at user.frontierstore.net). The journal already covers almost everything.",
+                    |ui| {
+                        badge(ui, "Not configured", pal::GRAY);
+                    },
+                );
+            });
         });
-        ui.add_space(8.0);
-        card(ui, "Inara — commander profile", |ui| {
-            changed |= ui.checkbox(&mut acc.inara_enabled, "Sync my commander profile to Inara").changed();
-            changed |= secret_field(ui, &mut acc.inara_api_key, &mut st.inara_key_input, "Inara API key");
-            ui.hyperlink_to(format!("{} Get your Inara API key", icon::ARROW_SQUARE_OUT), "https://inara.cz/elite/cmdr-settings-api/");
-            changed |= ui.checkbox(&mut acc.inara_dev_mode, "Developer mode (required until Inara whitelists the app name)").changed();
-            ui.label(RichText::new("Inara accepts about 2 requests a minute; Elite Nexus batches updates every 35+ seconds so your key is never locked out.").small().color(pal::FAINT));
-            status_line(ui, &status.uplink.inara);
+        c.add(|ui| {
+            section(ui, "EDSM · flight log and star map");
+            group(ui, |g| {
+                changed |= g.switch(&mut acc.edsm_enabled, "Sync my journal to EDSM", "");
+                g.row("Commander name", "", |ui| {
+                    changed |= ui.add(egui::TextEdit::singleline(&mut acc.edsm_commander).desired_width(200.0).margin(egui::Margin::symmetric(10, 6))).changed();
+                });
+                changed |= key_row(g, &mut acc.edsm_api_key, &mut st.edsm_key_input, "EDSM API key");
+                link_row(g, "Get your EDSM API key", "https://www.edsm.net/en/settings/api");
+                status_row(g, &status.uplink.edsm);
+            });
+            section(ui, "Inara · commander profile");
+            group(ui, |g| {
+                changed |= g.switch(&mut acc.inara_enabled, "Sync my commander profile to Inara", "");
+                changed |= key_row(g, &mut acc.inara_api_key, &mut st.inara_key_input, "Inara API key");
+                link_row(g, "Get your Inara API key", "https://inara.cz/elite/cmdr-settings-api/");
+                // Proof that it works: who Inara says the key belongs to, with a link to the profile.
+                let s = &status.uplink.inara;
+                if acc.inara_enabled && !acc.inara_api_key.is_empty() {
+                    g.content(|ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            match (&s.account, s.checking) {
+                                (Some(a), _) => {
+                                    ui.label(RichText::new(format!("{} Connected as CMDR {}", icon::CHECK_CIRCLE, a.name)).color(pal::GOOD));
+                                    if let Some(url) = &a.url {
+                                        ui.hyperlink_to(format!("View your Inara profile {}", icon::ARROW_SQUARE_OUT), url);
+                                    }
+                                }
+                                (None, true) => {
+                                    ui.spinner();
+                                    ui.label(RichText::new("Checking the key with Inara…").color(pal::DIM));
+                                }
+                                (None, false) => {
+                                    ui.label(RichText::new("Not confirmed yet").color(pal::DIM));
+                                }
+                            }
+                            if !s.checking
+                                && widgets::button(ui, "Check again").on_hover_text("Asks Inara who this key belongs to (counts towards its limit of about 2 requests a minute)").clicked()
+                            {
+                                st.check_inara = true;
+                            }
+                        });
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new("Your profile (credits, ranks, reputation, ship and loadout, materials, cargo, location) is sent when sync starts, then updated live as you play.")
+                                    .size(size::FOOTNOTE)
+                                    .color(pal::DIM),
+                            )
+                            .wrap(),
+                        );
+                    });
+                }
+                status_row(g, s);
+            });
+            // Hidden depth.
+            ui.add_space(6.0);
+            if widgets::disclosure(ui, &mut st.show_inara_options, "Inara options") {
+                group(ui, |g| {
+                    changed |= g.switch(
+                        &mut acc.inara_dev_mode,
+                        "Developer mode",
+                        "Sent to Inara as isBeingDeveloped. Your profile is still updated; Inara only ignores shared data such as community-goal progress. Leave it on until Inara has approved \"Elite Nexus\". Updates are batched every 35+ seconds, so the key is never locked out.",
+                    );
+                });
+            }
         });
     });
-    ui.add_space(8.0);
-    ui.label(RichText::new(format!("{} History is never uploaded — only events that happen while Elite Nexus is running.", icon::INFO)).font(display(13.0)).color(pal::DIM));
     changed
 }

@@ -1,12 +1,12 @@
-//! The main window: sidebar, HUD header, page routing, toasts, voice.
+//! The main window: glass sidebar, page header with toolbar capsules, page routing, banners, voice.
 
 use crate::core::{Core, Phase};
 use crate::pages::{self, Page};
 use crate::settings::Settings;
-use crate::theme::{display, pal};
+use crate::theme::{display, pal, size};
 use crate::tts::Speaker;
 use crate::widgets;
-use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, RichText, Sense, Stroke, Ui, Vec2};
+use egui::{Align, Align2, Color32, CornerRadius, Frame, Layout, Margin, Rect, RichText, Sense, Stroke, Ui, Vec2};
 use egui_phosphor::regular as icon;
 use nexus_model::{Alert, Priority};
 use std::collections::VecDeque;
@@ -27,6 +27,8 @@ pub struct Overrides {
     pub mute: bool,
     /// Sub-tab to open on the start page (screenshots), e.g. `sell` for Market.
     pub tab: Option<String>,
+    /// `--demo` (screenshot runs only): sample content for pages that need an account, e.g. Ask.
+    pub demo: bool,
 }
 
 pub struct ScreenshotJob {
@@ -113,6 +115,7 @@ impl NexusApp {
         if let Some(t) = ov.tab.as_deref().and_then(pages::market::Tab::from_name) {
             market_ui.tab = t;
         }
+        let map = pages::galaxy_map::MapUi::new(ov.tab.as_deref() == Some("galaxy"));
         let speaker = Speaker::start();
         speaker.set_rate(settings.tts_rate);
         speaker.set_volume(settings.tts_volume);
@@ -121,7 +124,16 @@ impl NexusApp {
             settings,
             data_dir,
             page,
-            toasts: Vec::new(),
+            // `--demo` screenshots show one banner so its design can be checked.
+            toasts: if ov.demo && shot.is_some() {
+                vec![Toast {
+                    alert: Alert::new(nexus_journal::Timestamp::now(), nexus_model::AlertKind::Exploration, Priority::High, "Earth-like world")
+                        .detail("Brestla A 1 · 3.2 M Cr if mapped, first discovery"),
+                    born: Instant::now().checked_sub(Duration::from_secs(1)).unwrap_or_else(Instant::now),
+                }]
+            } else {
+                Vec::new()
+            },
             alert_log: VecDeque::new(),
             speaker,
             applied_scale: 0.0,
@@ -130,7 +142,7 @@ impl NexusApp {
             fleet: Default::default(),
             eng: Default::default(),
             log: Default::default(),
-            map: pages::galaxy_map::MapUi { show_route: true, show_labels: true, show_landmarks: false, show_assets: true },
+            map,
             binds: Default::default(),
             bgs: Default::default(),
             nav: Default::default(),
@@ -141,8 +153,8 @@ impl NexusApp {
             market,
             market_ui,
             colo: Default::default(),
-            assistant: Default::default(),
-            ask_ui: Default::default(),
+            assistant: if ov.demo && shot.is_some() { crate::assistant::AssistantService::demo() } else { Default::default() },
+            ask_ui: pages::ask::AskUi::new(ov.demo && shot.is_some()),
             ai_routes: Default::default(),
             overrides: ov,
             shot,
@@ -232,106 +244,148 @@ impl NexusApp {
         }
     }
 
-    fn sidebar(&mut self, ui: &mut Ui) {
-        ui.add_space(14.0);
+    /// The floating glass sidebar. `wide` shows labels; narrow windows get an icon rail.
+    fn sidebar(&mut self, ui: &mut Ui, wide: bool) {
+        let panel = ui.max_rect();
+        widgets::glass(ui.painter(), panel, 18, pal::SIDEBAR);
+        let pad = if wide { 12.0 } else { 10.0 };
+        let inner = panel.shrink2(Vec2::new(pad, 14.0));
+        let mut ui = ui.new_child(egui::UiBuilder::new().max_rect(inner).layout(Layout::top_down(Align::Min)));
+        let ui = &mut ui;
+        // App identity.
         ui.horizontal(|ui| {
-            ui.add_space(6.0);
-            ui.label(RichText::new(icon::DIAMOND).size(24.0).color(pal::ACCENT));
-            ui.vertical(|ui| {
-                ui.label(RichText::new("ELITE NEXUS").font(display(19.0)).color(pal::TEXT));
-                ui.label(RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).small().color(pal::FAINT));
-            });
-        });
-        ui.add_space(12.0);
-        egui::ScrollArea::vertical().id_salt("nav").show(ui, |ui| {
-            for (group, items) in Page::GROUPS {
-                ui.add_space(3.0);
-                ui.horizontal(|ui| {
-                    ui.add_space(10.0);
-                    ui.label(RichText::new(*group).font(display(11.0)).color(pal::FAINT));
+            if !wide {
+                ui.add_space(((inner.width() - 32.0) / 2.0).max(0.0));
+            }
+            app_tile(ui, 32.0);
+            if wide {
+                ui.add_space(2.0);
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 0.0;
+                    ui.label(RichText::new("Elite Nexus").font(display(size::HEADLINE)).color(pal::TEXT));
+                    ui.label(RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION"))).size(size::CAPTION).color(pal::DIM));
                 });
+            }
+        });
+        ui.add_space(14.0);
+        // The commander card sits at the bottom; the list scrolls in between.
+        let footer_h = if wide { 70.0 } else { 52.0 };
+        let list_h = (ui.available_height() - footer_h - 8.0).max(80.0);
+        egui::ScrollArea::vertical().id_salt("nav").max_height(list_h).auto_shrink([false, true]).show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 1.0;
+            for (i, (group, items)) in Page::GROUPS.iter().enumerate() {
+                if i > 0 {
+                    ui.add_space(if wide { 6.0 } else { 8.0 });
+                }
+                if wide {
+                    // Painted, not a `horizontal` row (rows are at least a button tall).
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 20.0), Sense::hover());
+                    ui.painter().text(r.left_center() + Vec2::new(10.0, 1.0), Align2::LEFT_CENTER, *group, display(size::CAPTION), pal::FAINT);
+                } else if i > 0 {
+                    let r = ui.available_rect_before_wrap();
+                    ui.painter().hline(r.x_range().shrink(12.0), r.top() - 4.0, Stroke::new(1.0, pal::SEPARATOR));
+                }
                 for p in *items {
-                    if nav_item(ui, *p, self.page == *p) {
+                    if nav_item(ui, *p, self.page == *p, wide) {
                         self.page = *p;
                     }
                 }
             }
-            ui.add_space(12.0);
         });
+        let model = self.core.model.read();
+        if let Some(gs) = model.active() {
+            let rest = ui.available_rect_before_wrap();
+            let card = Rect::from_min_max(egui::pos2(rest.left(), rest.bottom() - footer_h), rest.max);
+            let mut f = ui.new_child(egui::UiBuilder::new().max_rect(card).layout(Layout::top_down(Align::Min)));
+            if commander_card(&mut f, gs, wide) {
+                self.page = Page::Dashboard;
+            }
+        }
     }
 
-    fn header(&mut self, ui: &mut Ui) {
+    /// Large title on the left; live status, credits and the HUD button as toolbar capsules on the right.
+    fn page_header(&mut self, ui: &mut Ui, title: &str, subtitle: &str) {
         let status = self.core.status.read().clone();
-        let model = self.core.model.read();
-        let gs = model.active();
-        let mut pause_toggled = false;
-        ui.horizontal_centered(|ui| {
-            ui.add_space(4.0);
-            match gs {
-                Some(gs) => {
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new(format!("CMDR {}", gs.cmdr.name)).font(display(18.0)).color(pal::TEXT));
-                        let ship = gs.fleet.current().map(|s| if s.name.trim().is_empty() { s.type_name.clone() } else { format!("{} · {}", s.name, s.type_name) }).unwrap_or_default();
-                        ui.label(RichText::new(ship).small().color(pal::DIM));
-                    });
-                    ui.add_space(24.0);
-                    ui.separator();
-                    ui.add_space(8.0);
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new(format!("{} {}", icon::MAP_PIN, gs.location.system)).font(display(17.0)).color(pal::ACCENT_SOFT));
-                        ui.label(RichText::new(gs.location.situation()).small().color(pal::DIM));
-                    });
-                    if let Some(s) = gs.fleet.current().filter(|s| s.fuel_main_capacity > 0.0) {
-                        ui.add_space(16.0);
-                        ui.vertical(|ui| {
-                            ui.set_width(130.0);
-                            let f = (gs.fleet.fuel_main / s.fuel_main_capacity) as f32;
-                            let col = if f < 0.25 { pal::BAD } else if f < 0.5 { pal::WARN } else { pal::CYAN };
-                            ui.label(RichText::new(format!("{} {:.1}/{:.0} t", icon::GAS_PUMP, gs.fleet.fuel_main, s.fuel_main_capacity)).small().color(pal::DIM));
-                            widgets::bar(ui, f, col, 6.0, None);
-                        });
-                    }
-                }
-                None => {
-                    ui.label(RichText::new("Waiting for journal data…").font(display(18.0)).color(pal::DIM));
-                }
+        let narrow = ui.available_width() < 860.0;
+        // Toolbar items, left to right: credits, live feed, uploads, EDDN pause, status.
+        let mut items: Vec<CapItem> = Vec::new();
+        {
+            let model = self.core.model.read();
+            let gs = model.active();
+            if let Some(gs) = gs {
+                let cr = if narrow { widgets::short_credits(gs.cmdr.credits) } else { widgets::credits(gs.cmdr.credits) };
+                items.push(CapItem::new(cr, pal::GOLD, true).tip("Credit balance"));
             }
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.add_space(8.0);
-                let (_live, label, col) = match &status.phase {
-                    Phase::Live => {
-                        let fresh = status.last_live.is_some_and(|t| t.elapsed() < Duration::from_secs(120));
-                        let playing = gs.is_some_and(|g| !g.game_closed);
-                        if fresh || playing { (true, "LIVE", pal::GOOD) } else { (false, "OFFLINE", pal::FAINT) }
-                    }
-                    Phase::Loading { .. } | Phase::Starting => (false, "LOADING", pal::WARN),
-                    Phase::Error(_) => (false, "ERROR", pal::BAD),
+            if let Some((connected, per_min)) = self.market.feed_state() {
+                let text = match (connected, narrow) {
+                    (true, false) => format!("{} EDDN {per_min}/min", icon::BROADCAST),
+                    (true, true) => format!("{} {per_min}/min", icon::BROADCAST),
+                    (false, _) => format!("{} EDDN…", icon::BROADCAST),
                 };
-                let (rect, _) = ui.allocate_exact_size(Vec2::new(70.0, 22.0), Sense::hover());
-                ui.painter().rect_filled(rect, CornerRadius::same(11), col.gamma_multiply(0.15));
-                ui.painter().circle_filled(rect.left_center() + Vec2::new(12.0, 0.0), 4.0, col);
-                ui.painter().text(rect.left_center() + Vec2::new(22.0, 0.0), Align2::LEFT_CENTER, label, display(12.0), col);
-                ui.add_space(10.0);
-                let acc = &mut self.settings.accounts;
-                if service_indicators(ui, &self.sync, &self.market, &mut self.page, &mut self.market_ui.tab, acc.eddn_upload, &mut acc.eddn_paused) {
-                    pause_toggled = true;
+                items.push(CapItem::new(text, if connected { pal::DIM } else { pal::WARN }, false).action(CapAction::MarketDb).tip("Live market feed from EDDN. Click for the market database."));
+            }
+            if self.sync.any_enabled() {
+                let st = self.sync.status();
+                let all = [&st.eddn, &st.edsm, &st.inara, &st.edastro];
+                let sent: u64 = all.iter().map(|x| x.sent).sum();
+                let queued: usize = all.iter().map(|x| x.queued).sum();
+                let trouble = all.iter().any(|x| x.paused.is_some() || (x.last_error.is_some() && x.last_success.is_none()));
+                let text = if queued > 0 { format!("{} {sent} · {queued} queued", icon::CLOUD_ARROW_UP) } else { format!("{} {sent}", icon::CLOUD_ARROW_UP) };
+                items.push(CapItem::new(text, if trouble { pal::WARN } else { pal::DIM }, false).action(CapAction::Accounts).tip("Uploads sent this session (EDDN / EDSM / Inara / EDAstro). Click for details."));
+            }
+            if self.settings.accounts.eddn_upload {
+                let paused = self.settings.accounts.eddn_paused;
+                let (text, col, tip) = if paused {
+                    (format!("{} Resume EDDN", icon::PLAY), pal::WARN, "Sharing with EDDN is paused. Click to share again.")
+                } else {
+                    (format!("{} Pause EDDN", icon::PAUSE), pal::TEXT, "Stop sharing with EDDN, e.g. to keep a market you just found to yourself (prices are only sent when you undock).")
+                };
+                items.push(CapItem::new(text, col, false).action(CapAction::TogglePause).tip(tip));
+            }
+            let (label, col) = match &status.phase {
+                Phase::Live => {
+                    let fresh = status.last_live.is_some_and(|t| t.elapsed() < Duration::from_secs(120));
+                    let playing = gs.is_some_and(|g| !g.game_closed);
+                    if fresh || playing { ("Live", pal::GOOD) } else { ("Offline", pal::GRAY) }
                 }
-                if ui.button(RichText::new(format!("{} HUD", icon::PICTURE_IN_PICTURE)).color(pal::ACCENT_SOFT)).on_hover_text("Compact always-on-top HUD for a second screen").clicked() {
-                    let ctx = ui.ctx().clone();
-                    self.compact_request = true;
-                    ctx.request_repaint();
-                }
-                ui.add_space(10.0);
-                if let Some(gs) = gs {
-                    ui.label(RichText::new(widgets::credits(gs.cmdr.credits)).font(display(19.0)).color(pal::GOLD));
-                    ui.label(RichText::new(icon::COINS).size(18.0).color(pal::GOLD));
+                Phase::Loading { .. } | Phase::Starting => ("Loading", pal::WARN),
+                Phase::Error(_) => ("Error", pal::BAD),
+            };
+            let tip = if label == "Live" { "The game is running; the journal is followed live." } else { "Waiting for the game." };
+            items.push(CapItem::new(label.to_string(), col, true).dot(col).tip(tip));
+        }
+        let mut action = None;
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = 0.0;
+                ui.label(RichText::new(title).font(crate::theme::bold(size::LARGE_TITLE)).color(pal::TEXT));
+                if !subtitle.is_empty() {
+                    ui.add(egui::Label::new(RichText::new(subtitle).size(size::CALLOUT).color(pal::DIM)).truncate());
                 }
             });
+            ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
+                ui.add_space(2.0);
+                if toolbar_button(ui, icon::PICTURE_IN_PICTURE, "Compact always-on-top HUD for a second screen").clicked() {
+                    self.compact_request = true;
+                    ui.ctx().request_repaint();
+                }
+                ui.add_space(8.0);
+                action = toolbar_capsule(ui, &items);
+            });
         });
-        drop(model);
-        if pause_toggled {
-            self.sync.apply(&self.settings.accounts);
-            self.settings_dirty = Some(Instant::now());
+        ui.add_space(14.0);
+        match action {
+            Some(CapAction::MarketDb) => {
+                self.page = Page::Market;
+                self.market_ui.tab = pages::market::Tab::Database;
+            }
+            Some(CapAction::Accounts) => self.page = Page::Accounts,
+            Some(CapAction::TogglePause) => {
+                self.settings.accounts.eddn_paused = !self.settings.accounts.eddn_paused;
+                self.sync.apply(&self.settings.accounts);
+                self.settings_dirty = Some(Instant::now());
+            }
+            None => {}
         }
     }
 
@@ -364,18 +418,23 @@ impl NexusApp {
             return;
         };
         let (title, subtitle) = page_heading(self.page, gs);
-        widgets::page_title(ui, self.page.icon(), &title, &subtitle);
+        drop(model);
+        self.page_header(ui, &title, &subtitle);
+        let model = self.core.model.read();
+        let Some(gs) = model.active() else { return };
         let scroll = !matches!(self.page, Page::Ask | Page::Exploration | Page::Logbook | Page::GalaxyMap | Page::Fleet | Page::Navigation | Page::Bindings | Page::Market);
         let page = self.page;
         let high_value = self.settings.high_value_threshold;
         let mut settings_changed = false;
         let mut test_voice = false;
         let mut restart = false;
+        let mut map_action = None;
+        let route = if page == Page::GalaxyMap { pages::navigation::active_route(gs, self.nav.planned.as_ref()) } else { Vec::new() };
         let mut body = |ui: &mut Ui| match page {
             Page::Dashboard => pages::dashboard::show(ui, gs),
             Page::Exploration => pages::exploration::show(ui, gs, &mut self.explo, high_value),
             Page::Exobiology => pages::exobio::show(ui, gs),
-            Page::GalaxyMap => pages::galaxy_map::show(ui, gs, &mut self.map),
+            Page::GalaxyMap => map_action = pages::galaxy_map::show(ui, gs, &mut self.map, &route),
             Page::Mining => pages::mining::show(ui, gs),
             Page::Colonisation => pages::colonisation::show(ui, gs, &self.market, &mut self.colo),
             Page::Ask => match pages::ask::show(ui, &mut self.assistant, &mut self.ask_ui, &mut self.settings.ai) {
@@ -423,6 +482,9 @@ impl NexusApp {
                 let name = gs.cmdr.name.clone();
                 let status = pages::accounts::StatusView { eddn_feed: self.market.feed_summary().map(|(_, line)| line), uplink: self.sync.status() };
                 settings_changed |= pages::accounts::show(ui, &mut self.settings.accounts, &mut self.accounts, &name, &status);
+                if std::mem::take(&mut self.accounts.check_inara) {
+                    self.sync.check_inara();
+                }
                 if self.sync.any_enabled() {
                     ui.ctx().request_repaint_after(Duration::from_millis(500));
                 }
@@ -439,6 +501,11 @@ impl NexusApp {
             body(ui);
         }
         drop(model);
+        if let Some(pages::galaxy_map::MapAction::PlotTo(system)) = map_action {
+            self.nav.to = system;
+            self.nav.planner = pages::navigation::Planner::Exact;
+            self.page = Page::Navigation;
+        }
         if settings_changed {
             self.settings_dirty = Some(Instant::now());
             self.speaker.set_rate(self.settings.tts_rate);
@@ -465,16 +532,16 @@ impl NexusApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(420.0, 640.0)));
         } else {
             ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(egui::WindowLevel::Normal));
-            ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(Vec2::new(1100.0, 680.0)));
+            ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(Vec2::new(880.0, 600.0)));
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(1480.0, 920.0)));
         }
     }
 
     fn compact_ui(&mut self, ui: &mut Ui) {
-        egui::CentralPanel::default().frame(Frame::new().fill(pal::BG1).inner_margin(Margin::same(10))).show(ui, |ui| {
+        egui::CentralPanel::default().frame(Frame::new().fill(pal::BG1).inner_margin(Margin::same(14))).show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(icon::DIAMOND).color(pal::ACCENT));
-                ui.label(RichText::new("ELITE NEXUS HUD").font(display(13.0)).color(pal::DIM));
+                ui.label(RichText::new("Elite Nexus").font(display(13.5)).color(pal::DIM));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui.small_button(format!("{} Full view", icon::ARROWS_OUT)).clicked() {
                         let ctx = ui.ctx().clone();
@@ -496,43 +563,58 @@ impl NexusApp {
         });
     }
 
+    /// Alerts as macOS-style notification banners, top right, newest first.
     fn toasts(&mut self, ctx: &egui::Context) {
         let life = Duration::from_secs_f32(self.settings.toast_seconds.max(1.0));
         self.toasts.retain(|t| t.born.elapsed() < life);
         if self.toasts.is_empty() {
             return;
         }
-        ctx.request_repaint_after(Duration::from_millis(250));
+        ctx.request_repaint_after(Duration::from_millis(100));
         egui::Area::new(egui::Id::new("toasts"))
-            .anchor(Align2::RIGHT_BOTTOM, [-16.0, -16.0])
+            .anchor(Align2::RIGHT_TOP, [-18.0, 74.0])
             .order(egui::Order::Foreground)
             .interactable(false)
             .show(ctx, |ui| {
-                ui.set_max_width(380.0);
+                ui.set_width(360.0);
                 for t in self.toasts.iter().rev() {
                     let age = t.born.elapsed().as_secs_f32();
-                    let fade = ((life.as_secs_f32() - age) / 0.6).clamp(0.0, 1.0);
-                    let col = match t.alert.priority {
+                    // Slide in from the right, fade out at the end.
+                    let fade = ((life.as_secs_f32() - age) / 0.5).clamp(0.0, 1.0);
+                    let enter = (age / 0.25).clamp(0.0, 1.0);
+                    let slide = (1.0 - enter).powi(3) * 40.0;
+                    let tint = match t.alert.priority {
                         Priority::Critical => pal::BAD,
                         Priority::High => pal::ACCENT,
-                        Priority::Normal => pal::CYAN,
-                        Priority::Low => pal::DIM,
+                        Priority::Normal => pal::BLUE,
+                        Priority::Low => pal::GRAY,
                     };
-                    Frame::new()
-                        .fill(pal::CARD.gamma_multiply(fade))
-                        .stroke(Stroke::new(1.0, col.gamma_multiply(fade)))
-                        .corner_radius(CornerRadius::same(10))
-                        .inner_margin(Margin::same(12))
-                        .shadow(egui::Shadow { offset: [0, 4], blur: 18, spread: 0, color: Color32::from_black_alpha((120.0 * fade) as u8) })
-                        .show(ui, |ui| {
-                            ui.set_width(356.0);
-                            ui.label(RichText::new(t.alert.kind.label().to_uppercase()).font(display(11.0)).color(col.gamma_multiply(fade)));
-                            ui.label(RichText::new(&t.alert.title).font(display(16.0)).color(pal::TEXT.gamma_multiply(fade)));
-                            if !t.alert.detail.is_empty() {
-                                ui.label(RichText::new(&t.alert.detail).color(pal::DIM.gamma_multiply(fade)));
-                            }
-                        });
-                    ui.add_space(6.0);
+                    let top = ui.cursor().min;
+                    let width = 360.0;
+                    // Measure first so the glass is drawn under the text.
+                    let title = ui.painter().layout(t.alert.title.clone(), display(size::BODY), pal::TEXT.gamma_multiply(fade), width - 76.0);
+                    let detail = (!t.alert.detail.is_empty()).then(|| ui.painter().layout(t.alert.detail.clone(), egui::FontId::proportional(size::FOOTNOTE), pal::DIM.gamma_multiply(fade), width - 76.0));
+                    let h = 14.0 + 18.0 + title.size().y + detail.as_ref().map_or(0.0, |d| d.size().y + 2.0) + 14.0;
+                    let rect = Rect::from_min_size(top + Vec2::new(slide, 0.0), Vec2::new(width, h));
+                    let p = ui.painter();
+                    p.add(egui::Shadow { offset: [0, 10], blur: 30, spread: 0, color: Color32::from_black_alpha((120.0 * fade) as u8) }.as_shape(rect, CornerRadius::same(18)));
+                    p.rect_filled(rect, CornerRadius::same(18), Color32::from_rgb(52, 52, 56).gamma_multiply(fade));
+                    p.rect_stroke(rect, CornerRadius::same(18), Stroke::new(1.0, Color32::from_white_alpha((20.0 * fade) as u8)), egui::StrokeKind::Inside);
+                    // App icon, kind and time, then the message.
+                    let icon_rect = Rect::from_min_size(rect.min + Vec2::new(14.0, 14.0), Vec2::splat(34.0));
+                    paint_app_tile(p, icon_rect, fade);
+                    let x = icon_rect.right() + 12.0;
+                    p.text(egui::pos2(x, rect.top() + 14.0), Align2::LEFT_TOP, t.alert.kind.label().to_uppercase(), display(size::CAPTION), tint.gamma_multiply(fade));
+                    p.text(egui::pos2(rect.right() - 14.0, rect.top() + 14.0), Align2::RIGHT_TOP, "now", egui::FontId::proportional(size::CAPTION), pal::DIM.gamma_multiply(fade));
+                    let mut y = rect.top() + 14.0 + 18.0;
+                    let th = title.size().y;
+                    p.galley(egui::pos2(x, y), title, pal::TEXT);
+                    y += th + 2.0;
+                    if let Some(d) = detail {
+                        p.galley(egui::pos2(x, y), d, pal::DIM);
+                    }
+                    ui.allocate_space(Vec2::new(width, h));
+                    ui.add_space(10.0);
                 }
             });
     }
@@ -543,73 +625,176 @@ fn start_core(ctx: &egui::Context, journal_dir: Option<&PathBuf>, history: Optio
     Core::start(journal_dir.cloned(), move || repaint_ctx.request_repaint(), history)
 }
 
-/// Live feed and upload state, right-to-left in the header. Click to open the details. Returns true
-/// when the EDDN pause button was toggled.
-fn service_indicators(
-    ui: &mut Ui,
-    sync: &crate::sync::SyncService,
-    market: &crate::market::MarketService,
-    page: &mut Page,
-    market_tab: &mut pages::market::Tab,
-    eddn_upload: bool,
-    eddn_paused: &mut bool,
-) -> bool {
-    let mut toggled = false;
-    if eddn_upload {
-        let (label, col, tip) = if *eddn_paused {
-            (format!("{} Resume EDDN", icon::PLAY), pal::WARN, "Sharing with EDDN is paused. Click to share again.")
-        } else {
-            (format!("{} Pause EDDN", icon::PAUSE), pal::DIM, "Stop sharing with EDDN, e.g. to keep a market you just found to yourself (prices are only sent when you undock).")
-        };
-        if ui.add(egui::Button::new(RichText::new(label).small().color(col))).on_hover_text(tip).clicked() {
-            *eddn_paused = !*eddn_paused;
-            toggled = true;
-        }
-        ui.add_space(8.0);
-    }
-    if sync.any_enabled() {
-        let s = sync.status();
-        let all = [&s.eddn, &s.edsm, &s.inara, &s.edastro];
-        let sent: u64 = all.iter().map(|x| x.sent).sum();
-        let queued: usize = all.iter().map(|x| x.queued).sum();
-        let trouble = all.iter().any(|x| x.paused.is_some() || (x.last_error.is_some() && x.last_success.is_none()));
-        let col = if trouble { pal::WARN } else { pal::GOOD };
-        let text = if queued > 0 { format!("{} {sent} · {queued} queued", icon::CLOUD_ARROW_UP) } else { format!("{} {sent}", icon::CLOUD_ARROW_UP) };
-        if ui.add(egui::Label::new(RichText::new(text).small().color(col)).sense(Sense::click())).on_hover_text("Uploads sent this session (EDDN / EDSM / Inara / EDAstro)").clicked() {
-            *page = Page::Accounts;
-        }
-        ui.add_space(10.0);
-    }
-    if let Some((connected, per_min)) = market.feed_state() {
-        let (col, text) = if connected { (pal::GOOD, format!("{} EDDN {per_min}/min", icon::BROADCAST)) } else { (pal::WARN, format!("{} EDDN…", icon::BROADCAST)) };
-        if ui.add(egui::Label::new(RichText::new(text).small().color(col)).sense(Sense::click())).on_hover_text("Live market feed. Click for the market database.").clicked() {
-            *page = Page::Market;
-            *market_tab = pages::market::Tab::Database;
-        }
-        ui.add_space(10.0);
-    }
-    toggled
+#[derive(Clone, Copy)]
+enum CapAction {
+    MarketDb,
+    Accounts,
+    TogglePause,
 }
 
-fn nav_item(ui: &mut Ui, page: Page, selected: bool) -> bool {
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 26.0), Sense::click());
+/// One item in the toolbar capsule.
+struct CapItem {
+    text: String,
+    color: Color32,
+    strong: bool,
+    dot: Option<Color32>,
+    tip: &'static str,
+    action: Option<CapAction>,
+}
+
+impl CapItem {
+    fn new(text: String, color: Color32, strong: bool) -> Self {
+        CapItem { text, color, strong, dot: None, tip: "", action: None }
+    }
+    fn dot(mut self, c: Color32) -> Self {
+        self.dot = Some(c);
+        self
+    }
+    fn tip(mut self, t: &'static str) -> Self {
+        self.tip = t;
+        self
+    }
+    fn action(mut self, a: CapAction) -> Self {
+        self.action = Some(a);
+        self
+    }
+}
+
+/// A toolbar capsule (macOS 26 glass) sized to its items, with hairline dividers between them.
+/// Returns the action of the item clicked.
+fn toolbar_capsule(ui: &mut Ui, items: &[CapItem]) -> Option<CapAction> {
+    const PAD: f32 = 16.0;
+    const GAP: f32 = 12.0;
+    const H: f32 = 34.0;
+    let galleys: Vec<_> = items
+        .iter()
+        .map(|it| {
+            let font = if it.strong { display(size::FOOTNOTE) } else { egui::FontId::proportional(size::FOOTNOTE) };
+            ui.painter().layout_no_wrap(it.text.clone(), font, it.color)
+        })
+        .collect();
+    let widths: Vec<f32> = items.iter().zip(&galleys).map(|(it, g)| g.size().x + if it.dot.is_some() { 14.0 } else { 0.0 }).collect();
+    let n = items.len();
+    let total = 2.0 * PAD + widths.iter().sum::<f32>() + (n.saturating_sub(1)) as f32 * (2.0 * GAP + 1.0);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(total, H), Sense::hover());
+    let p = ui.painter().clone();
+    p.add(egui::Shadow { offset: [0, 4], blur: 16, spread: 0, color: Color32::from_black_alpha(70) }.as_shape(rect, CornerRadius::same(17)));
+    p.rect_filled(rect, CornerRadius::same(17), pal::CARD);
+    p.rect_stroke(rect, CornerRadius::same(17), Stroke::new(1.0, Color32::from_white_alpha(16)), egui::StrokeKind::Inside);
+    let mut clicked = None;
+    let mut x = rect.left() + PAD;
+    for (i, (it, g)) in items.iter().zip(galleys).enumerate() {
+        if i > 0 {
+            p.vline(x + GAP, (rect.center().y - 8.0)..=(rect.center().y + 8.0), Stroke::new(1.0, Color32::from_white_alpha(26)));
+            x += 2.0 * GAP + 1.0;
+        }
+        let w = widths[i];
+        let hit = Rect::from_min_size(egui::pos2(x - GAP / 2.0, rect.top()), Vec2::new(w + GAP, H));
+        let r = ui.interact(hit, resp.id.with(i), if it.action.is_some() { Sense::click() } else { Sense::hover() });
+        if it.action.is_some() && r.hovered() {
+            p.rect_filled(hit.shrink2(Vec2::new(0.0, 4.0)), CornerRadius::same(8), Color32::from_white_alpha(12));
+        }
+        let mut tx = x;
+        if let Some(d) = it.dot {
+            p.circle_filled(egui::pos2(x + 4.0, rect.center().y), 4.0, d);
+            tx += 14.0;
+        }
+        p.galley(egui::pos2(tx, rect.center().y - g.size().y / 2.0), g, it.color);
+        let r = if it.tip.is_empty() { r } else { r.on_hover_text(it.tip) };
+        if r.clicked() {
+            clicked = it.action;
+        }
+        x += w;
+    }
+    clicked
+}
+
+/// A round glass toolbar button.
+fn toolbar_button(ui: &mut Ui, glyph: &str, tip: &str) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(34.0), Sense::click());
+    let p = ui.painter();
+    p.add(egui::Shadow { offset: [0, 4], blur: 16, spread: 0, color: Color32::from_black_alpha(70) }.as_shape(rect, CornerRadius::same(17)));
+    let fill = if resp.hovered() { pal::CARD_HI } else { pal::CARD };
+    p.rect_filled(rect, CornerRadius::same(17), fill);
+    p.rect_stroke(rect, CornerRadius::same(17), Stroke::new(1.0, Color32::from_white_alpha(16)), egui::StrokeKind::Inside);
+    p.text(rect.center(), Align2::CENTER_CENTER, glyph, egui::FontId::proportional(17.0), pal::TEXT);
+    resp.on_hover_text(tip)
+}
+
+/// The app icon: Elite orange tile with the diamond, as in the Dock.
+fn paint_app_tile(p: &egui::Painter, rect: Rect, fade: f32) {
+    let r = CornerRadius::same((rect.width() * 0.26) as u8);
+    p.rect_filled(rect, r, pal::ACCENT.gamma_multiply(fade));
+    // A lighter top half gives the tile some depth.
+    let top = Rect::from_min_max(rect.min, egui::pos2(rect.max.x, rect.center().y));
+    p.with_clip_rect(top).rect_filled(rect, r, Color32::from_white_alpha((28.0 * fade) as u8));
+    p.text(rect.center(), Align2::CENTER_CENTER, icon::DIAMOND, egui::FontId::proportional(rect.width() * 0.58), pal::ON_ACCENT.gamma_multiply(fade));
+}
+
+fn app_tile(ui: &mut Ui, side: f32) {
+    let (rect, _) = ui.allocate_exact_size(Vec2::splat(side), Sense::hover());
+    paint_app_tile(ui.painter(), rect, 1.0);
+}
+
+/// The commander at the foot of the sidebar: avatar, name, ship, where, fuel. Returns true if clicked.
+fn commander_card(ui: &mut Ui, gs: &nexus_model::GameState, wide: bool) -> bool {
+    let rect = ui.max_rect();
+    let resp = ui.interact(rect, ui.id().with("cmdr-card"), Sense::click());
+    if resp.hovered() {
+        ui.painter().rect_filled(rect, CornerRadius::same(12), Color32::from_white_alpha(8));
+    }
+    let initials: String = gs.cmdr.name.split_whitespace().filter_map(|w| w.chars().next()).take(2).collect::<String>().to_uppercase();
+    let avatar = |ui: &mut Ui| {
+        let (r, _) = ui.allocate_exact_size(Vec2::splat(36.0), Sense::hover());
+        ui.painter().circle_filled(r.center(), 18.0, Color32::from_rgb(99, 99, 102));
+        ui.painter().text(r.center(), Align2::CENTER_CENTER, &initials, display(size::CALLOUT), pal::TEXT);
+    };
+    let inner = rect.shrink2(Vec2::new(8.0, 8.0));
+    let mut ui = ui.new_child(egui::UiBuilder::new().max_rect(inner).layout(Layout::top_down(Align::Min)));
+    if !wide {
+        ui.horizontal(|ui| {
+            ui.add_space(((inner.width() - 36.0) / 2.0).max(0.0));
+            avatar(ui);
+        });
+        let ship = gs.fleet.current().map(|s| s.type_name.clone()).unwrap_or_default();
+        resp.on_hover_text(format!("CMDR {}\n{}\n{}", gs.cmdr.name, ship, gs.location.system));
+        return false;
+    }
+    let ship = gs.fleet.current().map(|s| if s.name.trim().is_empty() { s.type_name.clone() } else { format!("{} · {}", s.name, s.type_name) }).unwrap_or_default();
+    ui.horizontal(|ui| {
+        avatar(ui);
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 0.0;
+            ui.add(egui::Label::new(RichText::new(format!("CMDR {}", gs.cmdr.name)).font(display(size::CALLOUT)).color(pal::TEXT)).truncate());
+            ui.add(egui::Label::new(RichText::new(format!("{} {}", icon::MAP_PIN, gs.location.system)).size(size::CAPTION).color(pal::DIM)).truncate());
+        });
+    });
+    if let Some(s) = gs.fleet.current().filter(|s| s.fuel_main_capacity > 0.0) {
+        let f = (gs.fleet.fuel_main / s.fuel_main_capacity) as f32;
+        let col = if f < 0.25 { pal::BAD } else if f < 0.5 { pal::WARN } else { pal::CYAN };
+        ui.add_space(4.0);
+        widgets::bar(&mut ui, f, col, 4.0, None).on_hover_text(format!("{} {:.1} / {:.0} t fuel", icon::GAS_PUMP, gs.fleet.fuel_main, s.fuel_main_capacity));
+    }
+    resp.on_hover_text(format!("{ship}
+{} · {}", gs.location.system, gs.location.situation())).clicked()
+}
+
+fn nav_item(ui: &mut Ui, page: Page, selected: bool, wide: bool) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::click());
     let p = ui.painter();
     if selected {
-        p.rect_filled(rect.shrink2(Vec2::new(6.0, 1.0)), CornerRadius::same(7), pal::ACCENT_BG);
-        p.rect_filled(egui::Rect::from_min_size(rect.left_top() + Vec2::new(6.0, 5.0), Vec2::new(3.0, 16.0)), CornerRadius::same(2), pal::ACCENT);
+        p.rect_filled(rect, CornerRadius::same(9), Color32::from_white_alpha(22));
     } else if resp.hovered() {
-        p.rect_filled(rect.shrink2(Vec2::new(6.0, 1.0)), CornerRadius::same(7), pal::CARD_HI);
+        p.rect_filled(rect, CornerRadius::same(9), Color32::from_white_alpha(10));
     }
-    let col = if selected { pal::ACCENT } else if resp.hovered() { pal::TEXT } else { pal::DIM };
-    p.text(rect.left_center() + Vec2::new(20.0, 0.0), Align2::LEFT_CENTER, page.icon(), egui::FontId::proportional(17.0), col);
-    p.text(
-        rect.left_center() + Vec2::new(46.0, 0.0),
-        Align2::LEFT_CENTER,
-        page.label(),
-        egui::FontId::proportional(14.0),
-        if selected { pal::TEXT } else { col },
-    );
-    resp.clicked()
+    if wide {
+        p.text(rect.left_center() + Vec2::new(12.0, 0.0), Align2::LEFT_CENTER, page.icon(), egui::FontId::proportional(17.0), pal::ACCENT);
+        p.text(rect.left_center() + Vec2::new(40.0, 0.0), Align2::LEFT_CENTER, page.label(), if selected { display(size::BODY) } else { egui::FontId::proportional(size::BODY) }, pal::TEXT);
+        resp.clicked()
+    } else {
+        p.text(rect.center(), Align2::CENTER_CENTER, page.icon(), egui::FontId::proportional(19.0), if selected { pal::ACCENT } else { pal::DIM });
+        resp.on_hover_text(page.label()).clicked()
+    }
 }
 
 fn page_heading(page: Page, gs: &nexus_model::GameState) -> (String, String) {
@@ -629,6 +814,7 @@ impl eframe::App for NexusApp {
         self.screenshot_tick(ctx);
         self.drain_alerts();
         self.assistant.poll();
+        self.sync.tick(&self.core);
         // A route the assistant planned goes to the Navigation page (and the clipboard flow).
         if let Some(route) = self.ai_routes.lock().take() {
             let first = route.waypoints.first().map(|w| w.system.clone());
@@ -666,17 +852,17 @@ impl eframe::App for NexusApp {
             self.toasts(&ctx);
             return;
         }
+        // Responsive: a full sidebar on wide windows, an icon rail on narrow ones.
+        let wide = ui.ctx().content_rect().width() >= 1180.0;
         egui::Panel::left("nav")
-            .exact_size(212.0)
+            .exact_size(if wide { 252.0 } else { 78.0 })
             .resizable(false)
-            .frame(Frame::new().fill(pal::BG0).inner_margin(Margin::symmetric(6, 0)).stroke(Stroke::new(1.0, pal::BORDER)))
-            .show(ui, |ui| self.sidebar(ui));
-        egui::Panel::top("hud")
-            .exact_size(58.0)
-            .frame(Frame::new().fill(pal::BG1).inner_margin(Margin::symmetric(14, 6)).stroke(Stroke::new(1.0, pal::BORDER)))
-            .show(ui, |ui| self.header(ui));
+            .show_separator_line(false)
+            .frame(Frame::new().fill(pal::WINDOW).inner_margin(Margin { left: 10, right: 0, top: 10, bottom: 10 }))
+            .show(ui, |ui| self.sidebar(ui, wide));
+        let side = if wide { 32 } else { 24 };
         egui::CentralPanel::default()
-            .frame(Frame::new().fill(pal::BG1).inner_margin(Margin::same(16)))
+            .frame(Frame::new().fill(pal::WINDOW).inner_margin(Margin { left: side, right: side, top: 20, bottom: 16 }))
             .show(ui, |ui| self.content(ui));
         if !self.settings.welcomed && self.shot.is_none() && matches!(self.core.status.read().phase, Phase::Live) {
             let files = self.core.status.read().files;

@@ -33,19 +33,16 @@ pub struct LogbookUi {
 
 pub fn show(ui: &mut Ui, gs: &GameState, st: &mut LogbookUi, index: &Arc<RwLock<JournalIndex>>) {
     st.search_hits.tick();
-    ui.horizontal(|ui| {
-        for (t, label) in [(Tab::Activity, "Activity"), (Tab::Journal, "Journal (every event)"), (Tab::Jumps, "Travel"), (Tab::Docks, "Docking"), (Tab::Ledger, "Credits ledger")] {
-            if ui.selectable_label(st.tab == t, label).clicked() {
-                st.tab = t;
-            }
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(12.0, 10.0);
+        if let Some(t) = crate::widgets::tabs(ui, st.tab, &[(Tab::Activity, "Activity"), (Tab::Journal, "Every event"), (Tab::Jumps, "Travel"), (Tab::Docks, "Docking"), (Tab::Ledger, "Credits ledger")]) {
+            st.tab = t;
         }
         if st.tab != Tab::Journal {
-            ui.add_space(20.0);
-            ui.label(RichText::new(icon::MAGNIFYING_GLASS).color(pal::DIM));
-            ui.add(egui::TextEdit::singleline(&mut st.filter).hint_text("Filter…").desired_width(220.0));
+            crate::widgets::search_field(ui, &mut st.filter, "Filter", 240.0);
         }
     });
-    ui.add_space(6.0);
+    ui.add_space(crate::widgets::GAP);
     let f = st.filter.to_ascii_lowercase();
     let matches = |s: &str| f.is_empty() || s.to_ascii_lowercase().contains(&f);
     match st.tab {
@@ -132,9 +129,8 @@ fn journal(ui: &mut Ui, st: &mut LogbookUi, index: &Arc<RwLock<JournalIndex>>) {
                 }
             }
         });
-        ui.label(RichText::new(icon::MAGNIFYING_GLASS).color(pal::DIM));
-        let resp = ui.add(egui::TextEdit::singleline(&mut st.search).hint_text("Search inside every event (e.g. a system, station, CMDR)…").desired_width(320.0));
-        let go = ui.button("Search").clicked() || (resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
+        let resp = crate::widgets::search_field(ui, &mut st.search, "Search every event: a system, station, CMDR…", 380.0);
+        let go = crate::widgets::primary_button(ui, "Search").clicked() || (resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
         if go {
             st.selected = None;
             if st.search.trim().is_empty() {
@@ -157,7 +153,7 @@ fn journal(ui: &mut Ui, st: &mut LogbookUi, index: &Arc<RwLock<JournalIndex>>) {
     if let Some(id) = st.event {
         rows.retain(|&i| idx.entries[i].name == id);
     }
-    ui.label(RichText::new(format!("{} events", rows.len())).small().color(pal::FAINT));
+    ui.label(RichText::new(format!("{} events", rows.len())).small().color(pal::DIM));
     let detail_w = 460.0;
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
@@ -169,15 +165,15 @@ fn journal(ui: &mut Ui, st: &mut LogbookUi, index: &Arc<RwLock<JournalIndex>>) {
                 .column(Column::initial(150.0))
                 .column(Column::initial(230.0))
                 .column(Column::remainder())
-                .header(22.0, |mut h| {
+                .header(30.0, |mut h| {
                     for t in ["When", "Event", "File"] {
                         h.col(|ui| {
-                            ui.label(RichText::new(t).color(pal::DIM).strong());
+                            crate::widgets::th(ui, t);
                         });
                     }
                 })
                 .body(|body| {
-                    body.rows(22.0, rows.len(), |mut row| {
+                    body.rows(32.0, rows.len(), |mut row| {
                         let i = rows[row.index()];
                         let e = idx.entries[i];
                         row.set_selected(st.selected == Some(i));
@@ -189,7 +185,7 @@ fn journal(ui: &mut Ui, st: &mut LogbookUi, index: &Arc<RwLock<JournalIndex>>) {
                         });
                         row.col(|ui| {
                             let f = idx.files.get(e.file as usize).and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                            ui.label(RichText::new(f).small().color(pal::FAINT));
+                            ui.label(RichText::new(f).small().color(pal::DIM));
                         });
                         if row.response().clicked() {
                             st.selected = Some(i);
@@ -255,19 +251,20 @@ fn full_text_search(index: &Arc<RwLock<JournalIndex>>, needle: &str) -> Vec<usiz
 }
 
 fn table(ui: &mut Ui, headers: &[&str], rows: usize, mut cell: impl FnMut(usize, usize, &mut Ui)) {
-    let mut b = TableBuilder::new(ui).striped(true).resizable(true);
+    let mut b = TableBuilder::new(ui).striped(true).resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
     for (i, _) in headers.iter().enumerate() {
         b = b.column(if i + 1 == headers.len() { Column::remainder() } else { Column::initial(if i == 0 { 130.0 } else { 220.0 }) });
     }
-    b.header(22.0, |mut h| {
+    b.header(30.0, |mut h| {
         for t in headers {
             h.col(|ui| {
-                ui.label(RichText::new(*t).color(pal::DIM).strong());
+                crate::widgets::th(ui, t);
             });
         }
     })
     .body(|body| {
-        body.rows(22.0, rows, |mut row| {
+        body.rows(32.0, rows, |mut row| {
             let i = row.index();
             for c in 0..headers.len() {
                 row.col(|ui| cell(i, c, ui));

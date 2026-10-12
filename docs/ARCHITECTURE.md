@@ -15,7 +15,10 @@ cargo test --workspace
 ```
 
 Agents/parallel builds: set your own `CARGO_TARGET_DIR` (e.g. `target-agents\<name>`) to avoid lock contention.
-`EliteNexus.exe --page Exploration --screenshot out.png` renders a page after loading and saves a PNG (used for UI checks).
+`EliteNexus.exe --page Exploration --screenshot out.png` renders a page after loading and saves a PNG (used for UI checks;
+the window is placed off-screen and never takes focus). `--size 1000x700` tests responsive layouts, `--tab <name>` opens
+a Market section (`abnormal`, `database`, …) or the whole-galaxy map (`galaxy`), `--demo` adds a sample Ask conversation
+and an alert banner, `--shot-delay 8` waits longer (the galaxy image paints in the background).
 
 ## Crates
 
@@ -48,11 +51,17 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
 
 * `app.rs` owns the services: `Core` (journal → model), `SyncService` (sync.rs → nexus-uplink),
   `MarketService` (market.rs → nexus-galaxy + nexus-eddn, price alerts, Spansh import), `AssistantService`
-  (assistant.rs → nexus-ai on a worker thread; `ai_tools.rs` implements its 13 tools over the model, galaxy DB,
+  (assistant.rs → nexus-ai on a worker thread; `ai_tools.rs` implements its 14 tools over the model, galaxy DB,
   journal and Spansh), Spansh client, TTS. `finder.rs` holds market lookups shared by pages and tools (sell plan,
   colonisation suppliers).
 * UI rule: simple surface, hidden depth. Defaults come from the commander's state; advanced options sit behind a
   collapsed "› Options" disclosure, never removed.
+* Design system (macOS 26 dark, Liquid-Glass sidebar and toolbar): `theme.rs` holds the palette (`pal`), the type scale
+  (`size`, nothing below 12 pt) and the egui style; `widgets.rs` the components: `card`/`card_tinted` (Health-style
+  headers), `cards` (responsive grid with equal-height rows), `split`, `group` rows with switches (System Settings
+  style), `tabs`/`segmented` (falls back to pills when too narrow), `switch`/`toggle`, `pill`, capsule `button`s,
+  `search_field`, `badge`, `th` table headings. Pages use these instead of raw egui widgets so the look stays uniform
+  and every layout adapts to the window width (the sidebar becomes an icon rail below 1180 px).
 * History is folded with alerts **disabled**; only live events raise alerts or get uploaded. Never upload history.
   Test runs (`--journal-dir`, `--screenshot`) never upload at all.
 * The UI never blocks: long work (DB queries, HTTP) runs off-thread and results are polled each frame.
@@ -60,6 +69,11 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
   Contents: `settings.json` (API keys DPAPI-sealed), `galaxy.db` (+ WAL), `uplink\` queues and caches.
 * The galaxy DB only keeps what queries use: EDDN jumps into unpopulated systems are dropped (populated systems,
   carrier jumps, docked arrivals, stations, markets and ring hotspots are kept); the commander's own journal is kept whole.
+  The `bodies` table keeps, from EDDN, only bodies with biology, Earth-like/water/ammonia worlds, terraformables and
+  on-foot evidence (`GalaxyOptions::all_eddn_bodies` keeps every landable body); from the own journal also every
+  landable body. Footfall flags are dated, monotonic, and the commander's journal wins.
+* Abnormal prices: partial indexes (`deals::ANOMALY_INDEXES`) hold only market rows ≥ 1.5× off the galactic average and
+  every unpriced (fleet-carrier) order, so a whole-galaxy scan reads just those rows.
 
 ## Conventions
 

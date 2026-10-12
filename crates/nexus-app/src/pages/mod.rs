@@ -50,12 +50,12 @@ pub enum Page {
 
 impl Page {
     pub const GROUPS: &'static [(&'static str, &'static [Page])] = &[
-        ("COCKPIT", &[Page::Ask, Page::Dashboard, Page::Navigation]),
-        ("EXPLORATION", &[Page::Exploration, Page::Exobiology, Page::GalaxyMap]),
-        ("ECONOMY", &[Page::Market, Page::Mining, Page::Colonisation, Page::Carrier]),
-        ("COMMANDER", &[Page::Engineering, Page::Fleet, Page::Missions, Page::Bgs]),
-        ("RECORDS", &[Page::Logbook, Page::Statistics]),
-        ("SYSTEM", &[Page::Bindings, Page::Accounts, Page::Settings]),
+        ("Cockpit", &[Page::Ask, Page::Dashboard, Page::Navigation]),
+        ("Exploration", &[Page::Exploration, Page::Exobiology, Page::GalaxyMap]),
+        ("Economy", &[Page::Market, Page::Mining, Page::Colonisation, Page::Carrier]),
+        ("Commander", &[Page::Engineering, Page::Fleet, Page::Missions, Page::Bgs]),
+        ("Records", &[Page::Logbook, Page::Statistics]),
+        ("System", &[Page::Bindings, Page::Accounts, Page::Settings]),
     ];
 
     pub fn label(self) -> &'static str {

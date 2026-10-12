@@ -44,10 +44,7 @@ const COLUMNS: [BgsKind; 9] = [
 pub fn show(ui: &mut Ui, gs: &GameState, st: &mut BgsUi) {
     let now = Timestamp::now();
     ui.horizontal(|ui| {
-        ui.selectable_value(&mut st.period, Period::SinceTick, "Since last tick");
-        ui.selectable_value(&mut st.period, Period::Day, "Last 24 h");
-        ui.selectable_value(&mut st.period, Period::Week, "7 days");
-        ui.selectable_value(&mut st.period, Period::All, "All time");
+        crate::widgets::segmented(ui, &mut st.period, &[(Period::SinceTick, "Since last tick"), (Period::Day, "Last 24 h"), (Period::Week, "7 days"), (Period::All, "All time")]);
         if st.period == Period::SinceTick {
             ui.label(RichText::new("tick at").color(pal::DIM));
             ui.add(egui::DragValue::new(&mut st.tick_hour_utc).range(0..=23).suffix(":00 UTC"));
@@ -59,7 +56,7 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut BgsUi) {
         Period::Week => Timestamp(now.0 - 7 * 86_400),
         Period::All => Timestamp::ZERO,
     };
-    ui.label(RichText::new(format!("Counting from {}", since.to_local_string("%d %b %H:%M"))).small().color(pal::FAINT));
+    ui.label(RichText::new(format!("Counting from {}", since.to_local_string("%d %b %H:%M"))).small().color(pal::DIM));
     ui.add_space(6.0);
 
     powerplay(ui, gs, since);
@@ -128,6 +125,8 @@ fn powerplay(ui: &mut Ui, gs: &GameState, since: Timestamp) {
             }
             let bars: Vec<Bar> = per_day.iter().map(|(d, m)| Bar::new(*d as f64, *m as f64).width(0.8).fill(pal::PURPLE)).collect();
             Plot::new("merits")
+                    .show_background(false)
+                    .show_grid([false, true])
                 .height(140.0)
                 .allow_scroll(false)
                 .x_axis_formatter(|m, _| Timestamp((m.value * 86_400.0) as i64).to_local_string("%d %b"))

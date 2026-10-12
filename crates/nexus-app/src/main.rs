@@ -108,14 +108,19 @@ fn main() -> eframe::Result {
     });
     let delay = std::time::Duration::from_secs_f64(arg("--shot-delay").and_then(|s| s.parse().ok()).unwrap_or(0.0));
     let shot = arg("--screenshot").map(|p| app::ScreenshotJob::new(p.into(), delay));
-    let overrides = app::Overrides { journal_dir: arg("--journal-dir").map(Into::into), mute: args.iter().any(|a| a == "--mute"), tab: arg("--tab") };
+    let overrides = app::Overrides { journal_dir: arg("--journal-dir").map(Into::into), mute: args.iter().any(|a| a == "--mute"), tab: arg("--tab"), demo: args.iter().any(|a| a == "--demo") };
     let screenshot_mode = shot.is_some();
 
+    // --size 1000x700: window size for responsive-layout screenshots.
+    let size = arg("--size").and_then(|s| {
+        let (w, h) = s.split_once('x')?;
+        Some([w.parse::<f32>().ok()?, h.parse::<f32>().ok()?])
+    });
     let mut viewport = egui::ViewportBuilder::default()
         .with_title("Elite Nexus")
         .with_app_id("elite-nexus")
-        .with_inner_size([1480.0, 920.0])
-        .with_min_inner_size([1100.0, 680.0])
+        .with_inner_size(size.unwrap_or([1480.0, 920.0]))
+        .with_min_inner_size([880.0, 600.0])
         .with_icon(app_icon());
     if screenshot_mode {
         // Render far outside the desktop, unfocused and without a taskbar button: UI checks must
@@ -124,7 +129,10 @@ fn main() -> eframe::Result {
     }
     let options = eframe::NativeOptions {
         viewport,
-        persistence_path: if screenshot_mode { None } else { Some(data_dir.join("ui-state.ron")) },
+        // Screenshot runs keep their own state and never restore a window size (eframe would
+        // otherwise fall back to a default folder on C: and reuse the last geometry).
+        persist_window: !screenshot_mode,
+        persistence_path: Some(data_dir.join(if screenshot_mode { "screenshot-ui-state.ron" } else { "ui-state.ron" })),
         ..Default::default()
     };
     eframe::run_native(

@@ -1,5 +1,5 @@
-use crate::theme::{display, pal};
-use crate::widgets::{badge, card, credits, empty, kv, short_credits};
+use crate::theme::{display, pal, size};
+use crate::widgets::{GAP, badge, card_tinted, cards, credits, empty, kv, short_credits, th};
 use egui::{Color32, Grid, Pos2, RichText, Sense, Stroke, Ui, Vec2};
 use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular as icon;
@@ -12,28 +12,36 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
     let radius = gs.status.as_ref().and_then(|s| s.planet_radius);
     let heading = gs.status.as_ref().and_then(|s| s.heading);
 
-    ui.columns(2, |c| {
-        card(&mut c[0], "Sampling", |ui| match &gs.exobio.current {
-            Some(cur) => sampling(ui, cur, pos, radius, heading),
-            None => {
-                ui.label(RichText::new("No sample in progress").font(display(18.0)).color(pal::DIM));
-                ui.label(RichText::new("Use the genetic sampler on a plant: progress, distance to the next valid sample and the colony range appear here live.").color(pal::FAINT));
-            }
+    cards(ui, 2, 340.0, |c| {
+        c.add(|ui| {
+            card_tinted(ui, icon::PLANT, "Sampling", pal::GOOD, |ui| match &gs.exobio.current {
+                Some(cur) => sampling(ui, cur, pos, radius, heading),
+                None => {
+                    ui.label(RichText::new("No sample in progress").font(display(size::TITLE3)).color(pal::TEXT));
+                    ui.add(egui::Label::new(RichText::new("Use the genetic sampler on a plant: progress, the distance to the next valid sample and the colony range appear here live.").color(pal::DIM)).wrap());
+                }
+            });
         });
-        card(&mut c[1], "Unsold Vista Genomics data", |ui| {
+        c.add(|ui| unsold(ui, gs));
+    });
+    ui.add_space(GAP);
+    bio_bodies(ui, gs);
+}
+
+fn unsold(ui: &mut Ui, gs: &GameState) {
+        card_tinted(ui, icon::FLASK, "Unsold Vista Genomics data", pal::GOLD, |ui| {
             let total = gs.exobio.unsold_value();
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing.x = 22.0;
                 crate::widgets::stat(ui, "estimated payout", short_credits(total), pal::GOLD);
-                ui.add_space(16.0);
                 crate::widgets::stat(ui, "samples", gs.exobio.unsold.len().to_string(), pal::TEXT);
-                ui.add_space(16.0);
                 crate::widgets::stat(ui, "sold so far", short_credits(gs.exobio.sold_total), pal::DIM);
             });
             ui.add_space(4.0);
             if gs.exobio.unsold.is_empty() {
                 ui.label(RichText::new("Everything sold.").color(pal::DIM));
             } else {
-                Grid::new("unsoldbio").num_columns(3).striped(true).spacing([10.0, 3.0]).show(ui, |ui| {
+                Grid::new("unsoldbio").max_col_width(ui.available_width()).num_columns(3).striped(true).spacing([10.0, 3.0]).show(ui, |ui| {
                     for r in gs.exobio.unsold.iter().rev() {
                         ui.label(RichText::new(&r.species).color(pal::TEXT));
                         ui.label(RichText::new(&r.body_name).color(pal::DIM));
@@ -46,16 +54,14 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                     }
                 });
             }
-            ui.label(RichText::new("Organic data is lost if you die — sell at Vista Genomics.").small().color(pal::FAINT));
+            ui.add_space(4.0);
+            ui.add(egui::Label::new(RichText::new("Organic data is lost if you die. Sell it at Vista Genomics.").size(size::FOOTNOTE).color(pal::DIM)).wrap());
         });
-    });
-    ui.add_space(10.0);
-    bio_bodies(ui, gs);
 }
 
 pub fn sampling(ui: &mut Ui, cur: &SampleInProgress, pos: Option<(f64, f64)>, radius: Option<f64>, heading: Option<f64>) {
     ui.horizontal(|ui| {
-        ui.label(RichText::new(&cur.species).font(display(22.0)).color(pal::TEXT));
+        ui.add(egui::Label::new(RichText::new(&cur.species).font(display(size::TITLE))).wrap());
         if let Some(v) = cur.value {
             badge(ui, &short_credits(v), pal::GOLD);
         }
@@ -71,26 +77,26 @@ pub fn sampling(ui: &mut Ui, cur: &SampleInProgress, pos: Option<(f64, f64)>, ra
             let col = if done { pal::GOOD } else { pal::FAINT };
             ui.label(RichText::new(if done { icon::CHECK_CIRCLE } else { icon::CIRCLE }).size(22.0).color(col));
         }
-        ui.label(RichText::new(format!("Sample {} of 3", cur.stage)).font(display(16.0)));
+        ui.label(RichText::new(format!("Sample {} of 3", cur.stage)).font(display(size::HEADLINE)));
     });
     let range = cur.colony_range_m.map(f64::from);
     if let Some(r) = range {
-        ui.label(RichText::new(format!("Colony range: {r:.0} m — samples must be at least this far apart")).color(pal::DIM));
+        ui.add(egui::Label::new(RichText::new(format!("Colony range {r:.0} m: samples must be at least this far apart.")).color(pal::DIM)).wrap());
     }
     let (Some(p), Some(rad)) = (pos, radius) else {
-        ui.label(RichText::new("Position unavailable (needs Status.json latitude/longitude while on the surface).").small().color(pal::FAINT));
+        ui.add(egui::Label::new(RichText::new("Position appears once you're on the surface.").size(size::FOOTNOTE).color(pal::DIM)).wrap());
         return;
     };
     if cur.points.is_empty() {
-        ui.label(RichText::new("Sample positions are only recorded while Elite Nexus is running.").small().color(pal::FAINT));
+        ui.add(egui::Label::new(RichText::new("Sample positions are only recorded while Elite Nexus is running.").size(size::FOOTNOTE).color(pal::DIM)).wrap());
         return;
     }
     let nearest = cur.nearest_sample_m(p, rad).unwrap_or(0.0);
     let ok = range.is_none_or(|r| nearest >= r);
     ui.add_space(6.0);
     ui.horizontal(|ui| {
-        let (txt, col) = if ok { (format!("{} {:.0} m — OK to sample", icon::CHECK, nearest), pal::GOOD) } else { (format!("{} {:.0} m — too close", icon::WARNING, nearest), pal::BAD) };
-        ui.label(RichText::new(txt).font(display(26.0)).color(col));
+        let (txt, col) = if ok { (format!("{} {:.0} m · OK to sample", icon::CHECK_CIRCLE, nearest), pal::GOOD) } else { (format!("{} {:.0} m · too close", icon::WARNING, nearest), pal::BAD) };
+        ui.label(RichText::new(txt).font(display(size::TITLE)).color(col));
     });
     if let Some(r) = range
         && !ok {
@@ -102,12 +108,13 @@ pub fn sampling(ui: &mut Ui, cur: &SampleInProgress, pos: Option<(f64, f64)>, ra
 /// Top-down radar centred on the commander, "up" = current heading.
 fn radar(ui: &mut Ui, cur: &SampleInProgress, me: (f64, f64), radius_m: f64, heading_deg: f64, range: f64) {
     let size = ui.available_width().min(320.0);
+    ui.add_space(6.0);
     let (rect, _) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
     let p = ui.painter_at(rect);
     let c = rect.center();
     let r_px = size / 2.0 - 8.0;
-    p.circle_filled(c, r_px, pal::BG0);
-    p.circle_stroke(c, r_px, Stroke::new(1.0, pal::BORDER));
+    p.circle_filled(c, r_px, pal::FIELD);
+    p.circle_stroke(c, r_px, Stroke::new(1.0, pal::SEPARATOR));
     // Offsets of previous samples in metres (local tangent plane: x east, y north).
     let pts: Vec<(f64, f64)> = cur
         .points
@@ -143,17 +150,17 @@ fn radar(ui: &mut Ui, cur: &SampleInProgress, me: (f64, f64), radius_m: f64, hea
         p.circle_filled(sp, (range * scale) as f32, col.gamma_multiply(0.12));
         p.circle_stroke(sp, (range * scale) as f32, Stroke::new(1.0, col.gamma_multiply(0.7)));
         p.circle_filled(sp, 5.0, col);
-        p.text(sp + Vec2::new(8.0, -8.0), egui::Align2::LEFT_BOTTOM, format!("#{}", i + 1), egui::FontId::proportional(12.0), pal::TEXT);
+        p.text(sp + Vec2::new(8.0, -8.0), egui::Align2::LEFT_BOTTOM, format!("#{}", i + 1), display(size::CAPTION), pal::TEXT);
     }
     // me
     let tri = [c + Vec2::new(0.0, -9.0), c + Vec2::new(6.0, 7.0), c + Vec2::new(-6.0, 7.0)];
     p.add(egui::Shape::convex_polygon(tri.to_vec(), pal::ACCENT, Stroke::NONE));
-    p.text(rect.left_top() + Vec2::new(6.0, 4.0), egui::Align2::LEFT_TOP, format!("{:.0} m", max_d), egui::FontId::proportional(11.0), pal::FAINT);
+    p.text(rect.left_top() + Vec2::new(6.0, 4.0), egui::Align2::LEFT_TOP, format!("{:.0} m", max_d), egui::FontId::proportional(size::CAPTION), pal::DIM);
     let _ = Color32::TRANSPARENT;
 }
 
 fn bio_bodies(ui: &mut Ui, gs: &GameState) {
-    card(ui, "Biological signals in this system", |ui| {
+    card_tinted(ui, icon::PLANET, "Biological signals in this system", pal::MINT, |ui| {
         let Some(sys) = gs.exploration.current_system() else {
             ui.label(RichText::new("No system data.").color(pal::DIM));
             return;
@@ -166,22 +173,21 @@ fn bio_bodies(ui: &mut Ui, gs: &GameState) {
         bodies.sort_by(|a, b| a.distance_ls.total_cmp(&b.distance_ls));
         TableBuilder::new(ui)
             .striped(true)
-            .resizable(true)
-            .column(Column::initial(110.0))
-            .column(Column::initial(60.0))
+            .resizable(false)
+            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+            .column(Column::initial(110.0).clip(true))
             .column(Column::initial(70.0))
+            .column(Column::initial(76.0))
             .column(Column::initial(70.0))
-            .column(Column::initial(170.0))
-            .column(Column::remainder())
-            .header(22.0, |mut h| {
+            .column(Column::initial(170.0).clip(true))
+            .column(Column::remainder().clip(true))
+            .header(30.0, |mut h| {
                 for t in ["Body", "Signals", "Gravity", "Temp", "Atmosphere", "Genera / species"] {
-                    h.col(|ui| {
-                        ui.label(RichText::new(t).color(pal::DIM).strong());
-                    });
+                    h.col(|ui| th(ui, t));
                 }
             })
             .body(|body| {
-                body.rows(26.0, bodies.len(), |mut row| {
+                body.rows(32.0, bodies.len(), |mut row| {
                     let b = bodies[row.index()];
                     row.col(|ui| {
                         ui.label(b.short_name(&sys.name));
@@ -207,7 +213,7 @@ fn bio_bodies(ui: &mut Ui, gs: &GameState) {
                             if b.genuses.is_empty() && b.organics.is_empty() {
                                 let likely = b.likely_species();
                                 if likely.is_empty() {
-                                    ui.label(RichText::new("map with DSS to reveal genera").color(pal::FAINT));
+                                    ui.label(RichText::new("Map with the DSS to reveal the genera").color(pal::DIM));
                                 }
                                 for p in likely.iter().take(4) {
                                     badge(ui, &format!("{} {:.0}%", p.species, p.likelihood * 100.0), pal::FAINT).on_hover_text(format!("{} Cr · colony {} m", nexus_data::names::group_digits(p.value), p.colony_range_m));
@@ -237,10 +243,10 @@ fn bio_bodies(ui: &mut Ui, gs: &GameState) {
                 });
             });
     });
-    ui.add_space(10.0);
-    card(ui, "Exobiology totals", |ui| {
-        Grid::new("biototals").num_columns(2).spacing([10.0, 3.0]).show(ui, |ui| {
-            kv(ui, "Species analysed (all time in journals)", gs.exobio.analysed_total.to_string());
+    ui.add_space(GAP);
+    card_tinted(ui, icon::CHART_BAR, "Totals", pal::BLUE, |ui| {
+        Grid::new("biototals").max_col_width(ui.available_width()).num_columns(2).spacing([14.0, 6.0]).show(ui, |ui| {
+            kv(ui, "Species analysed", gs.exobio.analysed_total.to_string());
             kv(ui, "Sold to Vista Genomics", credits(gs.exobio.sold_total));
             kv(ui, "Exobiologist rank", gs.cmdr.rank_name(nexus_data::ranks::RankKind::Exobiologist));
         });

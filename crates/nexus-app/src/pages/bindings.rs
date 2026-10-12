@@ -99,8 +99,9 @@ pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
     };
     let r = &loaded.report;
 
-    ui.columns(3, |c| {
-        card(&mut c[0], "Active presets", |ui| {
+    crate::widgets::cards(ui, 3, 280.0, |c| {
+        c.add(|ui| {
+            card(ui, "Active presets", |ui| {
             for cat in [PresetCategory::General, PresetCategory::Ship, PresetCategory::Srv, PresetCategory::OnFoot] {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(cat.label()).color(pal::DIM));
@@ -109,7 +110,9 @@ pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
             }
             ui.label(RichText::new(format!("{} actions bound · {} bindings", r.totals.bound_actions, r.totals.bindings)).small().color(pal::DIM));
         });
-        card(&mut c[1], "Health", |ui| {
+        });
+        c.add(|ui| {
+            card(ui, "Health", |ui| {
             let essentials = r.missing_essentials().count();
             ui.horizontal(|ui| {
                 crate::widgets::stat(ui, "conflicts", r.conflicts.len().to_string(), if r.conflicts.is_empty() { pal::GOOD } else { pal::BAD });
@@ -119,7 +122,9 @@ pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
                 crate::widgets::stat(ui, "recommended", (r.missing.len() - essentials).to_string(), pal::DIM);
             });
         });
-        card(&mut c[2], "Devices", |ui| {
+        });
+        c.add(|ui| {
+            card(ui, "Devices", |ui| {
             ui.horizontal_wrapped(|ui| {
                 for d in &r.devices {
                     let col = if d.conflicts > 0 { pal::WARN } else { pal::CYAN };
@@ -127,11 +132,13 @@ pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
                 }
             });
         });
+        });
     });
     ui.add_space(8.0);
     if !r.conflicts.is_empty() || r.missing.iter().any(|m| m.importance == Importance::Essential) {
-        ui.columns(2, |c| {
-            card(&mut c[0], "Conflicts", |ui| {
+        crate::widgets::cards(ui, 2, 360.0, |c| {
+            c.add(|ui| {
+                card(ui, "Conflicts", |ui| {
                 if r.conflicts.is_empty() {
                     ui.label(RichText::new("None — nice.").color(pal::GOOD));
                 }
@@ -142,7 +149,9 @@ pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
                     });
                 }
             });
-            card(&mut c[1], "Missing essentials", |ui| {
+            });
+            c.add(|ui| {
+                card(ui, "Missing essentials", |ui| {
                 let mut any = false;
                 for m in r.missing_essentials() {
                     any = true;
@@ -155,13 +164,13 @@ pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
                     ui.label(RichText::new("All essentials bound.").color(pal::GOOD));
                 }
             });
+            });
         });
         ui.add_space(8.0);
     }
 
     ui.horizontal(|ui| {
-        ui.label(RichText::new(icon::MAGNIFYING_GLASS).color(pal::DIM));
-        ui.add(egui::TextEdit::singleline(&mut st.filter).hint_text("Search actions or keys…").desired_width(240.0));
+        crate::widgets::search_field(ui, &mut st.filter, "Search actions or keys", 280.0);
         egui::ComboBox::from_id_salt("bindctx")
             .selected_text(st.context.map(|c| c.label()).unwrap_or("All contexts"))
             .show_ui(ui, |ui| {
@@ -170,7 +179,7 @@ pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
                     ui.selectable_value(&mut st.context, Some(c), c.label());
                 }
             });
-        ui.checkbox(&mut st.only_problems, "Only conflicts");
+        crate::widgets::toggle(ui, &mut st.only_problems, "Only conflicts");
     });
     let f = st.filter.to_ascii_lowercase();
     let rows: Vec<_> = loaded
@@ -190,22 +199,23 @@ pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
         .collect();
     TableBuilder::new(ui)
         .striped(true)
-        .resizable(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
         .column(Column::initial(110.0))
         .column(Column::initial(170.0))
         .column(Column::initial(260.0))
         .column(Column::initial(200.0))
         .column(Column::initial(200.0))
         .column(Column::remainder())
-        .header(22.0, |mut h| {
+        .header(30.0, |mut h| {
             for t in ["Context", "Category", "Action", "Primary", "Secondary", "Axis"] {
                 h.col(|ui| {
-                    ui.label(RichText::new(t).color(pal::DIM).strong());
+                    crate::widgets::th(ui, t);
                 });
             }
         })
         .body(|body| {
-            body.rows(24.0, rows.len(), |mut row| {
+            body.rows(32.0, rows.len(), |mut row| {
                 let (a, info) = &rows[row.index()];
                 row.col(|ui| {
                     ui.label(RichText::new(info.context.label()).color(pal::DIM));

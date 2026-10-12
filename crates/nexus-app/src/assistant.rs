@@ -50,6 +50,20 @@ impl Default for AssistantService {
 }
 
 impl AssistantService {
+    /// A sample conversation for screenshot runs (`--demo`): long lines, a list and a pending answer.
+    pub fn demo() -> Self {
+        let mut s = AssistantService { model: Some("gemini-3.5-flash-lite".into()), ..Default::default() };
+        s.exchanges.push(Exchange {
+            question: "Are you aware of the first footfall status of planets on the route we're planning for exobiology? I need planets where I can find expensive biology that nobody has walked on yet.".into(),
+            answer: Some(Ok("Yes. The exobiology planner (powered by Spansh) targets bodies that typically carry high-value biology such as **Stratum Tectonicas**, worth about 19 M Cr base or about 95 M Cr with the first-logged bonus.\n\nTo get the ×5 bonus:\n- Pick systems a little off the beaten path, where no commander has stamped their name.\n- When you scan a body with the FSS or DSS, check its footfall status before you land; bodies nobody has walked on in unpopulated systems qualify.\n  - Populated systems never pay the bonus, even when the body shows no footfall.\n\nYour route is loaded on the Navigation page. Happy hunting!".into())),
+            tools: vec!["money_routes".into(), "knowledge".into()],
+            usage: Usage::default(),
+        });
+        s.exchanges.push(Exchange { question: "Which of those bodies are still unfootfalled?".into(), answer: None, tools: Vec::new(), usage: Usage::default() });
+        s.status = Some("Checking the planets…".into());
+        s
+    }
+
     pub fn busy(&self) -> bool {
         self.rx.is_some()
     }

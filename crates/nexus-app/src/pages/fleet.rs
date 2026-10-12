@@ -17,19 +17,36 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut FleetUi) {
         return;
     }
     let selected = st.selected.or(gs.fleet.current_ship_id);
+    let mut ships: Vec<&Ship> = gs.fleet.ships.values().collect();
+    ships.sort_by(|a, b| (Some(b.id) == gs.fleet.current_ship_id).cmp(&(Some(a.id) == gs.fleet.current_ship_id)).then(b.total_value().cmp(&a.total_value())));
+    if ui.available_width() < 940.0 {
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
+            for s in &ships {
+                let name = if s.name.trim().is_empty() { s.type_name.clone() } else { s.name.clone() };
+                if crate::widgets::pill(ui, selected == Some(s.id), &name).clicked() {
+                    st.selected = Some(s.id);
+                }
+            }
+        });
+        ui.add_space(crate::widgets::GAP);
+        if let Some(s) = selected.and_then(|id| gs.fleet.ships.get(&id)) {
+            ship_detail(ui, gs, s);
+        }
+        return;
+    }
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(330.0);
-            let mut ships: Vec<&Ship> = gs.fleet.ships.values().collect();
-            ships.sort_by(|a, b| (Some(b.id) == gs.fleet.current_ship_id).cmp(&(Some(a.id) == gs.fleet.current_ship_id)).then(b.total_value().cmp(&a.total_value())));
             ui.label(RichText::new(format!("{} ships · {}", ships.len(), short_credits(gs.fleet.total_value()))).font(display(16.0)).color(pal::GOLD));
             egui::ScrollArea::vertical().id_salt("shiplist").show(ui, |ui| {
-                for s in ships {
+                for s in &ships {
                     ship_tile(ui, gs, s, selected == Some(s.id), st);
+                    ui.add_space(4.0);
                 }
             });
         });
-        ui.add_space(10.0);
+        ui.add_space(crate::widgets::GAP - ui.spacing().item_spacing.x);
         ui.vertical(|ui| {
             if let Some(s) = selected.and_then(|id| gs.fleet.ships.get(&id)) {
                 ship_detail(ui, gs, s);
@@ -41,21 +58,21 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut FleetUi) {
 fn ship_tile(ui: &mut Ui, gs: &GameState, s: &Ship, selected: bool, st: &mut FleetUi) {
     let current = Some(s.id) == gs.fleet.current_ship_id;
     let fill = if selected { pal::CARD_HI } else { pal::CARD };
-    let stroke = if selected { pal::ACCENT } else { pal::BORDER };
+    let stroke = if selected { egui::Stroke::new(1.5, pal::ACCENT) } else { egui::Stroke::NONE };
     let resp = egui::Frame::new()
         .fill(fill)
-        .stroke(egui::Stroke::new(1.0, stroke))
-        .corner_radius(8)
-        .inner_margin(10)
+        .stroke(stroke)
+        .corner_radius(14)
+        .inner_margin(14)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.label(RichText::new(if s.name.trim().is_empty() { &s.type_name } else { &s.name }).font(display(16.0)).color(pal::TEXT));
                 if current {
-                    badge(ui, "ACTIVE", pal::GOOD);
+                    badge(ui, "Active", pal::GOOD);
                 }
                 if s.hot {
-                    badge(ui, "HOT", pal::BAD);
+                    badge(ui, "Hot", pal::BAD);
                 }
             });
             ui.label(RichText::new(&s.type_name).color(pal::DIM));
@@ -150,20 +167,21 @@ fn ship_detail(ui: &mut Ui, _gs: &GameState, s: &Ship) {
     modules.sort_by(|a, b| slot_group(&a.slot).0.cmp(&slot_group(&b.slot).0).then(a.slot.cmp(&b.slot)));
     TableBuilder::new(ui)
         .striped(true)
-        .resizable(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
         .column(Column::initial(130.0))
         .column(Column::initial(240.0))
         .column(Column::initial(80.0))
         .column(Column::remainder().at_least(200.0))
-        .header(22.0, |mut h| {
+        .header(30.0, |mut h| {
             for t in ["Slot", "Module", "Value", "Engineering"] {
                 h.col(|ui| {
-                    ui.label(RichText::new(t).color(pal::DIM).strong());
+                    crate::widgets::th(ui, t);
                 });
             }
         })
         .body(|body| {
-            body.rows(26.0, modules.len(), |mut row| {
+            body.rows(32.0, modules.len(), |mut row| {
                 let m = modules[row.index()];
                 row.col(|ui| {
                     ui.label(RichText::new(nexus_data::outfitting::slot_display(&m.slot)).color(pal::DIM));

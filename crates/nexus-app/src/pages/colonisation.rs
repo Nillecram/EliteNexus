@@ -40,7 +40,7 @@ pub fn show(ui: &mut Ui, gs: &GameState, market: &MarketService, st: &mut Coloni
                 }
             });
             bar(ui, d.progress as f32, pal::GOOD, 10.0, None);
-            ui.label(RichText::new(format!("Updated {}", crate::widgets::ago(d.updated))).small().color(pal::FAINT));
+            ui.label(RichText::new(format!("Updated {}", crate::widgets::ago(d.updated))).small().color(pal::DIM));
             ui.add_space(4.0);
             let mut res: Vec<_> = d.resources.iter().filter(|r| r.remaining() > 0).collect();
             res.sort_by_key(|r| std::cmp::Reverse(r.remaining()));
@@ -158,7 +158,7 @@ fn suppliers_section(ui: &mut Ui, gs: &GameState, d: &nexus_model::colonisation:
                 }
             });
             if list.iter().all(|s| s.hits.is_empty()) {
-                ui.label(RichText::new("The market database has no sellers yet: turn on the live feed or run the Spansh import (Market → Database & feed).").small().color(pal::FAINT));
+                ui.label(RichText::new("The market database has no sellers yet: turn on the live feed or run the Spansh import (Market → Database & feed).").small().color(pal::DIM));
             }
         }
         None => {}

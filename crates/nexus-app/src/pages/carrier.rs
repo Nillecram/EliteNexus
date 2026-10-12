@@ -11,8 +11,9 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
         empty(ui, icon::ANCHOR, "No fleet carrier", "Carrier data appears when the game writes CarrierStats (open the carrier management screen).");
         return;
     }
-    ui.columns(3, |col| {
-        card(&mut col[0], "Carrier", |ui| {
+    crate::widgets::cards(ui, 3, 280.0, |col| {
+        col.add(|ui| {
+            card(ui, "Carrier", |ui| {
             ui.label(RichText::new(&c.name).font(display(24.0)));
             ui.label(RichText::new(&c.callsign).font(display(16.0)).color(pal::ACCENT));
             ui.add_space(4.0);
@@ -35,15 +36,19 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                 }
             });
         });
-        card(&mut col[1], "Tritium", |ui| {
+        });
+        col.add(|ui| {
+            card(ui, "Tritium", |ui| {
             ui.label(RichText::new(format!("{} t", c.fuel)).font(display(24.0)).color(pal::CYAN));
             bar(ui, c.fuel as f32 / 1000.0, pal::CYAN, 10.0, None);
             ui.label(RichText::new(format!("Jump range {:.0} / {:.0} ly", c.jump_range_curr, c.jump_range_max)).color(pal::DIM));
-            ui.label(RichText::new("Use Navigation → Carrier route for exact tritium per jump (Spansh).").small().color(pal::FAINT));
+            ui.label(RichText::new("Use Navigation → Carrier route for exact tritium per jump (Spansh).").small().color(pal::DIM));
         });
-        card(&mut col[2], "Finance", |ui| {
+        });
+        col.add(|ui| {
+            card(ui, "Finance", |ui| {
             ui.label(RichText::new(short_credits(c.finance.carrier_balance)).font(display(24.0)).color(pal::GOLD));
-            Grid::new("cfin").num_columns(2).spacing([10.0, 3.0]).show(ui, |ui| {
+            Grid::new("cfin").max_col_width(ui.available_width()).num_columns(2).spacing([10.0, 3.0]).show(ui, |ui| {
                 kv(ui, "Available", short_credits(c.finance.available_balance));
                 kv(ui, "Reserved", short_credits(c.finance.reserve_balance));
                 if let Some(p) = c.finance.reserve_percent {
@@ -51,10 +56,12 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                 }
             });
         });
+        });
     });
     ui.add_space(8.0);
-    ui.columns(2, |col| {
-        card(&mut col[0], "Capacity", |ui| {
+    crate::widgets::cards(ui, 2, 360.0, |col| {
+        col.add(|ui| {
+            card(ui, "Capacity", |ui| {
             let s = &c.space;
             let total = s.total_capacity.max(1) as f32;
             Grid::new("cspace").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
@@ -72,8 +79,10 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                 }
             });
         });
-        card(&mut col[1], "Crew & services", |ui| {
-            Grid::new("ccrew").num_columns(3).striped(true).spacing([10.0, 3.0]).show(ui, |ui| {
+        });
+        col.add(|ui| {
+            card(ui, "Crew & services", |ui| {
+            Grid::new("ccrew").max_col_width(ui.available_width()).num_columns(3).striped(true).spacing([10.0, 3.0]).show(ui, |ui| {
                 for m in &c.crew {
                     ui.label(nexus_data::names::split_camel(&m.crew_role));
                     let (t, colr) = if !m.activated {
@@ -89,10 +98,12 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                 }
             });
         });
+        });
     });
     ui.add_space(8.0);
-    ui.columns(2, |col| {
-        card(&mut col[0], "Market orders", |ui| {
+    crate::widgets::cards(ui, 2, 360.0, |col| {
+        col.add(|ui| {
+            card(ui, "Market orders", |ui| {
             if c.trade_orders.is_empty() {
                 ui.label(RichText::new("No orders recorded.").color(pal::DIM));
             }
@@ -111,17 +122,20 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                 }
             });
         });
-        card(&mut col[1], "Jump history", |ui| {
+        });
+        col.add(|ui| {
+            card(ui, "Jump history", |ui| {
             if c.jumps.is_empty() {
                 ui.label(RichText::new("No jumps recorded yet.").color(pal::DIM));
             }
-            Grid::new("cjumps").num_columns(2).striped(true).show(ui, |ui| {
+            Grid::new("cjumps").max_col_width(ui.available_width()).num_columns(2).striped(true).show(ui, |ui| {
                 for j in c.jumps.iter().rev().take(30) {
                     ui.label(RichText::new(j.ts.to_local_string("%d %b %H:%M")).color(pal::FAINT));
                     ui.label(&j.system);
                     ui.end_row();
                 }
             });
+        });
         });
     });
 }

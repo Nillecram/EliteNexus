@@ -2,8 +2,8 @@
 //! exobiology). Whatever route is active drives the "next system → clipboard" automation.
 
 use crate::jobs::Slot;
-use crate::theme::{display, pal};
-use crate::widgets::{badge, card, empty, short_credits};
+use crate::theme::{display, pal, size};
+use crate::widgets::{self, GAP, badge, card, card_tinted, cards, empty, short_credits, th, toggle};
 use egui::{RichText, Ui};
 use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular as icon;
@@ -190,37 +190,39 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut NavUi, auto_copy: &mut bool, s
     if st.range <= 0.0 {
         st.range = gs.fleet.current().map(|s| s.max_jump_range).filter(|r| *r > 0.0).unwrap_or(30.0);
     }
-    ui.horizontal(|ui| {
-        changed |= ui.checkbox(auto_copy, "Copy the next system to the clipboard after every jump").changed();
-        let route = active_route(gs, st.planned.as_ref());
-        if let Some(next) = route.first()
-            && ui.button(format!("{} Copy next: {}", icon::COPY, next.system)).clicked() {
-                ui.ctx().copy_text(next.system.clone());
-            }
-        if st.planned.is_some() && ui.button(format!("{} Back to in-game route", icon::X)).clicked() {
-            st.planned = None;
-        }
-    });
-    ui.add_space(6.0);
-    ui.horizontal(|ui| {
-        for (p, label) in [
+    if let Some(p) = widgets::tabs(
+        ui,
+        st.planner,
+        &[
             (Planner::InGame, "In-game route"),
-            (Planner::Neutron, "Neutron plotter"),
-            (Planner::Exact, "Exact plotter (your ship)"),
+            (Planner::Neutron, "Neutron"),
+            (Planner::Exact, "Exact plotter"),
             (Planner::Carrier, "Fleet carrier"),
             (Planner::Riches, "Road to riches"),
             (Planner::Exobiology, "Exobiology"),
-        ] {
-            if ui.selectable_label(st.planner == p, label).clicked() {
-                st.planner = p;
-            }
-        }
-    });
-    ui.add_space(6.0);
+        ],
+    ) {
+        st.planner = p;
+    }
+    ui.add_space(GAP);
     if st.planner != Planner::InGame {
         planner_form(ui, gs, st, spansh, rt);
-        ui.add_space(6.0);
+        ui.add_space(GAP);
     }
+    ui.horizontal_wrapped(|ui| {
+        changed |= toggle(ui, auto_copy, "Copy the next system to the clipboard after every jump").changed();
+        ui.add_space(12.0);
+        let route = active_route(gs, st.planned.as_ref());
+        if let Some(next) = route.first()
+            && widgets::button(ui, &format!("{} Copy {}", icon::COPY, next.system)).clicked()
+        {
+            ui.ctx().copy_text(next.system.clone());
+        }
+        if st.planned.is_some() && widgets::button(ui, &format!("{} Back to the in-game route", icon::ARROW_U_UP_LEFT)).clicked() {
+            st.planned = None;
+        }
+    });
+    ui.add_space(GAP);
     route_view(ui, gs, st);
     changed
 }
@@ -231,18 +233,18 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
     if st.range <= 0.0 {
         st.range = gs.fleet.current().map(|s| (s.max_jump_range * 10.0).round() / 10.0).filter(|r| *r > 0.0).unwrap_or(20.0);
     }
-    card(ui, "Spansh planner", |ui| {
+    card(ui, "", |ui| {
         // The simple surface: where from, where to, go.
         ui.horizontal_wrapped(|ui| {
-            ui.label("From");
-            ui.add(egui::TextEdit::singleline(&mut st.from).hint_text(gs.location.system.as_str()).desired_width(220.0));
+            ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
+            field(ui, "From", &mut st.from, gs.location.system.as_str());
             if matches!(st.planner, Planner::Neutron | Planner::Exact | Planner::Carrier) {
-                ui.label("To");
-                ui.add(egui::TextEdit::singleline(&mut st.to).hint_text("destination system").desired_width(220.0));
+                ui.label(RichText::new(icon::ARROW_RIGHT).size(16.0).color(pal::DIM));
+                field(ui, "To", &mut st.to, "Destination system");
             }
             let busy = st.job.busy();
-            let label = if busy { format!("{} Plotting…", icon::HOURGLASS) } else { format!("{} Plot route", icon::PATH) };
-            if ui.add_enabled(!busy, egui::Button::new(RichText::new(label).color(pal::ACCENT))).clicked() {
+            let label = if busy { format!("{} Plotting…", icon::HOURGLASS) } else { "Plot route".to_string() };
+            if ui.add_enabled_ui(!busy, |ui| widgets::primary_button(ui, &label)).inner.clicked() {
                 match make_request(gs, st, spansh) {
                     Some(fut) => st.job.run_async(ui.ctx(), rt, fut),
                     None => st.job.last = Some(Err("This planner needs your ship's loadout (fly it once) and a destination.".into())),
@@ -250,10 +252,6 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
             }
             if busy {
                 ui.spinner();
-            }
-            let options = format!("{} Options", if st.show_options { icon::CARET_DOWN } else { icon::CARET_RIGHT });
-            if ui.add(egui::Button::new(RichText::new(options).small().color(pal::DIM)).frame(false)).clicked() {
-                st.show_options = !st.show_options;
             }
         });
         let hint = match st.planner {
@@ -265,10 +263,12 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
             Planner::InGame => None,
         };
         if let Some(h) = hint {
-            ui.label(RichText::new(h).small().color(pal::DIM));
+            ui.add_space(4.0);
+            ui.add(egui::Label::new(RichText::new(h).size(size::FOOTNOTE).color(pal::DIM)).wrap());
         }
+        ui.add_space(4.0);
         // The hidden depth: everything the Spansh website offers, collapsed by default.
-        if st.show_options {
+        if widgets::disclosure(ui, &mut st.show_options, "Options") {
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| match st.planner {
                 Planner::Neutron => {
@@ -289,11 +289,13 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
                         })
                         .response
                         .on_hover_text("Spansh routing strategy: Optimistic is usually fastest; Least fuel avoids scooping; Neutron-guided follows a neutron route.");
-                    ui.checkbox(&mut o.use_supercharge, "Neutron boosts");
-                    ui.checkbox(&mut o.use_injections, "FSD injections");
-                    ui.checkbox(&mut o.exclude_secondary, "Skip secondary stars");
-                    ui.checkbox(&mut o.refuel_every_scoopable, "Refuel at every scoopable");
-                    ui.checkbox(&mut o.already_supercharged, "Already supercharged");
+                    ui.end_row();
+                    toggle(ui, &mut o.use_supercharge, "Neutron boosts");
+                    toggle(ui, &mut o.use_injections, "FSD injections");
+                    toggle(ui, &mut o.exclude_secondary, "Skip secondary stars");
+                    toggle(ui, &mut o.refuel_every_scoopable, "Refuel at every scoopable");
+                    toggle(ui, &mut o.already_supercharged, "Already supercharged");
+                    ui.end_row();
                     ui.label("Reserve");
                     ui.add(egui::DragValue::new(&mut o.reserve).range(0.0..=64.0).speed(0.1).suffix(" t"));
                 }
@@ -312,7 +314,7 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
                                 ui.selectable_value(&mut st.riches_kind, RichesKind::Ammonia, "Ammonia worlds");
                                 ui.selectable_value(&mut st.riches_kind, RichesKind::RockyHmc, "Terraformable rocky/HMC");
                             });
-                        ui.checkbox(&mut st.use_mapping, "Count mapping value");
+                        toggle(ui, &mut st.use_mapping, "Count mapping value");
                     }
                     ui.label("Range");
                     ui.add(egui::DragValue::new(&mut st.range).range(5.0..=120.0).suffix(" ly"));
@@ -327,14 +329,24 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
                     }
                 }
                 Planner::Carrier | Planner::InGame => {
-                    ui.label(RichText::new("No extra options for this planner.").small().color(pal::FAINT));
+                    ui.label(RichText::new("No extra options for this planner.").size(size::FOOTNOTE).color(pal::DIM));
                 }
             });
         }
         if let Some(Err(e)) = &st.job.last {
-            ui.label(RichText::new(e).color(pal::BAD));
+            ui.add(egui::Label::new(RichText::new(format!("{} {e}", icon::WARNING_CIRCLE)).color(pal::BAD)).wrap());
         }
-        ui.label(RichText::new("Route data © Spansh (spansh.co.uk)").small().color(pal::FAINT));
+        ui.add_space(2.0);
+        ui.label(RichText::new("Route data © Spansh (spansh.co.uk)").size(size::CAPTION).color(pal::FAINT));
+    });
+}
+
+/// A labelled text field: small caption above a rounded field.
+fn field(ui: &mut Ui, label: &str, text: &mut String, hint: &str) {
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 3.0;
+        ui.label(RichText::new(label).size(size::FOOTNOTE).color(pal::DIM));
+        ui.add(egui::TextEdit::singleline(text).hint_text(hint).desired_width(230.0).margin(egui::Margin::symmetric(10, 6)));
     });
 }
 
@@ -460,11 +472,12 @@ fn make_request(gs: &GameState, st: &NavUi, spansh: &Spansh) -> Option<PlanFutur
 fn route_view(ui: &mut Ui, gs: &GameState, st: &NavUi) {
     let route = active_route(gs, st.planned.as_ref());
     if let Some(p) = &st.planned {
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             badge(ui, p.kind, pal::CYAN);
-            ui.label(RichText::new(&p.summary).font(display(15.0)));
-            ui.hyperlink_to(format!("{} open on Spansh", icon::ARROW_SQUARE_OUT), &p.web_url);
+            ui.label(RichText::new(&p.summary).font(display(size::HEADLINE)));
+            ui.hyperlink_to(format!("{} Open on Spansh", icon::ARROW_SQUARE_OUT), &p.web_url);
         });
+        ui.add_space(8.0);
     }
     if route.is_empty() {
         empty(ui, icon::NAVIGATION_ARROW, "No route", "Plot a route in the galaxy map, or use a Spansh planner above.");
@@ -496,43 +509,57 @@ fn route_view(ui: &mut Ui, gs: &GameState, st: &NavUi) {
             run = 0;
         }
     }
-    ui.columns(4, |c| {
-        card(&mut c[0], "Destination", |ui| {
-            ui.label(RichText::new(route.last().map(|w| w.system.as_str()).unwrap_or("?")).font(display(18.0)));
+    let jumps: u32 = route.iter().map(|w| w.jumps.max(1)).sum();
+    let big = |ui: &mut Ui, text: String, color: egui::Color32| {
+        ui.add(egui::Label::new(RichText::new(text).font(display(size::TITLE3)).color(color)).wrap());
+    };
+    let note = |ui: &mut Ui, text: String, color: egui::Color32| {
+        ui.add(egui::Label::new(RichText::new(text).size(size::FOOTNOTE).color(color)).wrap());
+    };
+    cards(ui, 4, 190.0, |c| {
+        c.add(|ui| {
+            card_tinted(ui, icon::FLAG_CHECKERED, "Destination", pal::TEAL, |ui| {
+                big(ui, route.last().map(|w| w.system.clone()).unwrap_or_else(|| "?".into()), pal::TEXT);
+            });
         });
-        card(&mut c[1], "Remaining", |ui| {
-            let jumps: u32 = route.iter().map(|w| w.jumps.max(1)).sum();
-            ui.label(RichText::new(format!("{} waypoints · {} jumps · {:.0} ly", route.len(), jumps, total)).font(display(16.0)));
+        c.add(|ui| {
+            card_tinted(ui, icon::PATH, "Remaining", pal::BLUE, |ui| {
+                big(ui, format!("{total:.0} ly"), pal::TEXT);
+                note(ui, format!("{} waypoints · {jumps} jumps", route.len()), pal::DIM);
+            });
         });
-        card(&mut c[2], "Fuel stars", |ui| {
-            ui.label(RichText::new(format!("{scoopable} scoopable")).font(display(16.0)).color(pal::GOOD));
-            if worst >= 3 {
-                ui.label(RichText::new(format!("{} {worst} non-scoopable in a row", icon::WARNING)).color(pal::WARN));
-            }
+        c.add(|ui| {
+            card_tinted(ui, icon::GAS_PUMP, "Fuel stars", pal::GOOD, |ui| {
+                big(ui, format!("{scoopable} scoopable"), pal::TEXT);
+                if worst >= 3 {
+                    note(ui, format!("{} {worst} non-scoopable in a row", icon::WARNING), pal::WARN);
+                }
+            });
         });
-        card(&mut c[3], "Neutron stars", |ui| {
-            ui.label(RichText::new(format!("{neutrons} on route")).font(display(16.0)).color(if neutrons > 0 { pal::CYAN } else { pal::DIM }));
+        c.add(|ui| {
+            card_tinted(ui, icon::LIGHTNING, "Neutron stars", pal::CYAN, |ui| {
+                big(ui, format!("{neutrons} on route"), if neutrons > 0 { pal::TEXT } else { pal::DIM });
+            });
         });
     });
-    ui.add_space(8.0);
+    ui.add_space(GAP);
     TableBuilder::new(ui)
         .striped(true)
-        .resizable(true)
-        .column(Column::initial(40.0))
-        .column(Column::initial(270.0))
-        .column(Column::initial(190.0))
-        .column(Column::initial(80.0))
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+        .column(Column::exact(44.0))
+        .column(Column::initial(250.0).at_least(140.0).clip(true))
+        .column(Column::initial(210.0).at_least(120.0).clip(true))
+        .column(Column::initial(70.0))
         .column(Column::initial(90.0))
-        .column(Column::remainder())
-        .header(22.0, |mut h| {
-            for t in ["#", "System", "Star / flags", "Jumps", "Distance", "Notes"] {
-                h.col(|ui| {
-                    ui.label(RichText::new(t).color(pal::DIM).strong());
-                });
+        .column(Column::remainder().at_least(120.0).clip(true))
+        .header(30.0, |mut h| {
+            for t in ["#", "System", "Star", "Jumps", "Distance", "Notes"] {
+                h.col(|ui| th(ui, t));
             }
         })
         .body(|body| {
-            body.rows(24.0, route.len(), |mut row| {
+            body.rows(32.0, route.len(), |mut row| {
                 let i = row.index();
                 let w = &route[i];
                 row.set_selected(i == 0);
@@ -572,7 +599,7 @@ fn route_view(ui: &mut Ui, gs: &GameState, st: &NavUi) {
                             ui.label(RichText::new(short_credits(v as i64)).color(pal::GOLD));
                         }
                         if !w.note.is_empty() {
-                            ui.label(RichText::new(&w.note).small().color(pal::DIM));
+                            ui.add(egui::Label::new(RichText::new(&w.note).size(size::FOOTNOTE).color(pal::DIM)).truncate());
                         }
                     });
                 });
