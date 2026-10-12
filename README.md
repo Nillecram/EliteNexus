@@ -13,10 +13,13 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 
 | | |
 |---|---|
+| ![Exobiology: live sampling radar with two samples, colony-range circles and "OK to sample"](docs/screenshots/exobiology.png) **Exobiology** — live sampling radar, colony range, species value | ![Exploration: every body in the system with value, mapped value and highlights](docs/screenshots/exploration.png) **Exploration** — every body, value now vs. mapped, highlights |
 | ![Ask: the AI co-pilot answering an exobiology question](docs/screenshots/ask.png) **Ask** — the AI co-pilot | ![Market: stations paying far above the galactic average](docs/screenshots/market.png) **Market** — abnormal prices across the galaxy |
-| ![Fleet: every ship with its full engineered loadout](docs/screenshots/fleet.png) **Fleet** — loadouts, engineering, one-click EDSY/Coriolis | ![Galaxy map: everywhere you've been, with your ship and carrier](docs/screenshots/galaxy-map.png) **Galaxy map** — your travels, ship and carrier |
-| ![Fleet carrier: tritium, finances, capacity and crew](docs/screenshots/carrier.png) **Fleet carrier** — tritium, finances, crew | ![Statistics: credits over time, income by category, jumps per day](docs/screenshots/statistics.png) **Statistics** — credits, income, jumps |
-| ![Logbook: every journal event, searchable](docs/screenshots/logbook.png) **Logbook** — every journal event, searchable | |
+| ![Navigation: the plotted route with star classes, scoopable stars and jump distances](docs/screenshots/navigation.png) **Navigation** — route, fuel stars, next system to the clipboard | ![Engineering: blueprint wishlist and the materials shopping list](docs/screenshots/engineering.png) **Engineering** — wishlist and shopping list |
+| ![Fleet: every ship with its full engineered loadout](docs/screenshots/fleet.png) **Fleet** — loadouts, engineering, one-click EDSY/Coriolis | ![Fleet carrier: tritium, finances, capacity and crew](docs/screenshots/carrier.png) **Fleet carrier** — tritium, finances, crew |
+| ![Galaxy map: everywhere you've been, with your ship and carrier](docs/screenshots/galaxy-map.png) **Galaxy map** — your travels, ship and carrier | ![Statistics: credits over time, income by category, jumps per day](docs/screenshots/statistics.png) **Statistics** — credits, income, jumps |
+| ![Logbook: every journal event, searchable](docs/screenshots/logbook.png) **Logbook** — every journal event, searchable | ![Bindings: active presets, conflicts and every bound action](docs/screenshots/bindings.png) **Bindings** — presets, conflicts, reference card |
+| ![Accounts & sync: EDDN, EDSM, Inara and EDAstro, all opt-in](docs/screenshots/accounts.png) **Accounts & sync** — EDDN, EDSM, Inara, EDAstro | |
 
 ## Why it's faster
 
