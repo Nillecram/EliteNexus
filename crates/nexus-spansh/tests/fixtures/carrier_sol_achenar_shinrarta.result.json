@@ -1,0 +1,105 @@
+{
+  "created_at": "2026-10-12T10:59:01",
+  "job": "EE6344B6-C62B-11F1-9B76-AF48D4925400",
+  "parameters": {
+    "calculate_starting_fuel": 1,
+    "capacity": 25000,
+    "capacity_used": 1000,
+    "current_fuel": 0,
+    "destination_systems": [
+      "Achenar",
+      "Shinrarta Dezhra"
+    ],
+    "mass": 25000,
+    "refuel_destinations": [],
+    "source_system": "Sol",
+    "tritium_amount": 0
+  },
+  "result": {
+    "calculate_starting_fuel": true,
+    "capacity": 25000,
+    "capacity_used": 1000,
+    "destinations": [
+      "Achenar",
+      "Shinrarta Dezhra"
+    ],
+    "fuel_loaded": 0,
+    "jumps": [
+      {
+        "distance": 0,
+        "distance_to_destination": 139.449790751456,
+        "fuel_in_tank": 46,
+        "fuel_used": 0,
+        "has_icy_ring": false,
+        "id64": 10477373803,
+        "is_desired_destination": 1,
+        "is_system_pristine": false,
+        "must_restock": 1,
+        "name": "Sol",
+        "restock_amount": 46,
+        "tritium_in_market": 0,
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      {
+        "distance": 139.449790751456,
+        "distance_to_destination": 0,
+        "fuel_in_tank": 23,
+        "fuel_used": 23,
+        "has_icy_ring": false,
+        "id64": 164098653,
+        "is_desired_destination": 1,
+        "is_system_pristine": false,
+        "must_restock": 0,
+        "name": "Achenar",
+        "restock_amount": 0,
+        "tritium_in_market": 0,
+        "x": 67.5,
+        "y": -119.46875,
+        "z": 24.84375
+      },
+      {
+        "distance": 0,
+        "distance_to_destination": 137.587333770455,
+        "fuel_in_tank": 23,
+        "fuel_used": 0,
+        "has_icy_ring": false,
+        "id64": 164098653,
+        "is_desired_destination": 1,
+        "is_system_pristine": false,
+        "must_restock": 0,
+        "name": "Achenar",
+        "restock_amount": 0,
+        "tritium_in_market": 0,
+        "x": 67.5,
+        "y": -119.46875,
+        "z": 24.84375
+      },
+      {
+        "distance": 137.587333770455,
+        "distance_to_destination": 0,
+        "fuel_in_tank": 0,
+        "fuel_used": 23,
+        "has_icy_ring": true,
+        "id64": 3932277478106,
+        "is_desired_destination": 1,
+        "is_system_pristine": false,
+        "must_restock": 0,
+        "name": "Shinrarta Dezhra",
+        "restock_amount": 0,
+        "tritium_in_market": 0,
+        "x": 55.71875,
+        "y": 17.59375,
+        "z": 27.15625
+      }
+    ],
+    "mass": 25000,
+    "refuel_destinations": [],
+    "source": "Sol",
+    "tritium_stored": 0
+  },
+  "state": "completed",
+  "status": "ok",
+  "updated_at": "2026-10-12T10:59:01"
+}

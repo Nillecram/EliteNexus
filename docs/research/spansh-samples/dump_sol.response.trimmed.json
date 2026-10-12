@@ -1,0 +1,953 @@
+{
+  "system": {
+    "allegiance": "Federation",
+    "bodies": [
+      {
+        "absoluteMagnitude": 4.829987,
+        "age": 4792,
+        "axialTilt": -0.219615,
+        "belts": [
+          {
+            "innerRadius": 308170000000.0,
+            "mass": 4060500000000.0,
+            "name": "Asteroid Belt",
+            "outerRadius": 489190000000.0,
+            "type": "Rocky"
+          }
+        ],
+        "bodyId": 0,
+        "distanceToArrival": 0.0,
+        "id64": 10477373803,
+        "luminosity": "V",
+        "mainStar": true,
+        "name": "Sol",
+        "rotationalPeriod": 2.58327451196759,
+        "solarMasses": 1.0,
+        "solarRadius": 0.999999953989935,
+        "spectralClass": "G2",
+        "stations": [],
+        "subType": "G (White-Yellow) Star",
+        "surfaceTemperature": 5778.0,
+        "timestamps": {
+          "distanceToArrival": "2026-10-12T03:39:21Z"
+        },
+        "type": "Star",
+        "updateTime": "2026-10-12T09:12:37Z"
+      },
+      {
+        "argOfPeriapsis": 29.124,
+        "ascendingNode": 48.331001,
+        "atmosphereType": null,
+        "axialTilt": 0.036826,
+        "bodyId": 1,
+        "distanceToArrival": 230.480878,
+        "earthMasses": 0.055,
+        "gravity": 0.375546038543897,
+        "id64": 36028807496337771,
+        "isLandable": true,
+        "materials": {
+          "Carbon": 10.810926,
+          "Chromium": 10.572534,
+          "Germanium": 3.806087,
+          "Iron": 23.508457,
+          "Manganese": 9.708753,
+          "Mercury": 1.026576,
+          "Nickel": 17.780811,
+          "Phosphorus": 6.92134,
+          "Ruthenium": 1.451797,
+          "Sulphur": 12.85643,
+          "Tin": 1.556283
+        },
+        "meanAnomaly": 204.041503,
+        "name": "Mercury",
+        "orbitalEccentricity": 0.2056,
+        "orbitalInclination": 7.0,
+        "orbitalPeriod": 87.9691003097454,
+        "parents": [
+          {
+            "Star": 0
+          }
+        ],
+        "radius": 2439.7,
+        "rotationalPeriod": 58.6460011179282,
+        "rotationalPeriodTidallyLocked": false,
+        "semiMajorAxis": 0.387098364729585,
+        "signals": {
+          "genuses": [],
+          "signals": {
+            "$PlanetaryMiningLocation_Name;": 6,
+            "$SAA_SignalType_Human;": 6
+          },
+          "updateTime": "2026-10-12T09:13:04Z"
+        },
+        "solidComposition": {
+          "Ice": 0.0,
+          "Metal": 60.0,
+          "Rock": 40.0
+        },
+        "stations": [
+          {
+            "allegiance": "Federation",
+            "controllingFaction": "Sol Workers' Party",
+            "controllingFactionState": null,
+            "distanceToArrival": 230.444934,
+            "economies": {
+              "Industrial": 100.0
+            },
+            "government": "Democracy",
+            "id": 3534389760,
+            "landingPads": {
+              "large": 2,
+              "medium": 2,
+              "small": 4
+            },
+            "latitude": -50.540878,
+            "longitude": -41.765411,
+            "market": {
+              "commodities": [
+                {
+                  "buyPrice": 1943,
+                  "category": "Technology",
+                  "commodityId": 128049231,
+                  "demand": 0,
+                  "name": "Advanced Catalysers",
+                  "sellPrice": 1942,
+                  "supply": 0,
+                  "symbol": "AdvancedCatalysers"
+                },
+                {
+                  "buyPrice": 0,
+                  "category": "Medicines",
+                  "commodityId": 128682046,
+                  "demand": 2218,
+                  "name": "Advanced Medicines",
+                  "sellPrice": 1727,
+                  "supply": 0,
+                  "symbol": "AdvancedMedicines"
+                },
+                {
+                  "buyPrice": 2125,
+                  "category": "Foods",
+                  "commodityId": 128667670,
+                  "demand": 0,
+                  "name": "Aepyornis Egg",
+                  "sellPrice": 2124,
+                  "supply": 0,
+                  "symbol": "CetiAepyornisEgg"
+                }
+              ],
+              "prohibitedCommodities": [],
+              "updateTime": "2026-10-11T17:44:01Z"
+            },
+            "name": "Walz Depot",
+            "outfitting": {
+              "modules": [
+                {
+                  "category": "standard",
+                  "class": 1,
+                  "moduleId": 128049304,
+                  "name": "Lightweight Alloy",
+                  "rating": "I",
+                  "ship": "Asp Explorer",
+                  "symbol": "Asp_Armour_Grade1"
+                },
+                {
+                  "category": "standard",
+                  "class": 1,
+                  "moduleId": 128049305,
+                  "name": "Reinforced Alloy",
+                  "rating": "I",
+                  "ship": "Asp Explorer",
+                  "symbol": "Asp_Armour_Grade2"
+                },
+                {
+                  "category": "standard",
+                  "class": 1,
+                  "moduleId": 128049306,
+                  "name": "Military Grade Composite",
+                  "rating": "I",
+                  "ship": "Asp Explorer",
+                  "symbol": "Asp_Armour_Grade3"
+                }
+              ],
+              "updateTime": "2026-10-12T01:23:54Z"
+            },
+            "primaryEconomy": "Industrial",
+            "services": [
+              "Dock",
+              "Autodock",
+              "Market"
+            ],
+            "shipyard": {
+              "ships": [
+                {
+                  "name": "Asp Explorer",
+                  "shipId": 128049303,
+                  "symbol": "Asp"
+                },
+                {
+                  "name": "Beluga Liner",
+                  "shipId": 128049345,
+                  "symbol": "BelugaLiner"
+                },
+                {
+                  "name": "Cobra MkIII",
+                  "shipId": 128049279,
+                  "symbol": "CobraMkIII"
+                }
+              ],
+              "updateTime": "2026-10-11T17:43:55Z"
+            },
+            "state": "UnderRepairs",
+            "type": "Planetary Outpost",
+            "updateTime": "2026-10-12T04:42:44Z"
+          },
+          {
+            "allegiance": "Federation",
+            "controllingFaction": "Sol Workers' Party",
+            "controllingFactionState": null,
+            "distanceToArrival": 230.826721,
+            "economies": {
+              "Industrial": 100.0
+            },
+            "government": "Democracy",
+            "id": 3534390016,
+            "landingPads": {
+              "large": 8,
+              "medium": 8,
+              "small": 8
+            },
+            "latitude": -53.810898,
+            "longitude": -123.199539,
+            "market": {
+              "commodities": [
+                {
+                  "buyPrice": 0,
+                  "category": "Medicines",
+                  "commodityId": 128682046,
+                  "demand": 5230,
+                  "name": "Advanced Medicines",
+                  "sellPrice": 1727,
+                  "supply": 0,
+                  "symbol": "AdvancedMedicines"
+                },
+                {
+                  "buyPrice": 0,
+                  "category": "Chemicals",
+                  "commodityId": 128924334,
+                  "demand": 50,
+                  "name": "Agronomic Treatment",
+                  "sellPrice": 3519,
+                  "supply": 0,
+                  "symbol": "AgronomicTreatment"
+                },
+                {
+                  "buyPrice": 0,
+                  "category": "Foods",
+                  "commodityId": 128049177,
+                  "demand": 118068,
+                  "name": "Algae",
+                  "sellPrice": 633,
+                  "supply": 0,
+                  "symbol": "Algae"
+                }
+              ],
+              "prohibitedCommodities": [
+                "Narcotics",
+                "Battle Weapons",
+                "Bootleg Liquor"
+              ],
+              "updateTime": "2026-10-11T14:01:18Z"
+            },
+            "name": "Ehrlich City",
+            "outfitting": {
+              "modules": [
+                {
+                  "category": "standard",
+                  "class": 1,
+                  "moduleId": 128049304,
+                  "name": "Lightweight Alloy",
+                  "rating": "I",
+                  "ship": "Asp Explorer",
+                  "symbol": "Asp_Armour_Grade1"
+                },
+                {
+                  "category": "standard",
+                  "class": 1,
+                  "moduleId": 128049305,
+                  "name": "Reinforced Alloy",
+                  "rating": "I",
+                  "ship": "Asp Explorer",
+                  "symbol": "Asp_Armour_Grade2"
+                },
+                {
+                  "category": "standard",
+                  "class": 1,
+                  "moduleId": 128049306,
+                  "name": "Military Grade Composite",
+                  "rating": "I",
+                  "ship": "Asp Explorer",
+                  "symbol": "Asp_Armour_Grade3"
+                }
+              ],
+              "updateTime": "2026-10-11T17:04:11Z"
+            },
+            "primaryEconomy": "Industrial",
+            "services": [
+              "Dock",
+              "Autodock",
+              "Market"
+            ],
+            "shipyard": {
+              "ships": [
+                {
+                  "name": "Asp Explorer",
+                  "shipId": 128049303,
+                  "symbol": "Asp"
+                },
+                {
+                  "name": "Beluga Liner",
+                  "shipId": 128049345,
+                  "symbol": "BelugaLiner"
+                },
+                {
+                  "name": "Cobra MkIII",
+                  "shipId": 128049279,
+                  "symbol": "CobraMkIII"
+                }
+              ],
+              "updateTime": "2026-10-11T17:08:20Z"
+            },
+            "state": "UnderRepairs",
+            "type": "Planetary Port",
+            "updateTime": "2026-10-11T17:08:20Z"
+          },
+          {
+            "allegiance": "Federation",
+            "controllingFaction": "Sol Workers' Party",
+            "controllingFactionState": null,
+            "distanceToArrival": 232.382846,
+            "economies": {
+              "Industrial": 100.0
+            },
+            "government": "Democracy",
+            "id": 3534391808,
+            "landingPads": {
+              "large": 2,
+              "medium": 2,
+              "small": 4
+            },
+            "latitude": -7.70397,
+            "longitude": -73.202888,
+            "market": {
+              "commodities": [
+                {
+                  "buyPrice": 1943,
+                  "category": "Technology",
+                  "commodityId": 128049231,
+                  "demand": 0,
+                  "name": "Advanced Catalysers",
+                  "sellPrice": 1942,
+                  "supply": 0,
+                  "symbol": "AdvancedCatalysers"
+                },
+                {
+                  "buyPrice": 0,
+                  "category": "Medicines",
+                  "commodityId": 128682046,
+                  "demand": 2355,
+                  "name": "Advanced Medicines",
+                  "sellPrice": 1727,
+                  "supply": 0,
+                  "symbol": "AdvancedMedicines"
+                },
+                {
+                  "buyPrice": 2125,
+                  "category": "Foods",
+                  "commodityId": 128667670,
+                  "demand": 0,
+                  "name": "Aepyornis Egg",
+                  "sellPrice": 2124,
+                  "supply": 0,
+                  "symbol": "CetiAepyornisEgg"
+                }
+              ],
+              "prohibitedCommodities": [],
+              "updateTime": "2026-10-08T22:41:04Z"
+            },
+            "name": "Furukawa Enterprise",
+            "outfitting": {
+              "modules": [
+                {
+                  "category": "standard",
+                  "class": 1,
+                  "moduleId": 128049304,
+                  "name": "Lightweight Alloy",
+                  "rating": "I",
+                  "ship": "Asp Explorer",
+                  "symbol": "Asp_Armour_Grade1"
+                },
+                {
+                  "category": "standard",
+                  "class": 1,
+                  "moduleId": 128049305,
+                  "name": "Reinforced Alloy",
+                  "rating": "I",
+                  "ship": "Asp Explorer",
+                  "symbol": "Asp_Armour_Grade2"
+                },
+                {
+                  "category": "standard",
+                  "class": 1,
+                  "moduleId": 128049306,
+                  "name": "Military Grade Composite",
+                  "rating": "I",
+                  "ship": "Asp Explorer",
+                  "symbol": "Asp_Armour_Grade3"
+                }
+              ],
+              "updateTime": "2026-10-08T22:41:00Z"
+            },
+            "primaryEconomy": "Industrial",
+            "services": [
+              "Dock",
+              "Autodock",
+              "Market"
+            ],
+            "shipyard": {
+              "ships": [
+                {
+                  "name": "Asp Explorer",
+                  "shipId": 128049303,
+                  "symbol": "Asp"
+                },
+                {
+                  "name": "Cobra MkIII",
+                  "shipId": 128049279,
+                  "symbol": "CobraMkIII"
+                },
+                {
+                  "name": "Cobra MkV",
+                  "shipId": 129031229,
+                  "symbol": "CobraMkV"
+                }
+              ],
+              "updateTime": "2026-10-08T22:41:00Z"
+            },
+            "state": "UnderRepairs",
+            "type": "Planetary Outpost",
+            "updateTime": "2026-10-08T22:41:04Z"
+          }
+        ],
+        "subType": "Metal-rich body",
+        "surfacePressure": 0.0,
+        "surfaceTemperature": 401.965271,
+        "terraformingState": "Not terraformable",
+        "timestamps": {
+          "distanceToArrival": "2026-10-12T03:39:21Z",
+          "meanAnomaly": "2026-10-12T03:39:21Z"
+        },
+        "type": "Planet",
+        "updateTime": "2026-10-12T03:39:21Z"
+      },
+      {
+        "argOfPeriapsis": 55.186001,
+        "ascendingNode": 76.677999,
+        "atmosphereComposition": {
+          "Carbon dioxide": 96.5,
+          "Nitrogen": 3.499999
+        },
+        "atmosphereType": "Hot thick Carbon dioxide",
+        "axialTilt": 3.094469,
+        "bodyId": 2,
+        "distanceToArrival": 363.098733,
+        "earthMasses": 0.815,
+        "gravity": 0.904402467625166,
+        "id64": 72057604515301739,
+        "isLandable": false,
+        "meanAnomaly": 152.879174,
+        "name": "Venus",
+        "orbitalEccentricity": 0.0067,
+        "orbitalInclination": 3.395,
+        "orbitalPeriod": 224.700997825023,
+        "parents": [
+          {
+            "Star": 0
+          }
+        ],
+        "radius": 6051.8,
+        "rotationalPeriod": 243.018485452627,
+        "rotationalPeriodTidallyLocked": true,
+        "semiMajorAxis": 0.723325688208136,
+        "signals": {
+          "signals": {
+            "$SAA_SignalType_Human;": 1
+          },
+          "updateTime": "2022-11-27T21:38:33Z"
+        },
+        "solidComposition": {
+          "Ice": 0.0,
+          "Metal": 30.0,
+          "Rock": 70.0
+        },
+        "stations": [],
+        "subType": "High metal content world",
+        "surfacePressure": 93.1895090056748,
+        "surfaceTemperature": 735.0,
+        "terraformingState": "Not terraformable",
+        "timestamps": {
+          "distanceToArrival": "2026-10-12T03:39:21Z",
+          "meanAnomaly": "2026-10-12T03:39:21Z"
+        },
+        "type": "Planet",
+        "updateTime": "2026-10-12T03:39:21Z",
+        "volcanismType": "Minor Rocky Magma"
+      }
+    ],
+    "bodyCount": 40,
+    "controllingFaction": {
+      "allegiance": "Federation",
+      "government": "Democracy",
+      "name": "Mother Gaia",
+      "pendingStates": [
+        {
+          "state": "Expansion",
+          "trend": 0.0
+        }
+      ],
+      "recoveringStates": [
+        {
+          "state": "Public Holiday",
+          "trend": 0.0
+        }
+      ]
+    },
+    "controllingPower": "Jerome Archer",
+    "coords": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "date": "2026-10-12T09:12:37Z",
+    "factions": [
+      {
+        "allegiance": "Independent",
+        "government": "Cooperative",
+        "influence": 0.009814,
+        "name": "Aegis Core",
+        "state": "None"
+      },
+      {
+        "activeStates": [
+          {
+            "state": "Civil Liberty"
+          }
+        ],
+        "allegiance": "Federation",
+        "government": "Democracy",
+        "influence": 0.167812,
+        "name": "Federal Congress",
+        "recoveringStates": [
+          {
+            "state": "Pirate Attack",
+            "trend": 0.0
+          }
+        ],
+        "state": "Civil Liberty"
+      },
+      {
+        "allegiance": "Federation",
+        "government": "Democracy",
+        "influence": 0.315015,
+        "name": "Mother Gaia",
+        "pendingStates": [
+          {
+            "state": "Expansion",
+            "trend": 0.0
+          }
+        ],
+        "recoveringStates": [
+          {
+            "state": "Public Holiday",
+            "trend": 0.0
+          }
+        ],
+        "state": "None"
+      }
+    ],
+    "government": "Democracy",
+    "id64": 10477373803,
+    "name": "Sol",
+    "population": 18320926115,
+    "powerState": "Stronghold",
+    "powerStateControlProgress": 0.383393,
+    "powerStateReinforcement": 72028,
+    "powerStateUndermining": 103435,
+    "powers": [
+      "Aisling Duval",
+      "Edmund Mahon",
+      "Li Yong-Rui"
+    ],
+    "primaryEconomy": "Refinery",
+    "secondaryEconomy": "Service",
+    "security": "High",
+    "stations": [
+      {
+        "allegiance": "Federation",
+        "controllingFaction": "Mother Gaia",
+        "controllingFactionState": null,
+        "distanceToArrival": 230.38088,
+        "economies": {
+          "Refinery": 100.0
+        },
+        "government": "Democracy",
+        "id": 128016384,
+        "landingPads": {
+          "large": 6,
+          "medium": 13,
+          "small": 10
+        },
+        "market": {
+          "commodities": [
+            {
+              "buyPrice": 0,
+              "category": "Technology",
+              "commodityId": 128049231,
+              "demand": 2855292,
+              "name": "Advanced Catalysers",
+              "sellPrice": 3501,
+              "supply": 0,
+              "symbol": "AdvancedCatalysers"
+            },
+            {
+              "buyPrice": 0,
+              "category": "Medicines",
+              "commodityId": 128682046,
+              "demand": 220310,
+              "name": "Advanced Medicines",
+              "sellPrice": 1727,
+              "supply": 0,
+              "symbol": "AdvancedMedicines"
+            },
+            {
+              "buyPrice": 0,
+              "category": "Chemicals",
+              "commodityId": 128924334,
+              "demand": 2060,
+              "name": "Agronomic Treatment",
+              "sellPrice": 3702,
+              "supply": 0,
+              "symbol": "AgronomicTreatment"
+            }
+          ],
+          "prohibitedCommodities": [
+            "Narcotics",
+            "Battle Weapons",
+            "Bootleg Liquor"
+          ],
+          "updateTime": "2026-10-12T09:15:29Z"
+        },
+        "name": "Daedalus",
+        "outfitting": {
+          "modules": [
+            {
+              "category": "standard",
+              "class": 1,
+              "moduleId": 128049268,
+              "name": "Lightweight Alloy",
+              "rating": "I",
+              "ship": "Adder",
+              "symbol": "Adder_Armour_Grade1"
+            },
+            {
+              "category": "standard",
+              "class": 1,
+              "moduleId": 128049269,
+              "name": "Reinforced Alloy",
+              "rating": "I",
+              "ship": "Adder",
+              "symbol": "Adder_Armour_Grade2"
+            },
+            {
+              "category": "standard",
+              "class": 1,
+              "moduleId": 128049270,
+              "name": "Military Grade Composite",
+              "rating": "I",
+              "ship": "Adder",
+              "symbol": "Adder_Armour_Grade3"
+            }
+          ],
+          "updateTime": "2026-10-12T09:15:29Z"
+        },
+        "primaryEconomy": "Refinery",
+        "services": [
+          "Dock",
+          "Autodock",
+          "Market"
+        ],
+        "shipyard": {
+          "ships": [
+            {
+              "name": "Adder",
+              "shipId": 128049267,
+              "symbol": "Adder"
+            },
+            {
+              "name": "Beluga Liner",
+              "shipId": 128049345,
+              "symbol": "BelugaLiner"
+            },
+            {
+              "name": "Cobra MkIV",
+              "shipId": 128672262,
+              "symbol": "CobraMkIV"
+            }
+          ],
+          "updateTime": "2026-10-12T09:15:29Z"
+        },
+        "state": "UnderRepairs",
+        "type": "Orbis Starport",
+        "updateTime": "2026-10-12T09:15:29Z"
+      },
+      {
+        "allegiance": "Federation",
+        "controllingFaction": "Mother Gaia",
+        "controllingFactionState": null,
+        "distanceToArrival": 503.335385,
+        "economies": {
+          "Refinery": 100.0
+        },
+        "government": "Democracy",
+        "id": 128016640,
+        "landingPads": {
+          "large": 6,
+          "medium": 13,
+          "small": 9
+        },
+        "market": {
+          "commodities": [
+            {
+              "buyPrice": 0,
+              "category": "Technology",
+              "commodityId": 128049231,
+              "demand": 2807881,
+              "name": "Advanced Catalysers",
+              "sellPrice": 3501,
+              "supply": 0,
+              "symbol": "AdvancedCatalysers"
+            },
+            {
+              "buyPrice": 0,
+              "category": "Medicines",
+              "commodityId": 128682046,
+              "demand": 241337,
+              "name": "Advanced Medicines",
+              "sellPrice": 1727,
+              "supply": 0,
+              "symbol": "AdvancedMedicines"
+            },
+            {
+              "buyPrice": 0,
+              "category": "Chemicals",
+              "commodityId": 128924334,
+              "demand": 2256,
+              "name": "Agronomic Treatment",
+              "sellPrice": 3702,
+              "supply": 0,
+              "symbol": "AgronomicTreatment"
+            }
+          ],
+          "prohibitedCommodities": [
+            "Narcotics",
+            "Battle Weapons",
+            "Bootleg Liquor"
+          ],
+          "updateTime": "2026-10-12T09:09:34Z"
+        },
+        "name": "Galileo",
+        "outfitting": {
+          "modules": [
+            {
+              "category": "standard",
+              "class": 1,
+              "moduleId": 128049268,
+              "name": "Lightweight Alloy",
+              "rating": "I",
+              "ship": "Adder",
+              "symbol": "Adder_Armour_Grade1"
+            },
+            {
+              "category": "standard",
+              "class": 1,
+              "moduleId": 128049269,
+              "name": "Reinforced Alloy",
+              "rating": "I",
+              "ship": "Adder",
+              "symbol": "Adder_Armour_Grade2"
+            },
+            {
+              "category": "standard",
+              "class": 1,
+              "moduleId": 128049270,
+              "name": "Military Grade Composite",
+              "rating": "I",
+              "ship": "Adder",
+              "symbol": "Adder_Armour_Grade3"
+            }
+          ],
+          "updateTime": "2026-10-12T09:09:34Z"
+        },
+        "primaryEconomy": "Refinery",
+        "services": [
+          "Dock",
+          "Autodock",
+          "Market"
+        ],
+        "shipyard": {
+          "ships": [
+            {
+              "name": "Adder",
+              "shipId": 128049267,
+              "symbol": "Adder"
+            },
+            {
+              "name": "Beluga Liner",
+              "shipId": 128049345,
+              "symbol": "BelugaLiner"
+            },
+            {
+              "name": "Cobra MkIV",
+              "shipId": 128672262,
+              "symbol": "CobraMkIV"
+            }
+          ],
+          "updateTime": "2026-10-12T09:09:34Z"
+        },
+        "state": "UnderRepairs",
+        "type": "Ocellus Starport",
+        "updateTime": "2026-10-12T09:09:34Z"
+      },
+      {
+        "allegiance": "Federation",
+        "controllingFaction": "Mother Gaia",
+        "controllingFactionState": null,
+        "distanceToArrival": 504.363139,
+        "economies": {
+          "Service": 100.0
+        },
+        "government": "Democracy",
+        "id": 128016896,
+        "landingPads": {
+          "large": 5,
+          "medium": 9,
+          "small": 8
+        },
+        "market": {
+          "commodities": [
+            {
+              "buyPrice": 0,
+              "category": "Medicines",
+              "commodityId": 128682046,
+              "demand": 197051,
+              "name": "Advanced Medicines",
+              "sellPrice": 1727,
+              "supply": 0,
+              "symbol": "AdvancedMedicines"
+            },
+            {
+              "buyPrice": 0,
+              "category": "Chemicals",
+              "commodityId": 128924334,
+              "demand": 1842,
+              "name": "Agronomic Treatment",
+              "sellPrice": 3702,
+              "supply": 0,
+              "symbol": "AgronomicTreatment"
+            },
+            {
+              "buyPrice": 0,
+              "category": "Foods",
+              "commodityId": 128049182,
+              "demand": 169704,
+              "name": "Animal Meat",
+              "sellPrice": 1891,
+              "supply": 0,
+              "symbol": "Animalmeat"
+            }
+          ],
+          "prohibitedCommodities": [],
+          "updateTime": "2026-10-12T09:17:54Z"
+        },
+        "name": "Abraham Lincoln",
+        "outfitting": {
+          "modules": [
+            {
+              "category": "standard",
+              "class": 1,
+              "moduleId": 128671832,
+              "name": "Lightweight Alloy",
+              "rating": "I",
+              "ship": "Diamondback Explorer",
+              "symbol": "DiamondBackXL_Armour_Grade1"
+            },
+            {
+              "category": "standard",
+              "class": 1,
+              "moduleId": 128671833,
+              "name": "Reinforced Alloy",
+              "rating": "I",
+              "ship": "Diamondback Explorer",
+              "symbol": "DiamondBackXL_Armour_Grade2"
+            },
+            {
+              "category": "standard",
+              "class": 1,
+              "moduleId": 128671834,
+              "name": "Military Grade Composite",
+              "rating": "I",
+              "ship": "Diamondback Explorer",
+              "symbol": "DiamondBackXL_Armour_Grade3"
+            }
+          ],
+          "updateTime": "2026-10-12T09:17:55Z"
+        },
+        "primaryEconomy": "Service",
+        "services": [
+          "Dock",
+          "Autodock",
+          "Market"
+        ],
+        "shipyard": {
+          "ships": [
+            {
+              "name": "Beluga Liner",
+              "shipId": 128049345,
+              "symbol": "BelugaLiner"
+            },
+            {
+              "name": "Cobra MkIV",
+              "shipId": 128672262,
+              "symbol": "CobraMkIV"
+            },
+            {
+              "name": "Cobra MkV",
+              "shipId": 129031229,
+              "symbol": "CobraMkV"
+            }
+          ],
+          "updateTime": "2026-10-12T09:17:55Z"
+        },
+        "state": "UnderRepairs",
+        "type": "Orbis Starport",
+        "updateTime": "2026-10-12T09:17:55Z"
+      }
+    ],
+    "timestamps": {
+      "controllingPower": "2026-10-12T09:12:37Z",
+      "factions": "2026-10-12T09:12:37Z",
+      "powerState": "2026-10-12T09:12:37Z",
+      "powers": "2026-10-12T09:12:37Z"
+    }
+  }
+}

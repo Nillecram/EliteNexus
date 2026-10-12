@@ -1,0 +1,342 @@
+{
+  "count": 43,
+  "query": "Shinrarta Dezhra",
+  "results": [
+    {
+      "record": {
+        "allegiance": "Pilots Federation",
+        "bodies": [
+          {
+            "distance_to_arrival": 0.0,
+            "estimated_mapping_value": 4591,
+            "estimated_scan_value": 1211,
+            "id": 36032729296442074,
+            "id64": 36032729296442074,
+            "is_main_star": true,
+            "name": "Shinrarta Dezhra",
+            "subtype": "K (Yellow-Orange) Star",
+            "type": "Star"
+          },
+          {
+            "distance_to_arrival": 1477.460604,
+            "estimated_mapping_value": 4578,
+            "estimated_scan_value": 1207,
+            "id": 72061526315406042,
+            "id64": 72061526315406042,
+            "is_main_star": null,
+            "name": "LTT 4550",
+            "subtype": "M (Red dwarf) Star",
+            "type": "Star"
+          },
+          {
+            "distance_to_arrival": 40.471954,
+            "estimated_mapping_value": 53947,
+            "estimated_scan_value": 14848,
+            "id": 396320699486081754,
+            "id64": 396320699486081754,
+            "is_main_star": null,
+            "landmark_value": 0,
+            "landmarks": [
+              {
+                "count": 1,
+                "subtype": "Crater Outpost",
+                "type": "Surface Station",
+                "value": 0
+              },
+              {
+                "count": 3,
+                "subtype": "Surface Station",
+                "type": "Surface Station",
+                "value": 0
+              },
+              {
+                "count": 1,
+                "subtype": "Tourist Beacon",
+                "type": "Tourist Beacon",
+                "value": 0
+              }
+            ],
+            "name": "Shinrarta Dezhra A 1",
+            "subtype": "High metal content world",
+            "terraforming_state": "Not terraformable",
+            "type": "Planet"
+          }
+        ],
+        "body_count": 39,
+        "controlling_minor_faction": "Pilots' Federation Local Branch",
+        "estimated_mapping_value": 1360945,
+        "estimated_scan_value": 371303,
+        "government": "Democracy",
+        "id64": 3932277478106,
+        "is_being_colonised": false,
+        "is_colonised": false,
+        "known_permit": true,
+        "landmark_value": 4000000,
+        "minor_faction_presences": [
+          {
+            "active_states": [
+              "Boom",
+              "Civil Liberty"
+            ],
+            "allegiance": "Federation",
+            "government": "Democracy",
+            "influence": 0.318681,
+            "name": "Future of Arro Naga",
+            "state": "Boom"
+          },
+          {
+            "allegiance": "Federation",
+            "government": "Corporate",
+            "influence": 0.188811,
+            "name": "LTT 4487 Industry",
+            "state": "None"
+          },
+          {
+            "active_states": [
+              "Boom"
+            ],
+            "allegiance": "Independent",
+            "government": "Prison Colony",
+            "influence": 0.213786,
+            "name": "Los Chupacabras",
+            "state": "Boom"
+          }
+        ],
+        "name": "Shinrarta Dezhra",
+        "needs_permit": true,
+        "population": 85287324,
+        "primary_economy": "High Tech",
+        "region": "Inner Orion Spur",
+        "secondary_economy": "Industrial",
+        "security": "High",
+        "stations": [
+          {
+            "controlling_minor_faction": "Pilots' Federation Local Branch",
+            "distance_to_arrival": 330.931403,
+            "has_large_pad": true,
+            "has_market": true,
+            "has_outfitting": true,
+            "has_shipyard": true,
+            "large_pads": 9,
+            "market_id": 128666762,
+            "medium_pads": 18,
+            "name": "Jameson Memorial",
+            "services": [
+              "Dock",
+              "Autodock",
+              "Market"
+            ],
+            "small_pads": 17,
+            "type": "Orbis Starport"
+          },
+          {
+            "controlling_minor_faction": "Lori Jameson",
+            "distance_to_arrival": 40.477549,
+            "has_large_pad": true,
+            "has_market": true,
+            "has_outfitting": true,
+            "large_pads": 3,
+            "market_id": 128679815,
+            "medium_pads": 3,
+            "name": "Jameson Base",
+            "services": [
+              "Dock",
+              "Autodock",
+              "Market"
+            ],
+            "small_pads": 2,
+            "type": "Planetary Outpost"
+          },
+          {
+            "controlling_minor_faction": "The Dark Wheel",
+            "distance_to_arrival": 40.471954,
+            "has_large_pad": false,
+            "market_id": 3534249216,
+            "name": "Nixon Enterprise"
+          }
+        ],
+        "synthesis_recipes": [
+          {
+            "level": "Premium",
+            "name": "AFM Refill"
+          },
+          {
+            "level": "Standard",
+            "name": "AFM Refill"
+          },
+          {
+            "level": "Basic",
+            "name": "AFM Refill"
+          }
+        ],
+        "thargoid_war_failure_state": "None",
+        "thargoid_war_state": "None",
+        "thargoid_war_success_state": "None",
+        "updated_at": "2026-10-12T07:28:40Z",
+        "x": 55.71875,
+        "y": 17.59375,
+        "z": 27.15625
+      },
+      "type": "system"
+    },
+    {
+      "record": {
+        "age": 8068.0,
+        "arg_of_periapsis": 201.271868,
+        "atmosphere": "No atmosphere",
+        "axis_tilt": -0.041915,
+        "belts": [
+          {
+            "inner_radius": 879730000.0,
+            "mass": 117620000000000.0,
+            "name": "Shinrarta Dezhra A A Belt",
+            "outer_radius": 2186700000.0,
+            "type": "Rocky"
+          }
+        ],
+        "body_id": 1,
+        "distance_to_arrival": 0.0,
+        "estimated_mapping_value": 4591,
+        "estimated_scan_value": 1211,
+        "id64": 36032729296442074,
+        "is_main_star": true,
+        "luminosity_class": "V",
+        "name": "Shinrarta Dezhra",
+        "orbital_eccentricity": 0.018651,
+        "orbital_inclination": 21.118831,
+        "orbital_period": 1847.15594406481,
+        "orbital_synchronicity": 1843.85017544773,
+        "parents": [
+          {
+            "id64": 3932277478106,
+            "type": "Null"
+          }
+        ],
+        "rotational_period": 3.30576861708333,
+        "semi_major_axis": 1.1569602727459,
+        "solar_masses": 0.648438,
+        "solar_radius": 0.766601524083393,
+        "spectral_class": "K4",
+        "subtype": "K (Yellow-Orange) Star",
+        "surface_temperature": 4343.0,
+        "system_id64": 3932277478106,
+        "system_name": "Shinrarta Dezhra",
+        "system_region": "Inner Orion Spur",
+        "system_x": 55.71875,
+        "system_y": 17.59375,
+        "system_z": 27.15625,
+        "type": "Star",
+        "updated_at": "2026-10-12T07:28:40Z"
+      },
+      "type": "body"
+    },
+    {
+      "record": {
+        "controlling_minor_faction": "Leaders of Kumbaya",
+        "controlling_minor_faction_influence": 0.599404,
+        "distance_to_arrival": 4023.667683,
+        "economies": [
+          {
+            "name": "High Tech",
+            "share": 140.0
+          }
+        ],
+        "export_commodities": [
+          {
+            "name": "Synthetic Meat"
+          },
+          {
+            "name": "Resonating Separators"
+          },
+          {
+            "name": "Hydrogen Fuel"
+          }
+        ],
+        "government": "Feudal",
+        "has_large_pad": false,
+        "has_market": true,
+        "import_commodities": [
+          {
+            "name": "Cobalt"
+          },
+          {
+            "name": "Rutile"
+          },
+          {
+            "name": "Pyrophyllite"
+          }
+        ],
+        "is_planetary": false,
+        "large_pads": 0,
+        "market": [
+          {
+            "buy_price": 2241,
+            "category": "Technology",
+            "commodity": "Advanced Catalysers",
+            "demand": 1,
+            "sell_price": 2185,
+            "supply": 927
+          },
+          {
+            "buy_price": 969,
+            "category": "Medicines",
+            "commodity": "Advanced Medicines",
+            "demand": 1,
+            "sell_price": 929,
+            "supply": 471
+          },
+          {
+            "buy_price": 725,
+            "category": "Medicines",
+            "commodity": "Agri-Medicines",
+            "demand": 1,
+            "sell_price": 695,
+            "supply": 706
+          }
+        ],
+        "market_id": 4218631171,
+        "market_updated_at": "2026-04-30T19:50:35Z",
+        "medium_pads": 1,
+        "name": "Shinrarta Dezhra",
+        "primary_economy": "High Tech",
+        "prohibited_commodities": [
+          {
+            "name": "Narcotics"
+          },
+          {
+            "name": "Battle Weapons"
+          },
+          {
+            "name": "Combat Stabilisers"
+          }
+        ],
+        "services": [
+          {
+            "name": "Dock"
+          },
+          {
+            "name": "Autodock"
+          },
+          {
+            "name": "Market"
+          }
+        ],
+        "small_pads": 2,
+        "state": "Construction",
+        "system_id64": 2587474545019,
+        "system_is_colonised": true,
+        "system_name": "Col 285 Sector XP-O d6-75",
+        "system_population": 198480,
+        "system_power": [],
+        "system_primary_economy": "High Tech",
+        "system_secondary_economy": "Colony",
+        "system_x": 71.875,
+        "system_y": 87.53125,
+        "system_z": 178.9375,
+        "type": "Outpost",
+        "updated_at": "2026-04-30T19:50:35Z"
+      },
+      "type": "station"
+    }
+  ]
+}

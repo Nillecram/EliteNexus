@@ -1,0 +1,20 @@
+[package]
+name = "nexus-journal"
+description = "Elite Dangerous player journal + companion file reader (historical bulk load and live tailing)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+crossbeam-channel.workspace = true
+rayon.workspace = true
+rustc-hash.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+known-folders.workspace = true

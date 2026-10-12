@@ -1,0 +1,206 @@
+use crate::theme::{display, pal};
+use crate::widgets::{badge, card, empty, short_credits};
+use egui::{Grid, RichText, Sense, Ui};
+use egui_extras::{Column, TableBuilder};
+use egui_phosphor::regular as icon;
+use nexus_model::fleet::{Ship, ShipModule};
+use nexus_model::GameState;
+
+#[derive(Default)]
+pub struct FleetUi {
+    pub selected: Option<u64>,
+}
+
+pub fn show(ui: &mut Ui, gs: &GameState, st: &mut FleetUi) {
+    if gs.fleet.ships.is_empty() {
+        empty(ui, icon::ROCKET, "No ships yet", "Ships appear after the game writes a Loadout or StoredShips event.");
+        return;
+    }
+    let selected = st.selected.or(gs.fleet.current_ship_id);
+    ui.horizontal_top(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(330.0);
+            let mut ships: Vec<&Ship> = gs.fleet.ships.values().collect();
+            ships.sort_by(|a, b| (Some(b.id) == gs.fleet.current_ship_id).cmp(&(Some(a.id) == gs.fleet.current_ship_id)).then(b.total_value().cmp(&a.total_value())));
+            ui.label(RichText::new(format!("{} ships · {}", ships.len(), short_credits(gs.fleet.total_value()))).font(display(16.0)).color(pal::GOLD));
+            egui::ScrollArea::vertical().id_salt("shiplist").show(ui, |ui| {
+                for s in ships {
+                    ship_tile(ui, gs, s, selected == Some(s.id), st);
+                }
+            });
+        });
+        ui.add_space(10.0);
+        ui.vertical(|ui| {
+            if let Some(s) = selected.and_then(|id| gs.fleet.ships.get(&id)) {
+                ship_detail(ui, gs, s);
+            }
+        });
+    });
+}
+
+fn ship_tile(ui: &mut Ui, gs: &GameState, s: &Ship, selected: bool, st: &mut FleetUi) {
+    let current = Some(s.id) == gs.fleet.current_ship_id;
+    let fill = if selected { pal::CARD_HI } else { pal::CARD };
+    let stroke = if selected { pal::ACCENT } else { pal::BORDER };
+    let resp = egui::Frame::new()
+        .fill(fill)
+        .stroke(egui::Stroke::new(1.0, stroke))
+        .corner_radius(8)
+        .inner_margin(10)
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(if s.name.trim().is_empty() { &s.type_name } else { &s.name }).font(display(16.0)).color(pal::TEXT));
+                if current {
+                    badge(ui, "ACTIVE", pal::GOOD);
+                }
+                if s.hot {
+                    badge(ui, "HOT", pal::BAD);
+                }
+            });
+            ui.label(RichText::new(&s.type_name).color(pal::DIM));
+            ui.horizontal(|ui| {
+                if s.max_jump_range > 0.0 {
+                    ui.label(RichText::new(format!("{} {:.1} ly", icon::ARROW_FAT_RIGHT, s.max_jump_range)).color(pal::ACCENT_SOFT));
+                }
+                ui.label(RichText::new(short_credits(s.total_value())).color(pal::GOLD));
+                if s.engineered_modules() > 0 {
+                    ui.label(RichText::new(format!("{} {}", icon::WRENCH, s.engineered_modules())).color(pal::PURPLE));
+                }
+            });
+            let loc = if current {
+                gs.location.situation()
+            } else {
+                match (&s.location.system, &s.location.station, s.location.in_transit) {
+                    (Some(sys), Some(stn), true) => format!("{} In transit → {} ({})", icon::TRUCK, stn, sys),
+                    (Some(sys), Some(stn), false) => format!("{} {} ({})", icon::MAP_PIN, stn, sys),
+                    (Some(sys), None, _) => format!("{} {}", icon::MAP_PIN, sys),
+                    _ => "Location unknown".into(),
+                }
+            };
+            ui.label(RichText::new(loc).small().color(pal::DIM));
+        })
+        .response
+        .interact(Sense::click());
+    if resp.clicked() {
+        st.selected = Some(s.id);
+    }
+    ui.add_space(4.0);
+}
+
+fn slot_group(slot: &str) -> (u8, &'static str) {
+    let s = slot.to_ascii_lowercase();
+    if s.contains("hardpoint") {
+        if s.starts_with("tiny") { (1, "Utility") } else { (0, "Hardpoints") }
+    } else if matches!(
+        s.as_str(),
+        "armour" | "powerplant" | "mainengines" | "frameshiftdrive" | "lifesupport" | "powerdistributor" | "radar" | "fueltank"
+    ) {
+        (2, "Core internals")
+    } else if s.starts_with("slot") || s.contains("military") {
+        (3, "Optional internals")
+    } else {
+        (4, "Other")
+    }
+}
+
+fn ship_detail(ui: &mut Ui, _gs: &GameState, s: &Ship) {
+    card(ui, "Loadout", |ui| {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(s.display_name()).font(display(22.0)));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if let Some(json) = &s.loadout_json {
+                    if ui.button(format!("{} Coriolis", icon::ARROW_SQUARE_OUT)).on_hover_text("Open this exact build in coriolis.io").clicked()
+                        && let Some(url) = crate::export::coriolis_url(json) {
+                            ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+                        }
+                    if ui.button(format!("{} EDSY", icon::ARROW_SQUARE_OUT)).on_hover_text("Open this exact build in edsy.org").clicked()
+                        && let Some(url) = crate::export::edsy_url(json) {
+                            ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+                        }
+                    if ui.button(format!("{} Copy JSON", icon::COPY)).clicked() {
+                        ui.ctx().copy_text(json.clone());
+                    }
+                }
+            });
+        });
+        Grid::new("shipstats").num_columns(6).spacing([14.0, 3.0]).show(ui, |ui| {
+            kv_inline(ui, "Jump range", format!("{:.2} ly", s.max_jump_range));
+            kv_inline(ui, "Cargo", format!("{} t", s.cargo_capacity));
+            kv_inline(ui, "Fuel", format!("{:.0} t", s.fuel_main_capacity));
+            ui.end_row();
+            kv_inline(ui, "Hull value", short_credits(s.hull_value));
+            kv_inline(ui, "Modules", short_credits(s.modules_value));
+            kv_inline(ui, "Rebuy", short_credits(s.rebuy));
+            ui.end_row();
+            kv_inline(ui, "Unladen mass", format!("{:.1} t", s.unladen_mass));
+            kv_inline(ui, "Hull", format!("{:.0}%", s.hull_health * 100.0));
+            kv_inline(ui, "Loadout seen", if s.loadout_ts.is_zero() { "never".into() } else { s.loadout_ts.to_local_string("%d %b %Y") });
+            ui.end_row();
+        });
+    });
+    ui.add_space(8.0);
+    if s.modules.is_empty() {
+        card(ui, "Modules", |ui| {
+            ui.label(RichText::new("No loadout recorded for this ship yet — fly it once and Elite Nexus captures the full build.").color(pal::DIM));
+        });
+        return;
+    }
+    let mut modules: Vec<&ShipModule> = s.modules.iter().filter(|m| !m.item.contains("_cockpit") && !m.slot.eq_ignore_ascii_case("VesselVoice") && !m.slot.contains("Paint") && !m.slot.contains("Decal") && !m.slot.contains("Name") && !m.slot.contains("Bobble") && !m.slot.contains("Livery")).collect();
+    modules.sort_by(|a, b| slot_group(&a.slot).0.cmp(&slot_group(&b.slot).0).then(a.slot.cmp(&b.slot)));
+    TableBuilder::new(ui)
+        .striped(true)
+        .resizable(true)
+        .column(Column::initial(130.0))
+        .column(Column::initial(240.0))
+        .column(Column::initial(80.0))
+        .column(Column::remainder().at_least(200.0))
+        .header(22.0, |mut h| {
+            for t in ["Slot", "Module", "Value", "Engineering"] {
+                h.col(|ui| {
+                    ui.label(RichText::new(t).color(pal::DIM).strong());
+                });
+            }
+        })
+        .body(|body| {
+            body.rows(26.0, modules.len(), |mut row| {
+                let m = modules[row.index()];
+                row.col(|ui| {
+                    ui.label(RichText::new(nexus_data::outfitting::slot_display(&m.slot)).color(pal::DIM));
+                });
+                row.col(|ui| {
+                    let t = RichText::new(nexus_data::outfitting::display_name(&m.item));
+                    ui.label(if m.on { t } else { t.color(pal::FAINT) });
+                });
+                row.col(|ui| {
+                    if let Some(v) = m.value {
+                        ui.label(RichText::new(short_credits(v)).color(pal::DIM));
+                    }
+                });
+                row.col(|ui| {
+                    if let Some(e) = &m.engineering {
+                        ui.horizontal(|ui| {
+                            badge(ui, &format!("G{} {}", e.level, nexus_data::names::split_camel(&e.blueprint.replace('_', " "))), pal::PURPLE);
+                            if let Some(x) = &e.experimental {
+                                badge(ui, x, pal::ACCENT);
+                            }
+                        })
+                        .response
+                        .on_hover_ui(|ui| {
+                            for md in &e.modifiers {
+                                if let Some(p) = md.improvement_pct() {
+                                    let col = if p >= 0.0 { pal::GOOD } else { pal::BAD };
+                                    ui.label(RichText::new(format!("{}: {:+.1}%", md.label, p)).color(col));
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        });
+}
+
+fn kv_inline(ui: &mut Ui, k: &str, v: String) {
+    ui.label(RichText::new(k).color(pal::DIM));
+    ui.label(RichText::new(v).color(pal::TEXT));
+}

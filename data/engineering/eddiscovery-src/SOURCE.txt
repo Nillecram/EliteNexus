@@ -1,0 +1,17 @@
+Source:    https://github.com/EDDiscovery/EliteDangerousCore  (branch master)
+Commit:    13bb0c0921851f149cce6ab970fa17460f88013e  (last upstream push 2026-10-10)
+Retrieved: 2026-10-12 via https://codeload.github.com/EDDiscovery/EliteDangerousCore/zip/refs/heads/master
+Files:     EliteDangerous/FrontierData/Items/{RecipesEngineering.cs, RecipesSynthesis.cs, Recipes.cs,
+           RecipesHelpers.cs, MCMRType.cs, Engineers.cs, Suits.cs, HandItems.cs}
+           -- copied UNMODIFIED as reference data (C# source, not compiled into this project).
+License:   Apache License 2.0 -- full text in ./LICENSE. Each file also carries the
+           "Copyright ... EDDiscovery development team" Apache header. Upstream has no NOTICE file.
+
+Why it is here: this is the most current permissively licensed engineering dataset
+(on-foot costs after the 2022 rebalance incl. credits, Colonia on-foot engineers,
+engineer locations/requirements, tech-broker list incl. SCO FSDs and AX items).
+Ingredient strings use EDD short codes ("5MRCOL" = 5 x Optical Lens) that are
+resolved through MCMRType.cs. Known data bugs: mine-launcher blueprints are tagged
+ModuleTypes.LifeSupport; several Colonia engineers' max grades are 4 where the game
+offers 5 (Etienne Dorn, Petra Olmanova, Marsha Hicks); Dazzle Shell lists Mechanical
+Scrap twice. See docs/research/engineering.md.

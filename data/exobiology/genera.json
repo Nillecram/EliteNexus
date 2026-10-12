@@ -1,0 +1,974 @@
+{
+  "meta": {
+    "generated": "2026-10-12",
+    "description": "Exobiology genus table for Elite Nexus. Colony range = minimum distance (metres) between genetic samples of the same species (clonal colony range). codex_prefix = common prefix of the species codex ids ($Codex_Ent_..._Name;) used in ScanOrganic / CodexEntry / SellOrganicData.",
+    "units": {
+      "gravity_g": "SurfaceGravity (m/s^2) / 9.797759 (BioScan convention)",
+      "pressure_atm": "SurfacePressure (Pa) / 101231.65625 (BioScan convention)",
+      "temperature": "Kelvin",
+      "distance": "metres"
+    },
+    "first_logged_bonus": "If the species qualifies as First Logged, Vista Genomics pays base value + 4 x base value as Bonus (5 x total). See docs/research/exploration.md for the eligibility rule.",
+    "fleet_carrier_sale": "Selling at a fleet-carrier Vista Genomics pays 75% to the seller (12.5% to the carrier owner, 12.5% lost).",
+    "sources": [
+      "https://github.com/Silarn/EDMC-ExploData/blob/master/src/ExploData/explo_data/bio_data/genus.py",
+      "https://github.com/Xjph/ObservatoryCore/blob/master/ObservatoryBotanist/Botanist.cs",
+      "https://github.com/njthomson/SrvSurvey/wiki/Organic-Scanning",
+      "https://us-central1-canonn-api-236217.cloudfunctions.net/query/codex/ref",
+      "https://elite-dangerous.fandom.com/wiki/Exobiology_Sample_Values_and_Details"
+    ],
+    "journal_quirks": [
+      "Clypeus genus has been seen in journals as \"$Codex_Ent_Clepeus_Genus_Name;;\" (misspelled, double semicolon) - Observatory Botanist maps it to Clypeus.",
+      "Stratum Araneamus may report Genus \"$Codex_Ent_Stratum_04_Name;\" instead of \"$Codex_Ent_Stratum_Genus_Name;\" (ExploData genus.py).",
+      "Horizons-era organics use the species id as the genus id: e.g. SAASignalsFound Genuses lists \"$Codex_Ent_Brancae_Name;\" (Brain Trees), \"$Codex_Ent_Sphere_Name;\" (Anemone), \"$Codex_Ent_Tube_Name;\" (Sinuous Tubers), \"$Codex_Ent_Cone_Name;\", \"$Codex_Ent_Vents_Name;\", \"$Codex_Ent_Ground_Struct_Ice_Name;\".",
+      "Variant codex ids append a star-class code (O,B,A,F,G,K,M,L,T,Y,TTS,Ae,W,D,N) or a capitalised element name before \"_Name;\", e.g. \"$Codex_Ent_Aleoids_01_A_Name;\", \"$Codex_Ent_Bacterial_04_Antimony_Name;\"."
+    ]
+  },
+  "genera": {
+    "Aleoida": {
+      "genus_codex": "$Codex_Ent_Aleoids_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Aleoids_",
+      "colony_range_m": 150,
+      "colony_range_sources": {
+        "explodata_bioscan": 150,
+        "observatory_botanist": 150,
+        "srvsurvey_wiki": 150,
+        "fandom": 150
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 5,
+      "variant_basis": "star",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Aleoids_01_Name;",
+        "$Codex_Ent_Aleoids_02_Name;",
+        "$Codex_Ent_Aleoids_03_Name;",
+        "$Codex_Ent_Aleoids_04_Name;",
+        "$Codex_Ent_Aleoids_05_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Amphora Plant": {
+      "genus_codex": "$Codex_Ent_Vents_Name;",
+      "codex_prefix": null,
+      "colony_range_m": 100,
+      "colony_range_sources": {
+        "explodata_bioscan": 100,
+        "observatory_botanist": 100,
+        "srvsurvey_wiki": 100,
+        "fandom": 100
+      },
+      "era": "horizons",
+      "vista_sellable": true,
+      "species_count": 1,
+      "variant_basis": "none",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Vents_Name;"
+      ],
+      "codex_match": "exact: Horizons-era ids have no common safe prefix (e.g. \"$Codex_Ent_Tube\" is also a prefix of \"$Codex_Ent_Tubus_\"); match species_codex exactly"
+    },
+    "Anemone": {
+      "genus_codex": "$Codex_Ent_Sphere_Name;",
+      "codex_prefix": null,
+      "colony_range_m": 100,
+      "colony_range_sources": {
+        "explodata_bioscan": 100,
+        "observatory_botanist": 100,
+        "srvsurvey_wiki": 100,
+        "fandom": 100
+      },
+      "era": "horizons",
+      "vista_sellable": true,
+      "species_count": 8,
+      "variant_basis": "none",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Sphere_Name;",
+        "$Codex_Ent_SphereABCD_01_Name;",
+        "$Codex_Ent_SphereABCD_02_Name;",
+        "$Codex_Ent_SphereABCD_03_Name;",
+        "$Codex_Ent_SphereEFGH_01_Name;",
+        "$Codex_Ent_SphereEFGH_02_Name;",
+        "$Codex_Ent_SphereEFGH_03_Name;",
+        "$Codex_Ent_SphereEFGH_Name;"
+      ],
+      "codex_match": "exact: Horizons-era ids have no common safe prefix (e.g. \"$Codex_Ent_Tube\" is also a prefix of \"$Codex_Ent_Tubus_\"); match species_codex exactly"
+    },
+    "Bacterium": {
+      "genus_codex": "$Codex_Ent_Bacterial_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Bacterial_",
+      "colony_range_m": 500,
+      "colony_range_sources": {
+        "explodata_bioscan": 500,
+        "observatory_botanist": 500,
+        "srvsurvey_wiki": 500,
+        "fandom": 500
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 13,
+      "variant_basis": "mixed (element/star)",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Bacterial_01_Name;",
+        "$Codex_Ent_Bacterial_02_Name;",
+        "$Codex_Ent_Bacterial_03_Name;",
+        "$Codex_Ent_Bacterial_04_Name;",
+        "$Codex_Ent_Bacterial_05_Name;",
+        "$Codex_Ent_Bacterial_06_Name;",
+        "$Codex_Ent_Bacterial_07_Name;",
+        "$Codex_Ent_Bacterial_08_Name;",
+        "$Codex_Ent_Bacterial_09_Name;",
+        "$Codex_Ent_Bacterial_10_Name;",
+        "$Codex_Ent_Bacterial_11_Name;",
+        "$Codex_Ent_Bacterial_12_Name;",
+        "$Codex_Ent_Bacterial_13_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Bark Mounds": {
+      "genus_codex": "$Codex_Ent_Cone_Name;",
+      "codex_prefix": null,
+      "colony_range_m": 100,
+      "colony_range_sources": {
+        "explodata_bioscan": 100,
+        "observatory_botanist": 100,
+        "srvsurvey_wiki": 100,
+        "fandom": 100
+      },
+      "era": "horizons",
+      "vista_sellable": true,
+      "species_count": 1,
+      "variant_basis": "none",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Cone_Name;"
+      ],
+      "codex_match": "exact: Horizons-era ids have no common safe prefix (e.g. \"$Codex_Ent_Tube\" is also a prefix of \"$Codex_Ent_Tubus_\"); match species_codex exactly"
+    },
+    "Brain Tree": {
+      "genus_codex": "$Codex_Ent_Brancae_Name;",
+      "codex_prefix": null,
+      "colony_range_m": 100,
+      "colony_range_sources": {
+        "explodata_bioscan": 100,
+        "observatory_botanist": 100,
+        "srvsurvey_wiki": 100,
+        "fandom": 100
+      },
+      "era": "horizons",
+      "vista_sellable": true,
+      "species_count": 8,
+      "variant_basis": "none",
+      "multiple_species_possible_per_body": true,
+      "species_codex": [
+        "$Codex_Ent_Seed_Name;",
+        "$Codex_Ent_SeedABCD_01_Name;",
+        "$Codex_Ent_SeedABCD_02_Name;",
+        "$Codex_Ent_SeedABCD_03_Name;",
+        "$Codex_Ent_SeedEFGH_01_Name;",
+        "$Codex_Ent_SeedEFGH_02_Name;",
+        "$Codex_Ent_SeedEFGH_03_Name;",
+        "$Codex_Ent_SeedEFGH_Name;"
+      ],
+      "codex_match": "exact: Horizons-era ids have no common safe prefix (e.g. \"$Codex_Ent_Tube\" is also a prefix of \"$Codex_Ent_Tubus_\"); match species_codex exactly"
+    },
+    "Cactoida": {
+      "genus_codex": "$Codex_Ent_Cactoid_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Cactoid_",
+      "colony_range_m": 300,
+      "colony_range_sources": {
+        "explodata_bioscan": 300,
+        "observatory_botanist": 300,
+        "srvsurvey_wiki": 300,
+        "fandom": 300
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 5,
+      "variant_basis": "star",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Cactoid_01_Name;",
+        "$Codex_Ent_Cactoid_02_Name;",
+        "$Codex_Ent_Cactoid_03_Name;",
+        "$Codex_Ent_Cactoid_04_Name;",
+        "$Codex_Ent_Cactoid_05_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Clypeus": {
+      "genus_codex": "$Codex_Ent_Clypeus_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Clypeus_",
+      "colony_range_m": 150,
+      "colony_range_sources": {
+        "explodata_bioscan": 150,
+        "observatory_botanist": 150,
+        "srvsurvey_wiki": 150,
+        "fandom": 150
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 3,
+      "variant_basis": "star",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Clypeus_01_Name;",
+        "$Codex_Ent_Clypeus_02_Name;",
+        "$Codex_Ent_Clypeus_03_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Concha": {
+      "genus_codex": "$Codex_Ent_Conchas_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Conchas_",
+      "colony_range_m": 150,
+      "colony_range_sources": {
+        "explodata_bioscan": 150,
+        "observatory_botanist": 150,
+        "srvsurvey_wiki": 150,
+        "fandom": 150
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 4,
+      "variant_basis": "mixed (element/star)",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Conchas_01_Name;",
+        "$Codex_Ent_Conchas_02_Name;",
+        "$Codex_Ent_Conchas_03_Name;",
+        "$Codex_Ent_Conchas_04_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Crystalline Shards": {
+      "genus_codex": "$Codex_Ent_Ground_Struct_Ice_Name;",
+      "codex_prefix": null,
+      "colony_range_m": 100,
+      "colony_range_sources": {
+        "explodata_bioscan": 100,
+        "observatory_botanist": 100,
+        "srvsurvey_wiki": 100,
+        "fandom": 100
+      },
+      "era": "horizons",
+      "vista_sellable": true,
+      "species_count": 1,
+      "variant_basis": "none",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Ground_Struct_Ice_Name;"
+      ],
+      "codex_match": "exact: Horizons-era ids have no common safe prefix (e.g. \"$Codex_Ent_Tube\" is also a prefix of \"$Codex_Ent_Tubus_\"); match species_codex exactly"
+    },
+    "Electricae": {
+      "genus_codex": "$Codex_Ent_Electricae_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Electricae_",
+      "colony_range_m": 1000,
+      "colony_range_sources": {
+        "explodata_bioscan": 1000,
+        "observatory_botanist": 1000,
+        "srvsurvey_wiki": 1000,
+        "fandom": 1000
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 2,
+      "variant_basis": "element",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Electricae_01_Name;",
+        "$Codex_Ent_Electricae_02_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Fonticulua": {
+      "genus_codex": "$Codex_Ent_Fonticulus_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Fonticulus_",
+      "colony_range_m": 500,
+      "colony_range_sources": {
+        "explodata_bioscan": 500,
+        "observatory_botanist": 500,
+        "srvsurvey_wiki": 500,
+        "fandom": 500
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 6,
+      "variant_basis": "star",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Fonticulus_01_Name;",
+        "$Codex_Ent_Fonticulus_02_Name;",
+        "$Codex_Ent_Fonticulus_03_Name;",
+        "$Codex_Ent_Fonticulus_04_Name;",
+        "$Codex_Ent_Fonticulus_05_Name;",
+        "$Codex_Ent_Fonticulus_06_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Frutexa": {
+      "genus_codex": "$Codex_Ent_Shrubs_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Shrubs_",
+      "colony_range_m": 150,
+      "colony_range_sources": {
+        "explodata_bioscan": 150,
+        "observatory_botanist": 150,
+        "srvsurvey_wiki": 150,
+        "fandom": 150
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 7,
+      "variant_basis": "star",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Shrubs_01_Name;",
+        "$Codex_Ent_Shrubs_02_Name;",
+        "$Codex_Ent_Shrubs_03_Name;",
+        "$Codex_Ent_Shrubs_04_Name;",
+        "$Codex_Ent_Shrubs_05_Name;",
+        "$Codex_Ent_Shrubs_06_Name;",
+        "$Codex_Ent_Shrubs_07_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Fumerola": {
+      "genus_codex": "$Codex_Ent_Fumerolas_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Fumerolas_",
+      "colony_range_m": 100,
+      "colony_range_sources": {
+        "explodata_bioscan": 100,
+        "observatory_botanist": 100,
+        "srvsurvey_wiki": 100,
+        "fandom": 100
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 4,
+      "variant_basis": "element",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Fumerolas_01_Name;",
+        "$Codex_Ent_Fumerolas_02_Name;",
+        "$Codex_Ent_Fumerolas_03_Name;",
+        "$Codex_Ent_Fumerolas_04_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Fungoida": {
+      "genus_codex": "$Codex_Ent_Fungoids_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Fungoids_",
+      "colony_range_m": 300,
+      "colony_range_sources": {
+        "explodata_bioscan": 300,
+        "observatory_botanist": 300,
+        "srvsurvey_wiki": 300,
+        "fandom": 300
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 4,
+      "variant_basis": "element",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Fungoids_01_Name;",
+        "$Codex_Ent_Fungoids_02_Name;",
+        "$Codex_Ent_Fungoids_03_Name;",
+        "$Codex_Ent_Fungoids_04_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Osseus": {
+      "genus_codex": "$Codex_Ent_Osseus_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Osseus_",
+      "colony_range_m": 800,
+      "colony_range_sources": {
+        "explodata_bioscan": 800,
+        "observatory_botanist": 800,
+        "srvsurvey_wiki": 800,
+        "fandom": 800
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 6,
+      "variant_basis": "mixed (element/star)",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Osseus_01_Name;",
+        "$Codex_Ent_Osseus_02_Name;",
+        "$Codex_Ent_Osseus_03_Name;",
+        "$Codex_Ent_Osseus_04_Name;",
+        "$Codex_Ent_Osseus_05_Name;",
+        "$Codex_Ent_Osseus_06_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Radicoida": {
+      "genus_codex": "$Codex_Ent_Ingensradices_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Ingensradices_",
+      "colony_range_m": 15,
+      "colony_range_sources": {
+        "explodata_bioscan": 15,
+        "observatory_botanist": null,
+        "srvsurvey_wiki": null,
+        "fandom": null
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 1,
+      "variant_basis": "none",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Ingensradices_Unicus_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Recepta": {
+      "genus_codex": "$Codex_Ent_Recepta_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Recepta_",
+      "colony_range_m": 150,
+      "colony_range_sources": {
+        "explodata_bioscan": 150,
+        "observatory_botanist": 150,
+        "srvsurvey_wiki": 150,
+        "fandom": 150
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 3,
+      "variant_basis": "mixed (element/star)",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Recepta_01_Name;",
+        "$Codex_Ent_Recepta_02_Name;",
+        "$Codex_Ent_Recepta_03_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Sinuous Tubers": {
+      "genus_codex": "$Codex_Ent_Tube_Name;",
+      "codex_prefix": null,
+      "colony_range_m": 100,
+      "colony_range_sources": {
+        "explodata_bioscan": 100,
+        "observatory_botanist": 100,
+        "srvsurvey_wiki": 100,
+        "fandom": 100
+      },
+      "era": "horizons",
+      "vista_sellable": true,
+      "species_count": 8,
+      "variant_basis": "none",
+      "multiple_species_possible_per_body": true,
+      "species_codex": [
+        "$Codex_Ent_Tube_Name;",
+        "$Codex_Ent_TubeABCD_01_Name;",
+        "$Codex_Ent_TubeABCD_02_Name;",
+        "$Codex_Ent_TubeABCD_03_Name;",
+        "$Codex_Ent_TubeEFGH_01_Name;",
+        "$Codex_Ent_TubeEFGH_02_Name;",
+        "$Codex_Ent_TubeEFGH_03_Name;",
+        "$Codex_Ent_TubeEFGH_Name;"
+      ],
+      "codex_match": "exact: Horizons-era ids have no common safe prefix (e.g. \"$Codex_Ent_Tube\" is also a prefix of \"$Codex_Ent_Tubus_\"); match species_codex exactly"
+    },
+    "Stratum": {
+      "genus_codex": "$Codex_Ent_Stratum_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Stratum_",
+      "colony_range_m": 500,
+      "colony_range_sources": {
+        "explodata_bioscan": 500,
+        "observatory_botanist": 500,
+        "srvsurvey_wiki": 500,
+        "fandom": 500
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 8,
+      "variant_basis": "star",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Stratum_01_Name;",
+        "$Codex_Ent_Stratum_02_Name;",
+        "$Codex_Ent_Stratum_03_Name;",
+        "$Codex_Ent_Stratum_04_Name;",
+        "$Codex_Ent_Stratum_05_Name;",
+        "$Codex_Ent_Stratum_06_Name;",
+        "$Codex_Ent_Stratum_07_Name;",
+        "$Codex_Ent_Stratum_08_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Thargoid": {
+      "genus_codex": null,
+      "codex_prefix": "$Codex_Ent_Thargoid_",
+      "codex_match": "exact: xeno samples at Thargoid surface sites; match species_codex exactly",
+      "colony_range_m": 100,
+      "colony_range_sources": {
+        "fandom_exobiology_sample_values": 100
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 8,
+      "variant_basis": "none",
+      "multiple_species_possible_per_body": null,
+      "species_codex": [
+        "$Codex_Ent_Thargoid_Barnacle_Matrix_Name;",
+        "$Codex_Ent_Thargoid_Coral_Tree_Name;",
+        "$Codex_Ent_Thargoid_Coral_Root_Name;",
+        "$Codex_Ent_Thargoid_Tower_Low_Name;",
+        "$Codex_Ent_Thargoid_Tower_Med_Name;",
+        "$Codex_Ent_Thargoid_Tower_High_Name;",
+        "$Codex_Ent_Thargoid_Tower_ExtraHigh_Name;",
+        "$Codex_Ent_Thargoid_Tower_Name;"
+      ],
+      "note": "Not an exobiology genus; Thargoid coral/spire/barnacle samples priced by Vista Genomics (EDDiscovery table + Canonn rewards). Availability depends on the Thargoid war state."
+    },
+    "Tubus": {
+      "genus_codex": "$Codex_Ent_Tubus_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Tubus_",
+      "colony_range_m": 800,
+      "colony_range_sources": {
+        "explodata_bioscan": 800,
+        "observatory_botanist": 800,
+        "srvsurvey_wiki": 800,
+        "fandom": 800
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 5,
+      "variant_basis": "star",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Tubus_01_Name;",
+        "$Codex_Ent_Tubus_02_Name;",
+        "$Codex_Ent_Tubus_03_Name;",
+        "$Codex_Ent_Tubus_04_Name;",
+        "$Codex_Ent_Tubus_05_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    },
+    "Tussock": {
+      "genus_codex": "$Codex_Ent_Tussocks_Genus_Name;",
+      "codex_prefix": "$Codex_Ent_Tussocks_",
+      "colony_range_m": 200,
+      "colony_range_sources": {
+        "explodata_bioscan": 200,
+        "observatory_botanist": 200,
+        "srvsurvey_wiki": 200,
+        "fandom": 200
+      },
+      "era": "odyssey",
+      "vista_sellable": true,
+      "species_count": 15,
+      "variant_basis": "star",
+      "multiple_species_possible_per_body": false,
+      "species_codex": [
+        "$Codex_Ent_Tussocks_01_Name;",
+        "$Codex_Ent_Tussocks_02_Name;",
+        "$Codex_Ent_Tussocks_03_Name;",
+        "$Codex_Ent_Tussocks_04_Name;",
+        "$Codex_Ent_Tussocks_05_Name;",
+        "$Codex_Ent_Tussocks_06_Name;",
+        "$Codex_Ent_Tussocks_07_Name;",
+        "$Codex_Ent_Tussocks_08_Name;",
+        "$Codex_Ent_Tussocks_09_Name;",
+        "$Codex_Ent_Tussocks_10_Name;",
+        "$Codex_Ent_Tussocks_11_Name;",
+        "$Codex_Ent_Tussocks_12_Name;",
+        "$Codex_Ent_Tussocks_13_Name;",
+        "$Codex_Ent_Tussocks_14_Name;",
+        "$Codex_Ent_Tussocks_15_Name;"
+      ],
+      "codex_match": "prefix: species ids are <codex_prefix><NN>_Name; (Radicoida: <codex_prefix>Unicus_Name;); variants insert _<StarClass|Element> before _Name;"
+    }
+  },
+  "non_sellable_codex_life": {
+    "note": "Space-borne / orbital life and crystal structures logged in the Codex (Canonn hud_category \"Cloud\"); no Vista Genomics reward (Canonn reward null), cannot be sampled with the genetic sampler.",
+    "groups": {
+      "Aster": {
+        "count": 8,
+        "examples": [
+          {
+            "name": "Cereum Aster Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp02_Def_Name;",
+            "entry_id": 2202001,
+            "platform": "legacy"
+          },
+          {
+            "name": "Lindigoticum Aster Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp02_Bl_Name;",
+            "entry_id": 2202002,
+            "platform": "legacy"
+          },
+          {
+            "name": "Prasinum Aster Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp02_Gr_Name;",
+            "entry_id": 2202003,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Calcite Plates": {
+        "count": 4,
+        "examples": [
+          {
+            "name": "Luteolum Calcite Plates",
+            "codex": "$Codex_Ent_L_Org_PltFun_V1_Def_Name;",
+            "entry_id": 2101001,
+            "platform": "legacy"
+          },
+          {
+            "name": "Lindigoticum Calcite Plates",
+            "codex": "$Codex_Ent_L_Org_PltFun_V1_Bl_Name;",
+            "entry_id": 2101002,
+            "platform": "legacy"
+          },
+          {
+            "name": "Viride Calcite Plates",
+            "codex": "$Codex_Ent_L_Org_PltFun_V1_Gr_Name;",
+            "entry_id": 2101003,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Chalice Pod": {
+        "count": 5,
+        "examples": [
+          {
+            "name": "Albidum Chalice Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp05_Def_Name;",
+            "entry_id": 2205001,
+            "platform": "legacy"
+          },
+          {
+            "name": "Caeruleum Chalice Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp05_Bl_Name;",
+            "entry_id": 2205002,
+            "platform": "legacy"
+          },
+          {
+            "name": "Viride Chalice Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp05_Gr_Name;",
+            "entry_id": 2205003,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Collared Pod": {
+        "count": 4,
+        "examples": [
+          {
+            "name": "Albidum Collared Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp04_Def_Name;",
+            "entry_id": 2204001,
+            "platform": "legacy"
+          },
+          {
+            "name": "Lividum Collared Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp04_Bl_Name;",
+            "entry_id": 2204002,
+            "platform": "legacy"
+          },
+          {
+            "name": "Blatteum Collared Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp04_Pur_Name;",
+            "entry_id": 2204004,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Gyre": {
+        "count": 4,
+        "examples": [
+          {
+            "name": "Roseum Gyre Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp06_Def_Name;",
+            "entry_id": 2206001,
+            "platform": "legacy"
+          },
+          {
+            "name": "Aurarium Gyre Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp06_Gd_Name;",
+            "entry_id": 2206002,
+            "platform": "legacy"
+          },
+          {
+            "name": "Viride Gyre Tree",
+            "codex": "$Codex_Ent_SPOI_SeedPolyp01_V1_Name;",
+            "entry_id": 2210001,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Ice Crystals": {
+        "count": 7,
+        "examples": [
+          {
+            "name": "Lindigoticum Ice Crystals",
+            "codex": "$Codex_Ent_L_Cry_IcCry_Bl_Name;",
+            "entry_id": 2100601,
+            "platform": "legacy"
+          },
+          {
+            "name": "Prasinum Ice Crystals",
+            "codex": "$Codex_Ent_L_Cry_IcCry_Gr_Name;",
+            "entry_id": 2100602,
+            "platform": "legacy"
+          },
+          {
+            "name": "Roseum Ice Crystals",
+            "codex": "$Codex_Ent_L_Cry_IcCry_Pk_Name;",
+            "entry_id": 2100603,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Lagrange Cloud": {
+        "count": 7,
+        "examples": [
+          {
+            "name": "Caeruleum Lagrange Cloud",
+            "codex": "$Codex_Ent_Gas_Clds_Blue_Name;",
+            "entry_id": 1400601,
+            "platform": "legacy"
+          },
+          {
+            "name": "Viride Lagrange Cloud",
+            "codex": "$Codex_Ent_Gas_Clds_Green_Name;",
+            "entry_id": 1400701,
+            "platform": "legacy"
+          },
+          {
+            "name": "Luteolum Lagrange Cloud",
+            "codex": "$Codex_Ent_Gas_Clds_Orange_Name;",
+            "entry_id": 1400801,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Metallic Crystals": {
+        "count": 4,
+        "examples": [
+          {
+            "name": "Prasinum Metallic Crystals",
+            "codex": "$Codex_Ent_L_Cry_MetCry_Gr_Name;",
+            "entry_id": 2100801,
+            "platform": "legacy"
+          },
+          {
+            "name": "Purpureum Metallic Crystals",
+            "codex": "$Codex_Ent_L_Cry_MetCry_Pur_Name;",
+            "entry_id": 2100802,
+            "platform": "legacy"
+          },
+          {
+            "name": "Rubeum Metallic Crystals",
+            "codex": "$Codex_Ent_L_Cry_MetCry_Red_Name;",
+            "entry_id": 2100803,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Mineral Spheres": {
+        "count": 2,
+        "examples": [
+          {
+            "name": "Solid Mineral Spheres",
+            "codex": "$Codex_Ent_SPOI_Ball_Name;",
+            "entry_id": 1410100,
+            "platform": "legacy"
+          },
+          {
+            "name": "Lattice Mineral Spheres",
+            "codex": "$Codex_Ent_SPOI_Ball_Lattice_Name;",
+            "entry_id": 1410110,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Mollusc": {
+        "count": 49,
+        "examples": [
+          {
+            "name": "Albulum Gourd Mollusc",
+            "codex": "$Codex_Ent_Small_Org_Moll01_V1_Def_Name;",
+            "entry_id": 2300101,
+            "platform": "legacy"
+          },
+          {
+            "name": "Caeruleum Gourd Mollusc",
+            "codex": "$Codex_Ent_Small_Org_Moll01_V1_Bl_Name;",
+            "entry_id": 2300102,
+            "platform": "legacy"
+          },
+          {
+            "name": "Viride Gourd Mollusc",
+            "codex": "$Codex_Ent_Small_Org_Moll01_V1_Gr_Name;",
+            "entry_id": 2300103,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Peduncle": {
+        "count": 10,
+        "examples": [
+          {
+            "name": "Candidum Peduncle Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp01_Def_Name;",
+            "entry_id": 2201001,
+            "platform": "legacy"
+          },
+          {
+            "name": "Caeruleum Peduncle Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp01_Bl_Name;",
+            "entry_id": 2201002,
+            "platform": "legacy"
+          },
+          {
+            "name": "Gypseeum Peduncle Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp01_Gr_Name;",
+            "entry_id": 2201003,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Quadripartite": {
+        "count": 4,
+        "examples": [
+          {
+            "name": "Albidum Quadripartite Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp08_Def_Name;",
+            "entry_id": 2207101,
+            "platform": "legacy"
+          },
+          {
+            "name": "Caeruleum Quadripartite Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp08_Bl_Name;",
+            "entry_id": 2207102,
+            "platform": "legacy"
+          },
+          {
+            "name": "Viride Quadripartite Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp08_Gr_Name;",
+            "entry_id": 2207103,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Rhizome": {
+        "count": 5,
+        "examples": [
+          {
+            "name": "Candidum Rhizome Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp07_Def_Name;",
+            "entry_id": 2207001,
+            "platform": "legacy"
+          },
+          {
+            "name": "Cobalteum Rhizome Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp07_Bl_Name;",
+            "entry_id": 2207002,
+            "platform": "legacy"
+          },
+          {
+            "name": "Gypseeum Rhizome Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp07_Gr_Name;",
+            "entry_id": 2207003,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Silicate Crystals": {
+        "count": 7,
+        "examples": [
+          {
+            "name": "Lindigoticum Silicate Crystals",
+            "codex": "$Codex_Ent_L_Cry_QtzCry_Bl_Name;",
+            "entry_id": 2100701,
+            "platform": "legacy"
+          },
+          {
+            "name": "Prasinum Silicate Crystals",
+            "codex": "$Codex_Ent_L_Cry_QtzCry_Gr_Name;",
+            "entry_id": 2100702,
+            "platform": "legacy"
+          },
+          {
+            "name": "Roseum Silicate Crystals",
+            "codex": "$Codex_Ent_L_Cry_QtzCry_Pk_Name;",
+            "entry_id": 2100703,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Stolon": {
+        "count": 2,
+        "examples": [
+          {
+            "name": "Stolon Pod",
+            "codex": "$Codex_Ent_SPOI_Root_Seeds_Name;",
+            "entry_id": 2207200,
+            "platform": "legacy"
+          },
+          {
+            "name": "Stolon Tree",
+            "codex": "$Codex_Ent_L_Seed_SdRt02_V3_Name;",
+            "entry_id": 2209021,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Storm Cloud": {
+        "count": 5,
+        "examples": [
+          {
+            "name": "Viride Lagrange Storm Cloud",
+            "codex": "$Codex_Ent_Gas_Clds_Green_Storm_Name;",
+            "entry_id": 1400702,
+            "platform": "legacy"
+          },
+          {
+            "name": "Luteolum Lagrange Storm Cloud",
+            "codex": "$Codex_Ent_Gas_Clds_Orange_Storm_Name;",
+            "entry_id": 1400802,
+            "platform": "legacy"
+          },
+          {
+            "name": "Roseum Lagrange Storm Cloud",
+            "codex": "$Codex_Ent_Gas_Clds_Pink_Storm_Name;",
+            "entry_id": 1400902,
+            "platform": "legacy"
+          }
+        ]
+      },
+      "Void": {
+        "count": 6,
+        "examples": [
+          {
+            "name": "Niveum Octahedral Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp03_Def_Name;",
+            "entry_id": 2203001,
+            "platform": "legacy"
+          },
+          {
+            "name": "Caeruleum Octahedral Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp03_Bl_Name;",
+            "entry_id": 2203002,
+            "platform": "legacy"
+          },
+          {
+            "name": "Viride Octahedral Pod",
+            "codex": "$Codex_Ent_S_Seed_SdTp03_Gr_Name;",
+            "entry_id": 2203003,
+            "platform": "legacy"
+          }
+        ]
+      }
+    }
+  }
+}

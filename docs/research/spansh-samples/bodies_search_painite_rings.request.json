@@ -1,0 +1,1 @@
+{"filters":{"ring_signals":[{"comparison":"<=>","count":[2,999],"name":"Painite"}],"distance":{"min":"0","max":"200"}},"sort":[{"distance":{"direction":"asc"}}],"size":3,"page":0,"reference_system":"Sol"}

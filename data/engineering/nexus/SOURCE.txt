@@ -1,0 +1,37 @@
+engineering.json — generated, do not edit by hand.
+
+Regenerate:  cargo run -p nexus-data --example convert_engineering
+             (crates/nexus-data/examples/convert_engineering.rs; prints a validation report)
+Embedded by: crates/nexus-data/src/engineering.rs (include_str!, parsed lazily at first use)
+
+Derived from (see the SOURCE.txt / LICENSE files next to each input):
+
+  * EDEngineer — https://github.com/msarilar/EDEngineer, commit 2cadd66 (archived 2024-03-22)
+    MIT License, Copyright (c) 2016 Max. Full licence text: data/engineering/edengineer/LICENSE
+    Used for: ship blueprint recipes per grade, engineers per grade, blueprint/experimental effect
+    texts, experimental recipes, ship-engineer unlock costs, synthesis effect texts.
+
+  * EDDiscovery EliteDangerousCore — https://github.com/EDDiscovery/EliteDangerousCore,
+    commit 13bb0c0 (2026-10-10). Apache License 2.0, Copyright EDDiscovery development team.
+    Full licence text: data/engineering/eddiscovery-src/LICENSE
+    Used for: journal symbols (BlueprintName / ExperimentalEffect), ingredient short codes
+    (MCMRType.cs), engineer locations, coordinates and requirements (Engineers.cs), synthesis
+    recipes and journal names (RecipesSynthesis.cs), technology-broker unlocks, Odyssey suit/weapon
+    upgrade and modification costs (RecipesEngineering.cs), the Pulse Laser "Short Range Blaster"
+    blueprint missing from EDEngineer.
+    Modifications (Apache-2.0 §4b): converted to JSON; values merged with EDEngineer as listed below.
+
+  * EDCD/FDevIDs — https://github.com/EDCD/FDevIDs, commit c356129 (2026-09-05).
+    engineers.csv (EngineerID, system address, market id); ingredient symbols are validated
+    against material.csv / commodity.csv / rare_commodity.csv / microresources.csv.
+    No licence declared upstream (see data/fdevids/SOURCE.txt).
+
+Corrections applied on top of the sources (docs/research/engineering.md §6.3, wiki-verified):
+  * Juri Ishmaak added up to G3 on Kill Warrant, Manifest and Frame Shift Wake Scanner blueprints.
+  * Lori Jameson Life Support capped at G4 (EDEngineer says G5).
+  * Colonia engineers' G5 access kept as in EDEngineer (EDD caps several at G4 — an EDD bug).
+  * Dazzle Shell: 5 Mechanical Scrap, 4 Manganese, 5 Hybrid Capacitors, 5 Mechanical Components
+    (EDEngineer's Fragment Cannon row and EDD's copy are incomplete/typo'd).
+  * On-foot engineer meeting/referral requirements updated to the post-2022 values (EDD is older);
+    see the ON_FOOT table in the converter.
+  * EDEngineer's "Abnormal Compact Emission Data" mapped to compactemissionsdata.

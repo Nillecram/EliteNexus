@@ -1,0 +1,85 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/nexus-journal",
+    "crates/nexus-data",
+    "crates/nexus-model",
+    "crates/nexus-galaxy",
+    "crates/nexus-eddn",
+    "crates/nexus-uplink",
+    "crates/nexus-spansh",
+    "crates/nexus-binds",
+    "crates/nexus-app",
+]
+default-members = ["crates/nexus-app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+authors = ["CMDR Alka Uruskan"]
+publish = false
+
+[workspace.dependencies]
+# internal
+nexus-journal = { path = "crates/nexus-journal" }
+nexus-data = { path = "crates/nexus-data" }
+nexus-model = { path = "crates/nexus-model" }
+nexus-galaxy = { path = "crates/nexus-galaxy" }
+nexus-eddn = { path = "crates/nexus-eddn" }
+nexus-uplink = { path = "crates/nexus-uplink" }
+nexus-spansh = { path = "crates/nexus-spansh" }
+nexus-binds = { path = "crates/nexus-binds" }
+
+# core
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+parking_lot = "0.12"
+crossbeam-channel = "0.5"
+rayon = "1"
+rustc-hash = "2"
+smallvec = "1"
+
+# storage / compression
+rusqlite = { version = "0.40", features = ["bundled"] }
+flate2 = "1"
+csv = "1"
+base64 = "0.23"
+
+# networking
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "gzip", "query", "form"] }
+zeromq = { version = "0.6", default-features = false, features = ["tokio-runtime", "tcp-transport"] }
+
+# misc
+roxmltree = "0.21"
+known-folders = "1"
+
+# gui
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "wgpu", "persistence", "links", "wayland", "x11"] }
+egui = "0.36"
+egui_extras = { version = "0.36", features = ["all_loaders"] }
+egui_plot = "0.37"
+egui-phosphor = "0.14"
+arboard = "3"
+tts = "0.26"
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[profile.dev]
+# Keep debug builds snappy while making dependency code reasonably fast (JSON parsing, sqlite, rendering).
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+panic = "unwind"

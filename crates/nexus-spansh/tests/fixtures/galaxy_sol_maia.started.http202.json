@@ -1,0 +1,31 @@
+{
+  "created_at": "2026-10-12T10:59:02",
+  "job": "EF801144-C62B-11F1-9B76-AF48D4925400",
+  "parameters": {
+    "algorithm": "optimistic",
+    "base_mass": 399.13,
+    "cargo": 0,
+    "destination_system": "Maia",
+    "exclude_secondary": false,
+    "fuel_multiplier": 0.013,
+    "fuel_power": 2.45,
+    "injection_multiplier": 2,
+    "internal_tank_size": 0.63,
+    "is_supercharged": false,
+    "max_fuel_per_jump": 5.2,
+    "optimal_mass": 2117.5,
+    "range_boost": 7.75,
+    "refuel_every_scoopable": 1,
+    "reserve_size": 0,
+    "ship_build": "[{\"data\":{\"CargoCapacity\":16,\"FuelCapacity\":{\"Main\":32.0,\"Reserve\":0.63},\"HullHealth\":1.0,\"HullValue\":40000000,\"MaxJumpRange\":68.2,\"Modules\":[{\"Engineering\":{\"BlueprintID\":128673694,\"BlueprintName\":\"FSD_LongRange\",\"Engineer\":\"Felicity Farseer\",\"EngineerID\":300100,\"ExperimentalEffect\":\"special_fsd_heavy\",\"Level\":5,\"Modifiers\":[{\"Label\":\"Mass\",\"LessIsGood\":1,\"OriginalValue\":20.0,\"Value\":26.0},{\"Label\":\"FSDOptimalMass\",\"LessIsGood\":0,\"OriginalValue\":1175.0,\"Value\":2117.5}],\"Quality\":1.0},\"Health\":1.0,\"Item\":\"int_hyperdrive_overcharge_size5_class5\",\"On\":true,\"Priority\":0,\"Slot\":\"FrameShiftDrive\"},{\"Health\":1.0,\"Item\":\"int_guardianfsdbooster_size3\",\"On\":true,\"Priority\":0,\"Slot\":\"Slot03_Size3\"},{\"Health\":1.0,\"Item\":\"int_fuelscoop_size5_class5\",\"On\":true,\"Priority\":0,\"Slot\":\"FuelScoop\"}],\"ModulesValue\":60000000,\"Rebuy\":5000000,\"Ship\":\"krait_light\",\"ShipID\":7,\"ShipIdent\":\"KP-01\",\"ShipName\":\"Wayfarer\",\"UnladenMass\":398.5,\"event\":\"Loadout\",\"timestamp\":\"2026-10-01T12:00:00Z\"},\"header\":{\"appName\":\"EliteNexus\",\"appVersion\":\"0.1.0\"}}]",
+    "source_system": "Sol",
+    "supercharge_multiplier": 4,
+    "tank_size": 32,
+    "use_injections": false,
+    "use_injections_when_required": false,
+    "use_supercharge": true
+  },
+  "state": "started",
+  "status": "queued",
+  "updated_at": "2026-10-12T10:59:02"
+}

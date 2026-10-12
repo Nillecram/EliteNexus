@@ -1,0 +1,388 @@
+{
+  "count": 3029,
+  "from": 0,
+  "reference": {
+    "id64": 10477373803,
+    "name": "Sol",
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "results": [
+    {
+      "arg_of_periapsis": 140.996462,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Helium",
+          "share": 26.233465
+        },
+        {
+          "name": "Hydrogen",
+          "share": 73.766533
+        }
+      ],
+      "axis_tilt": 0.907892,
+      "body_id": 13,
+      "distance": 5.95466269510709,
+      "distance_to_arrival": 3272.396648,
+      "earth_masses": 536.446533,
+      "estimated_mapping_value": 17980,
+      "estimated_scan_value": 4949,
+      "gravity": 3.73065279902111,
+      "id": "468392624387073449",
+      "id64": 468392624387073449,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "Barnard's Star 5",
+      "orbital_eccentricity": 0.005599,
+      "orbital_inclination": 1.6884,
+      "orbital_period": 10620.9890434036,
+      "orbital_synchronicity": 10620.4638594563,
+      "parents": [
+        {
+          "id64": 18263140541865,
+          "subtype": "M (Red dwarf) Star",
+          "type": "Star"
+        }
+      ],
+      "radius": 76446.464,
+      "reserve_level": "Depleted",
+      "rings": [
+        {
+          "inner_radius": 145100000.0,
+          "mass": 212120000000.0,
+          "name": "Barnard's Star 5 A Ring",
+          "outer_radius": 166790000.0,
+          "signal_count": 3,
+          "signals": [
+            {
+              "count": 2,
+              "name": "Painite"
+            },
+            {
+              "count": 1,
+              "name": "Platinum"
+            }
+          ],
+          "signals_updated_at": "2026-10-07T21:22:54Z",
+          "type": "Metal Rich"
+        },
+        {
+          "inner_radius": 166890000.0,
+          "mass": 1636900000000.0,
+          "name": "Barnard's Star 5 B Ring",
+          "outer_radius": 282870000.0,
+          "signal_count": 4,
+          "signals": [
+            {
+              "count": 1,
+              "name": "Bromellite"
+            },
+            {
+              "count": 1,
+              "name": "Grandidierite"
+            },
+            {
+              "count": 1,
+              "name": "Low Temperature Diamonds"
+            },
+            {
+              "count": 1,
+              "name": "Tritium"
+            }
+          ],
+          "signals_updated_at": "2026-10-11T15:00:22Z",
+          "type": "Icy"
+        }
+      ],
+      "rotational_period": 0.525183947349537,
+      "semi_major_axis": 6.5947600503502,
+      "signal_count": 6,
+      "signals": [
+        {
+          "count": 6,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2022-09-13T00:23:21Z",
+      "subtype": "Class I gas giant",
+      "surface_pressure": 0.0,
+      "surface_temperature": 90.848106,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 18263140541865,
+      "system_name": "Barnard's Star",
+      "system_power_state": "Stronghold",
+      "system_region": "Inner Orion Spur",
+      "system_x": -3.03125,
+      "system_y": 1.375,
+      "system_z": 4.9375,
+      "terraforming_state": "Not terraformable",
+      "type": "Planet",
+      "updated_at": "2026-10-12T08:05:31Z"
+    },
+    {
+      "arg_of_periapsis": 46.390047,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Helium",
+          "share": 30.86824
+        },
+        {
+          "name": "Hydrogen",
+          "share": 69.131767
+        }
+      ],
+      "axis_tilt": 0.09815,
+      "body_id": 21,
+      "distance": 7.17165372752338,
+      "distance_to_arrival": 917.061799,
+      "earth_masses": 33.6343,
+      "estimated_mapping_value": 12893,
+      "estimated_scan_value": 3549,
+      "gravity": 0.755850922810238,
+      "id": "756662882128907088",
+      "id64": 756662882128907088,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "WISE 0855-0714 6",
+      "orbital_eccentricity": 0.002252,
+      "orbital_inclination": -0.147636,
+      "orbital_period": 4175.14938723157,
+      "orbital_synchronicity": 4174.45494636383,
+      "parents": [
+        {
+          "id64": 58144730663760,
+          "subtype": "Y (Brown dwarf) Star",
+          "type": "Star"
+        }
+      ],
+      "radius": 42526.508,
+      "reserve_level": "Low",
+      "rings": [
+        {
+          "inner_radius": 66837000.0,
+          "mass": 33381000000.0,
+          "name": "WISE 0855-0714 6 A Ring",
+          "outer_radius": 74974000.0,
+          "signal_count": 10,
+          "signals": [
+            {
+              "count": 5,
+              "name": "Monazite"
+            },
+            {
+              "count": 2,
+              "name": "Painite"
+            },
+            {
+              "count": 1,
+              "name": "Platinum"
+            },
+            {
+              "count": 1,
+              "name": "Rhodplumsite"
+            },
+            {
+              "count": 1,
+              "name": "Serendibite"
+            }
+          ],
+          "signals_updated_at": "2026-09-26T11:43:58Z",
+          "type": "Metal Rich"
+        },
+        {
+          "inner_radius": 75074000.0,
+          "mass": 202710000000.0,
+          "name": "WISE 0855-0714 6 B Ring",
+          "outer_radius": 112380000.0,
+          "type": "Icy"
+        }
+      ],
+      "rotational_period": 0.694440867743055,
+      "semi_major_axis": 1.83448655030583,
+      "signal_count": 1,
+      "signals": [
+        {
+          "count": 1,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2021-04-14T16:27:49Z",
+      "subtype": "Class I gas giant",
+      "surface_pressure": 0.0,
+      "surface_temperature": 5.215577,
+      "system_controlling_power": "Aisling Duval",
+      "system_id64": 58144730663760,
+      "system_name": "WISE 0855-0714",
+      "system_power_state": "Fortified",
+      "system_region": "Inner Orion Spur",
+      "system_x": 6.53125,
+      "system_y": -2.15625,
+      "system_z": 2.03125,
+      "terraforming_state": "Not terraformable",
+      "type": "Planet",
+      "updated_at": "2026-10-12T05:26:56Z"
+    },
+    {
+      "arg_of_periapsis": 77.689379,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Helium",
+          "share": 25.385376
+        },
+        {
+          "name": "Hydrogen",
+          "share": 74.614624
+        }
+      ],
+      "axis_tilt": -0.506919,
+      "body_id": 31,
+      "distance": 15.7928484606166,
+      "distance_to_arrival": 1666.952726,
+      "earth_masses": 37.927818,
+      "estimated_mapping_value": 13061,
+      "estimated_scan_value": 3595,
+      "gravity": 0.681631997552768,
+      "id": "1116897184831244651",
+      "id64": 1116897184831244651,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": true,
+      "name": "Kokary 5",
+      "orbital_eccentricity": 0.016315,
+      "orbital_inclination": -8.525074,
+      "orbital_period": 258.027700086435,
+      "orbital_synchronicity": 7.251925644734,
+      "parents": [
+        {
+          "id64": 900724402717460843,
+          "type": "Null"
+        }
+      ],
+      "radius": 47554.384,
+      "reserve_level": "Common",
+      "rings": [
+        {
+          "inner_radius": 78465000.0,
+          "mass": 36907000000.0,
+          "name": "Kokary 5 A Ring",
+          "outer_radius": 87055000.0,
+          "signal_count": 4,
+          "signals": [
+            {
+              "count": 1,
+              "name": "Monazite"
+            },
+            {
+              "count": 1,
+              "name": "Painite"
+            },
+            {
+              "count": 1,
+              "name": "Rhodplumsite"
+            },
+            {
+              "count": 1,
+              "name": "Serendibite"
+            }
+          ],
+          "signals_updated_at": "2026-10-11T13:25:54Z",
+          "type": "Metallic"
+        },
+        {
+          "inner_radius": 87155000.0,
+          "mass": 241230000000.0,
+          "name": "Kokary 5 B Ring",
+          "outer_radius": 128530000.0,
+          "signal_count": 8,
+          "signals": [
+            {
+              "count": 2,
+              "name": "Monazite"
+            },
+            {
+              "count": 3,
+              "name": "Painite"
+            },
+            {
+              "count": 2,
+              "name": "Platinum"
+            },
+            {
+              "count": 1,
+              "name": "Serendibite"
+            }
+          ],
+          "signals_updated_at": "2026-10-11T13:25:41Z",
+          "type": "Metal Rich"
+        }
+      ],
+      "rotational_period": 265.279625731169,
+      "semi_major_axis": 0.0962852195251127,
+      "signal_count": 1,
+      "signals": [
+        {
+          "count": 1,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2021-09-13T22:00:10Z",
+      "subtype": "Class I gas giant",
+      "surface_pressure": 0.0,
+      "surface_temperature": 129.49556,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 4477243361643,
+      "system_name": "Kokary",
+      "system_power_state": "Stronghold",
+      "system_region": "Inner Orion Spur",
+      "system_x": 3.5,
+      "system_y": -10.3125,
+      "system_z": -11.4375,
+      "terraforming_state": "Not terraformable",
+      "type": "Planet",
+      "updated_at": "2026-10-12T05:43:38Z"
+    }
+  ],
+  "search": {
+    "filters": {
+      "distance": {
+        "max": "200",
+        "min": "0"
+      },
+      "ring_signals": [
+        {
+          "comparison": "<=>",
+          "count": [
+            2,
+            999
+          ],
+          "name": "Painite"
+        }
+      ]
+    },
+    "page": 0,
+    "reference_system": "Sol",
+    "reference_system_details": {
+      "id64": 10477373803,
+      "name": "Sol",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "size": 3,
+    "sort": [
+      {
+        "distance": {
+          "direction": "asc"
+        }
+      }
+    ]
+  },
+  "search_reference": "FC235E3C-C61D-11F1-93EB-CED8603BEE0B",
+  "size": 3
+}

@@ -1,0 +1,162 @@
+[
+  {
+    "id64": 819519,
+    "name": "Phua Fraae AA-A h0",
+    "coords": {
+      "x": -34608.78125,
+      "y": 513.34375,
+      "z": 26058.59375
+    },
+    "allegiance": null,
+    "government": "None",
+    "primaryEconomy": "None",
+    "secondaryEconomy": "None",
+    "security": "Anarchy",
+    "population": 0,
+    "bodyCount": 3,
+    "date": "2026-09-08T12:54:39Z",
+    "bodies": [
+      {
+        "id64": 36028797019783487,
+        "bodyId": 1,
+        "name": "Phua Fraae AA-A h0 barycentre 1",
+        "type": "Barycentre",
+        "orbitalPeriod": 983.835956840602,
+        "semiMajorAxis": 1.30881510784614,
+        "orbitalEccentricity": 0.372843,
+        "orbitalInclination": -47.405979,
+        "argOfPeriapsis": 116.761568,
+        "meanAnomaly": 278.223145,
+        "ascendingNode": -155.749948,
+        "timestamps": {
+          "meanAnomaly": "2026-09-08T13:38:04Z"
+        },
+        "stations": [],
+        "updateTime": "2026-09-08T13:38:04Z"
+      },
+      {
+        "id64": 72057594038747455,
+        "bodyId": 2,
+        "name": "Phua Fraae AA-A h0 A",
+        "type": "Star",
+        "subType": "B (Blue-White) Star",
+        "distanceToArrival": 0.0,
+        "mainStar": true,
+        "age": 0,
+        "spectralClass": "B0",
+        "luminosity": "IVa",
+        "absoluteMagnitude": -14.395462,
+        "solarMasses": 102.882813,
+        "solarRadius": 246.155877958303,
+        "surfaceTemperature": 30779.0,
+        "rotationalPeriod": 79.77747723125,
+        "rotationalPeriodTidallyLocked": false,
+        "axialTilt": 0.0,
+        "parents": [
+          {
+            "Null": 1
+          },
+          {
+            "Null": 0
+          }
+        ],
+        "orbitalPeriod": 70.7855751668981,
+        "semiMajorAxis": 0.586285850228428,
+        "orbitalEccentricity": 0.03932,
+        "orbitalInclination": 40.433073,
+        "argOfPeriapsis": 71.597933,
+        "meanAnomaly": 257.31193,
+        "ascendingNode": 160.285668,
+        "timestamps": {
+          "distanceToArrival": "2026-09-07T19:51:23Z",
+          "meanAnomaly": "2026-09-07T19:51:23Z"
+        },
+        "stations": [],
+        "updateTime": "2026-09-07T19:51:23Z"
+      },
+      {
+        "id64": 108086391057711423,
+        "bodyId": 3,
+        "name": "Phua Fraae AA-A h0 B",
+        "type": "Star",
+        "subType": "Herbig Ae/Be Star",
+        "distanceToArrival": 900.532252,
+        "mainStar": false,
+        "age": 2,
+        "spectralClass": "AeBe0",
+        "luminosity": "Vb",
+        "absoluteMagnitude": 6.521545,
+        "solarMasses": 50.066406,
+        "solarRadius": 0.57638547232207,
+        "surfaceTemperature": 5156.0,
+        "rotationalPeriod": 0.208273482164352,
+        "rotationalPeriodTidallyLocked": false,
+        "axialTilt": 0.0,
+        "parents": [
+          {
+            "Null": 1
+          },
+          {
+            "Null": 0
+          }
+        ],
+        "orbitalPeriod": 70.7855751668981,
+        "semiMajorAxis": 1.20477459609094,
+        "orbitalEccentricity": 0.03932,
+        "orbitalInclination": 40.433073,
+        "argOfPeriapsis": 251.597927,
+        "meanAnomaly": 261.079199,
+        "ascendingNode": 160.285668,
+        "timestamps": {
+          "distanceToArrival": "2026-09-08T13:38:04Z",
+          "meanAnomaly": "2026-09-08T13:38:04Z"
+        },
+        "stations": [],
+        "updateTime": "2026-09-08T13:38:04Z"
+      }
+    ],
+    "stations": [
+      {
+        "name": "T2X-02X",
+        "id": 3708716800,
+        "updateTime": "2026-09-08T13:11:07Z",
+        "controllingFaction": "FleetCarrier",
+        "controllingFactionState": null,
+        "distanceToArrival": 294.798969,
+        "primaryEconomy": "Private Enterprise",
+        "economies": {
+          "Private Enterprise": 100.0
+        },
+        "government": "Private Ownership",
+        "services": [
+          "Dock",
+          "Autodock",
+          "Market"
+        ],
+        "type": "Drake-Class Carrier",
+        "landingPads": {
+          "large": 8,
+          "medium": 4,
+          "small": 4
+        },
+        "carrierDockingAccess": "All",
+        "market": {
+          "commodities": [
+            {
+              "name": "Tritium",
+              "symbol": "Tritium",
+              "category": "Chemicals",
+              "commodityId": 128961249,
+              "demand": 0,
+              "supply": 19966,
+              "buyPrice": 215079,
+              "sellPrice": 0
+            }
+          ],
+          "prohibitedCommodities": [],
+          "updateTime": "2026-09-08T13:11:07Z"
+        }
+      }
+    ]
+  }
+]

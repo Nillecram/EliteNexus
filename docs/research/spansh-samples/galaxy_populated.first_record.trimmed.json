@@ -1,0 +1,237 @@
+[
+  {
+    "id64": 2456727,
+    "name": "HD 219286",
+    "coords": {
+      "x": -2373.71875,
+      "y": -27.21875,
+      "z": -926.21875
+    },
+    "allegiance": "Independent",
+    "government": "Cooperative",
+    "primaryEconomy": "Extraction",
+    "secondaryEconomy": "Agriculture",
+    "security": "Low",
+    "population": 232952,
+    "bodyCount": 23,
+    "controllingFaction": {
+      "name": "The Guard of Outer Imperial Colonies",
+      "state": "Expansion",
+      "government": "Cooperative",
+      "allegiance": "Independent",
+      "activeStates": [
+        {
+          "state": "Expansion"
+        }
+      ]
+    },
+    "factions": [
+      {
+        "name": "Constitution Party of Koyans",
+        "allegiance": "Independent",
+        "government": "Dictatorship",
+        "influence": 0.2,
+        "state": "None"
+      },
+      {
+        "name": "Pipinoukhe Boys",
+        "allegiance": "Independent",
+        "government": "Anarchy",
+        "influence": 0.07,
+        "state": "None"
+      },
+      {
+        "name": "The Guard of Outer Imperial Colonies",
+        "allegiance": "Independent",
+        "government": "Cooperative",
+        "influence": 0.6,
+        "state": "Expansion",
+        "activeStates": [
+          {
+            "state": "Expansion"
+          }
+        ]
+      }
+    ],
+    "timestamps": {
+      "factions": "2026-06-29T23:03:30Z"
+    },
+    "date": "2026-06-29T23:03:36Z",
+    "bodies": [
+      {
+        "id64": 2456727,
+        "bodyId": 0,
+        "name": "HD 219286",
+        "type": "Star",
+        "subType": "O (Blue-White) Star",
+        "distanceToArrival": 0.0,
+        "mainStar": true,
+        "age": 868,
+        "spectralClass": "O8",
+        "luminosity": "II",
+        "absoluteMagnitude": -0.773941,
+        "solarMasses": 104.847656,
+        "solarRadius": 0.405151378864127,
+        "surfaceTemperature": 32988.0,
+        "rotationalPeriod": 0.145694321574074,
+        "rotationalPeriodTidallyLocked": false,
+        "axialTilt": 0.0,
+        "timestamps": {
+          "distanceToArrival": "2026-06-29T23:03:35Z"
+        },
+        "stations": [],
+        "updateTime": "2026-06-29T23:03:35Z"
+      },
+      {
+        "id64": 36028797021420695,
+        "bodyId": 1,
+        "name": "HD 219286 1",
+        "type": "Star",
+        "subType": "A (Blue-White) Star",
+        "distanceToArrival": 119.02521,
+        "mainStar": false,
+        "age": 868,
+        "spectralClass": "A6",
+        "luminosity": "Vb",
+        "absoluteMagnitude": 2.430374,
+        "solarMasses": 1.902344,
+        "solarRadius": 1.46572855212078,
+        "surfaceTemperature": 8292.0,
+        "rotationalPeriod": 2.96925850954861,
+        "rotationalPeriodTidallyLocked": false,
+        "axialTilt": -0.352406,
+        "parents": [
+          {
+            "Star": 0
+          }
+        ],
+        "orbitalPeriod": 3.97546216846065,
+        "semiMajorAxis": 0.238557495440793,
+        "orbitalEccentricity": 0.000142,
+        "orbitalInclination": -0.002997,
+        "argOfPeriapsis": 9.83676,
+        "meanAnomaly": 17.892335,
+        "ascendingNode": 83.60242,
+        "timestamps": {
+          "distanceToArrival": "2026-06-29T23:03:36Z",
+          "meanAnomaly": "2026-06-29T23:03:36Z"
+        },
+        "stations": [],
+        "updateTime": "2026-06-29T23:03:36Z"
+      },
+      {
+        "id64": 72057594040384663,
+        "bodyId": 2,
+        "name": "HD 219286 2",
+        "type": "Planet",
+        "subType": "High metal content world",
+        "distanceToArrival": 179.336515,
+        "isLandable": false,
+        "gravity": 24.5954864892424,
+        "earthMasses": 218.378418,
+        "radius": 18996.072,
+        "surfaceTemperature": 19991.773438,
+        "surfacePressure": 453031607.85512,
+        "volcanismType": "Major Silicate Vapour Geysers",
+        "atmosphereType": "Hot thick Silicate vapour",
+        "atmosphereComposition": {
+          "Iron": 1.470906,
+          "Silicates": 98.172661,
+          "Water": 0.336371
+        },
+        "solidComposition": {
+          "Ice": 0.0,
+          "Metal": 33.1594,
+          "Rock": 66.8406
+        },
+        "terraformingState": "Not terraformable",
+        "rotationalPeriod": 7.68288606935185,
+        "rotationalPeriodTidallyLocked": true,
+        "axialTilt": 0.091097,
+        "parents": [
+          {
+            "Star": 0
+          }
+        ],
+        "orbitalPeriod": 7.34934521217593,
+        "semiMajorAxis": 0.359335719746544,
+        "orbitalEccentricity": 0.000195,
+        "orbitalInclination": 0.017863,
+        "argOfPeriapsis": 247.089606,
+        "meanAnomaly": 221.234753,
+        "ascendingNode": 177.20126,
+        "timestamps": {
+          "distanceToArrival": "2026-04-17T01:46:08Z",
+          "meanAnomaly": "2026-04-17T01:46:08Z"
+        },
+        "stations": [],
+        "updateTime": "2026-04-17T01:46:08Z"
+      }
+    ],
+    "stations": [
+      {
+        "name": "Slonczewski Horizons",
+        "id": 4332007939,
+        "updateTime": "2026-01-21T03:55:54Z",
+        "controllingFaction": "The Guard of Outer Imperial Colonies",
+        "controllingFactionState": "Expansion",
+        "distanceToArrival": 1243.906684,
+        "primaryEconomy": "Extraction",
+        "economies": {
+          "Agriculture": 100.0,
+          "Extraction": 140.0,
+          "Terraforming": 100.0
+        },
+        "government": "Cooperative",
+        "services": [
+          "Dock",
+          "Autodock",
+          "Black Market"
+        ],
+        "type": "Planetary Outpost",
+        "state": "Construction",
+        "landingPads": {
+          "large": 0,
+          "medium": 1,
+          "small": 3
+        },
+        "market": {
+          "commodities": [
+            {
+              "name": "Advanced Catalysers",
+              "symbol": "AdvancedCatalysers",
+              "category": "Technology",
+              "commodityId": 128049231,
+              "demand": 0,
+              "supply": 0,
+              "buyPrice": 1781,
+              "sellPrice": 1780
+            },
+            {
+              "name": "Advanced Medicines",
+              "symbol": "AdvancedMedicines",
+              "category": "Medicines",
+              "commodityId": 128682046,
+              "demand": 1933,
+              "supply": 0,
+              "buyPrice": 0,
+              "sellPrice": 1920
+            },
+            {
+              "name": "Aepyornis Egg",
+              "symbol": "CetiAepyornisEgg",
+              "category": "Foods",
+              "commodityId": 128667670,
+              "demand": 0,
+              "supply": 0,
+              "buyPrice": 2444,
+              "sellPrice": 2443
+            }
+          ],
+          "prohibitedCommodities": [],
+          "updateTime": "2026-01-21T03:55:54Z"
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,570 @@
+//! Public data types: what goes into the database ([`Ingest`]) and what comes out of queries.
+
+use crate::services::{MaterialTrader, Services, TechBroker};
+use serde::Serialize;
+
+/// Where a piece of data came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize)]
+pub enum Source {
+    #[default]
+    Eddn,
+    Journal,
+    Spansh,
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ingest
+// ---------------------------------------------------------------------------------------------
+
+/// One unit of data for the writer thread. Build them by hand, or with [`Ingest::from_eddn`] /
+/// [`Ingest::from_journal_event`], or hand raw JSON over with [`Ingest::Raw`] and let the writer
+/// convert it.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Ingest {
+    /// A complete market snapshot; replaces everything stored for the station's market.
+    Market(MarketSnapshot),
+    /// System position and (optionally) state, factions and powers.
+    System(SystemUpdate),
+    /// Station details (type, pads, services, economies, faction, distance).
+    Station(StationUpdate),
+    /// Ring hotspots from `SAASignalsFound` on a ring.
+    RingSignals(RingSignalsUpdate),
+    /// Raw JSON converted on the writer thread (via [`Ingest::from_eddn`] / [`Ingest::from_journal_event`]).
+    Raw(RawIngest),
+}
+
+/// Raw JSON for [`Ingest::Raw`].
+#[derive(Debug, Clone, PartialEq)]
+pub enum RawIngest {
+    /// A complete EDDN envelope (`{"$schemaRef", "header", "message"}`).
+    Eddn(serde_json::Value),
+    /// A journal event (or companion file such as Market.json) and its event name.
+    Journal {
+        event: String,
+        json: serde_json::Value,
+    },
+}
+
+/// Full market of one station (EDDN `commodity/3`, our own `Market.json`, or a Spansh dump).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct MarketSnapshot {
+    pub market_id: u64,
+    pub system_name: String,
+    pub station_name: String,
+    /// Raw station type in journal or Spansh spelling (`Coriolis`, `FleetCarrier`, `Planetary Port`).
+    pub station_type: Option<String>,
+    pub carrier_docking_access: Option<String>,
+    /// Unix seconds (UTC) of the snapshot.
+    pub timestamp: i64,
+    pub items: Vec<MarketItem>,
+    /// Prohibited commodity symbols, when the source provides them.
+    pub prohibited: Option<Vec<String>>,
+    /// Station economies (display name, proportion), when the source provides them.
+    pub economies: Option<Vec<(String, f64)>>,
+    pub source: Source,
+}
+
+/// One commodity row of a [`MarketSnapshot`].
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct MarketItem {
+    /// Lower-case symbol (`gold`); see [`crate::normalize_symbol`].
+    pub symbol: String,
+    /// Price the station sells at (what you pay); 0 = not sold.
+    pub buy: i64,
+    /// Price the station buys at (what you get); 0 = not bought.
+    pub sell: i64,
+    /// Galactic mean price (0 when unknown).
+    pub mean: i64,
+    pub stock: i64,
+    /// 0..=3, -1 for EDDN `""` (temporarily available), `None` when unknown.
+    pub stock_bracket: Option<i8>,
+    pub demand: i64,
+    pub demand_bracket: Option<i8>,
+}
+
+/// System position and optionally its full state.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SystemUpdate {
+    pub id64: u64,
+    pub name: String,
+    pub pos: Option<[f64; 3]>,
+    /// Unix seconds of the information.
+    pub timestamp: i64,
+    /// `None` = position/name only (e.g. from `Docked`), existing state is left alone.
+    pub details: Option<SystemDetails>,
+}
+
+/// State of a system (from `FSDJump` / `Location` / `CarrierJump` or a dump).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SystemDetails {
+    pub population: Option<u64>,
+    pub allegiance: Option<String>,
+    pub government: Option<String>,
+    pub economy: Option<String>,
+    pub second_economy: Option<String>,
+    pub security: Option<String>,
+    pub controlling_faction: Option<String>,
+    pub controlling_faction_state: Option<String>,
+    pub controlling_power: Option<String>,
+    pub powerplay_state: Option<String>,
+    pub powers: Vec<String>,
+    /// `Some` replaces the stored faction list of the system; `None` leaves it alone.
+    pub factions: Option<Vec<FactionUpdate>>,
+}
+
+/// One faction present in a system.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FactionUpdate {
+    pub name: String,
+    /// 0..=1.
+    pub influence: Option<f64>,
+    pub state: Option<String>,
+    pub government: Option<String>,
+    pub allegiance: Option<String>,
+    pub happiness: Option<String>,
+    pub active_states: Vec<String>,
+    pub pending_states: Vec<String>,
+    pub recovering_states: Vec<String>,
+}
+
+/// Landing pad counts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct LandingPads {
+    pub small: u32,
+    pub medium: u32,
+    pub large: u32,
+}
+
+/// Station details. `None` fields leave the stored value alone.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StationUpdate {
+    pub market_id: u64,
+    pub name: String,
+    pub system_id64: Option<u64>,
+    pub system_name: Option<String>,
+    /// Raw station type in journal or Spansh spelling.
+    pub station_type: Option<String>,
+    pub dist_ls: Option<f64>,
+    pub landing_pads: Option<LandingPads>,
+    pub services: Option<Services>,
+    pub primary_economy: Option<String>,
+    /// Display name + proportion, highest first.
+    pub economies: Option<Vec<(String, f64)>>,
+    pub faction: Option<String>,
+    pub faction_state: Option<String>,
+    pub government: Option<String>,
+    pub allegiance: Option<String>,
+    pub carrier_docking_access: Option<String>,
+    /// Hint for sources that know the station is on a planet but not its type (ApproachSettlement).
+    pub planetary: Option<bool>,
+    pub timestamp: i64,
+}
+
+/// Ring hotspots of one ring (replaces what is stored for that ring).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct RingSignalsUpdate {
+    pub system_id64: u64,
+    pub system_name: Option<String>,
+    /// e.g. `HIP 21991 A 1 A Ring`.
+    pub body_name: String,
+    /// `Icy`, `Metallic`, `Metal Rich`, `Rocky` when known.
+    pub ring_type: Option<String>,
+    /// (signal, count): commodity symbols such as `painite`, `lowtemperaturediamond`, `opal`.
+    pub signals: Vec<(String, i64)>,
+    pub timestamp: i64,
+}
+
+// ---------------------------------------------------------------------------------------------
+// Commodity search
+// ---------------------------------------------------------------------------------------------
+
+/// Direction of a commodity search, from the player's point of view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+pub enum TradeMode {
+    /// Stations that sell the commodity (you buy): lowest price first, needs stock.
+    #[default]
+    BuyFromStation,
+    /// Stations that buy the commodity (you sell): highest price first, needs demand.
+    SellToStation,
+}
+
+/// Result ordering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+pub enum Sort {
+    #[default]
+    BestPrice,
+    Nearest,
+    Freshest,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CommodityQuery {
+    /// Symbol (`gold`), journal name (`$gold_name;`) or display name (`Low Temperature Diamonds`).
+    pub commodity: String,
+    pub mode: TradeMode,
+    pub origin: Option<[f64; 3]>,
+    pub max_distance_ly: Option<f64>,
+    /// Minimum landing pad: `'S'`, `'M'` or `'L'`.
+    pub min_pad: Option<char>,
+    pub max_age_hours: Option<f64>,
+    /// Minimum stock (buy mode) or demand (sell mode); values below 1 are treated as 1.
+    pub min_quantity: i64,
+    pub include_carriers: bool,
+    pub include_planetary: bool,
+    pub limit: usize,
+    pub sort: Sort,
+}
+
+impl Default for CommodityQuery {
+    fn default() -> Self {
+        CommodityQuery {
+            commodity: String::new(),
+            mode: TradeMode::BuyFromStation,
+            origin: None,
+            max_distance_ly: None,
+            min_pad: None,
+            max_age_hours: None,
+            min_quantity: 1,
+            include_carriers: true,
+            include_planetary: true,
+            limit: 50,
+            sort: Sort::BestPrice,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CommodityHit {
+    pub system: String,
+    pub system_id64: Option<u64>,
+    pub pos: Option<[f64; 3]>,
+    /// From the query origin (None without origin or unknown system position).
+    pub distance_ly: Option<f64>,
+    pub station: String,
+    pub market_id: u64,
+    pub station_type: Option<String>,
+    pub dist_ls: Option<f64>,
+    pub max_pad: Option<char>,
+    /// Buy price (buy mode) or sell price (sell mode).
+    pub price: i64,
+    /// Stock (buy mode) or demand (sell mode).
+    pub quantity: i64,
+    pub updated_unix: i64,
+    pub is_carrier: bool,
+    pub is_planetary: bool,
+}
+
+// ---------------------------------------------------------------------------------------------
+// Stations / systems
+// ---------------------------------------------------------------------------------------------
+
+/// Everything stored about a station (without its market rows).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StationInfo {
+    pub market_id: u64,
+    pub name: String,
+    pub station_type: Option<String>,
+    pub system: String,
+    pub system_id64: Option<u64>,
+    pub pos: Option<[f64; 3]>,
+    pub dist_ls: Option<f64>,
+    pub max_pad: Option<char>,
+    pub is_carrier: bool,
+    pub is_planetary: bool,
+    pub is_odyssey_settlement: bool,
+    pub services: Services,
+    pub material_trader: Option<MaterialTrader>,
+    pub tech_broker: Option<TechBroker>,
+    pub economy: Option<String>,
+    pub second_economy: Option<String>,
+    pub faction: Option<String>,
+    pub faction_state: Option<String>,
+    pub government: Option<String>,
+    pub allegiance: Option<String>,
+    pub carrier_docking_access: Option<String>,
+    /// Station details last updated (unix seconds; 0 = never).
+    pub updated_unix: i64,
+    /// Market last updated (unix seconds; 0 = no market data).
+    pub market_updated_unix: i64,
+    pub commodity_count: u32,
+}
+
+/// One market row with names.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MarketRow {
+    pub symbol: String,
+    pub name: String,
+    pub category: String,
+    pub buy: i64,
+    pub sell: i64,
+    pub mean: i64,
+    pub stock: i64,
+    pub stock_bracket: Option<i8>,
+    pub demand: i64,
+    pub demand_bracket: Option<i8>,
+    pub updated_unix: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StationMarket {
+    pub station: StationInfo,
+    pub system: Option<SystemInfo>,
+    pub prohibited: Vec<String>,
+    /// Sorted by category, then name.
+    pub items: Vec<MarketRow>,
+}
+
+/// Everything stored about a system.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SystemInfo {
+    pub id64: u64,
+    pub name: String,
+    pub pos: Option<[f64; 3]>,
+    pub population: Option<u64>,
+    pub allegiance: Option<String>,
+    pub government: Option<String>,
+    pub economy: Option<String>,
+    pub second_economy: Option<String>,
+    pub security: Option<String>,
+    pub controlling_faction: Option<String>,
+    pub controlling_faction_state: Option<String>,
+    pub controlling_power: Option<String>,
+    pub powerplay_state: Option<String>,
+    pub powers: Vec<String>,
+    /// State last updated (unix seconds; 0 = only the position is known).
+    pub updated_unix: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SystemHit {
+    pub system: SystemInfo,
+    pub distance_ly: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct FactionInfo {
+    pub name: String,
+    pub influence: Option<f64>,
+    pub state: Option<String>,
+    pub government: Option<String>,
+    pub allegiance: Option<String>,
+    pub happiness: Option<String>,
+    pub active_states: Vec<String>,
+    pub pending_states: Vec<String>,
+    pub recovering_states: Vec<String>,
+    pub updated_unix: i64,
+}
+
+/// Nearest-station search with service filters.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StationQuery {
+    pub origin: [f64; 3],
+    /// `None` = search outward until `limit` stations are found.
+    pub max_distance_ly: Option<f64>,
+    /// Every service in this mask must be present.
+    pub services: Services,
+    /// Require a material trader of this type (implies [`Services::MATERIAL_TRADER`]).
+    pub material_trader: Option<MaterialTrader>,
+    /// Require a technology broker of this type (implies [`Services::TECH_BROKER`]).
+    pub tech_broker: Option<TechBroker>,
+    pub min_pad: Option<char>,
+    /// Maximum distance from the arrival star in light seconds.
+    pub max_dist_ls: Option<f64>,
+    pub include_carriers: bool,
+    pub include_planetary: bool,
+    pub limit: usize,
+}
+
+impl Default for StationQuery {
+    fn default() -> Self {
+        StationQuery {
+            origin: [0.0; 3],
+            max_distance_ly: None,
+            services: Services::NONE,
+            material_trader: None,
+            tech_broker: None,
+            min_pad: None,
+            max_dist_ls: None,
+            include_carriers: false,
+            include_planetary: true,
+            limit: 20,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StationHit {
+    pub station: StationInfo,
+    pub distance_ly: f64,
+}
+
+/// Ring hotspot search.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HotspotQuery {
+    pub origin: [f64; 3],
+    /// Commodity symbol or name (`painite`, `Low Temperature Diamonds`, `Void Opal`).
+    pub signal: String,
+    pub max_distance_ly: Option<f64>,
+    pub min_count: i64,
+    pub limit: usize,
+}
+
+impl Default for HotspotQuery {
+    fn default() -> Self {
+        HotspotQuery {
+            origin: [0.0; 3],
+            signal: String::new(),
+            max_distance_ly: None,
+            min_count: 1,
+            limit: 20,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct HotspotHit {
+    pub system: String,
+    pub system_id64: u64,
+    pub pos: [f64; 3],
+    pub distance_ly: f64,
+    pub body_name: String,
+    pub ring_type: Option<String>,
+    pub signal: String,
+    pub count: i64,
+    pub updated_unix: i64,
+}
+
+// ---------------------------------------------------------------------------------------------
+// Trade routes
+// ---------------------------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TradeQuery {
+    pub origin: [f64; 3],
+    /// Both ends of a route must be within this distance of `origin`.
+    pub radius_ly: f64,
+    /// Maximum distance between the buying and the selling station.
+    pub max_hop_ly: f64,
+    pub min_pad: Option<char>,
+    pub cargo_capacity: i64,
+    /// Credits available for the purchase (`None` = unlimited).
+    pub capital: Option<i64>,
+    pub max_age_hours: Option<f64>,
+    pub include_carriers: bool,
+    pub include_planetary: bool,
+    /// Maximum station distance from the arrival star (both ends), light seconds.
+    pub max_dist_ls: Option<f64>,
+    pub min_profit_per_ton: i64,
+    pub limit: usize,
+}
+
+impl Default for TradeQuery {
+    fn default() -> Self {
+        TradeQuery {
+            origin: [0.0; 3],
+            radius_ly: 30.0,
+            max_hop_ly: 20.0,
+            min_pad: None,
+            cargo_capacity: 100,
+            capital: None,
+            max_age_hours: Some(48.0),
+            include_carriers: false,
+            include_planetary: true,
+            max_dist_ls: None,
+            min_profit_per_ton: 1,
+            limit: 25,
+        }
+    }
+}
+
+/// One end of a trade route.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TradeStation {
+    pub market_id: u64,
+    pub station: String,
+    pub system: String,
+    pub system_id64: Option<u64>,
+    pub pos: [f64; 3],
+    pub distance_from_origin_ly: f64,
+    pub station_type: Option<String>,
+    pub dist_ls: Option<f64>,
+    pub max_pad: Option<char>,
+    pub is_carrier: bool,
+    pub is_planetary: bool,
+    pub market_updated_unix: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TradeRoute {
+    pub from: TradeStation,
+    pub to: TradeStation,
+    pub commodity: String,
+    pub commodity_name: String,
+    pub buy_price: i64,
+    pub sell_price: i64,
+    pub profit_per_ton: i64,
+    /// Stock at the buying station.
+    pub supply: i64,
+    /// Demand at the selling station.
+    pub demand: i64,
+    /// min(cargo capacity, capital / buy price, supply, demand).
+    pub units: i64,
+    pub total_profit: i64,
+    pub hop_ly: f64,
+}
+
+// ---------------------------------------------------------------------------------------------
+// Misc
+// ---------------------------------------------------------------------------------------------
+
+/// Pushed to [`crate::GalaxyDb::subscribe_updates`] receivers after each committed live market snapshot.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MarketUpdate {
+    pub market_id: u64,
+    pub station: String,
+    pub system: String,
+    pub system_id64: Option<u64>,
+    pub pos: Option<[f64; 3]>,
+    pub commodities: usize,
+    pub updated_unix: i64,
+    pub is_carrier: bool,
+    pub source: Source,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CommodityInfo {
+    pub symbol: String,
+    pub name: String,
+    pub category: String,
+    pub is_rare: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct PricePoint {
+    pub ts_unix: i64,
+    pub buy: i64,
+    pub sell: i64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct DbStats {
+    pub systems: u64,
+    pub stations: u64,
+    pub stations_with_market: u64,
+    pub market_rows: u64,
+    pub commodities: u64,
+    pub faction_rows: u64,
+    pub ring_signals: u64,
+    pub price_history_rows: u64,
+    pub newest_market_update: Option<i64>,
+    /// Main file + WAL.
+    pub db_bytes: u64,
+    /// Items waiting for the writer thread.
+    pub pending_writes: u64,
+    /// Items accepted since open (after `Raw` expansion).
+    pub ingested: u64,
+    pub market_snapshots: u64,
+    /// Market snapshots ignored because newer data was already stored.
+    pub stale_markets: u64,
+    pub commits: u64,
+}

@@ -1,0 +1,19 @@
+# Build output
+/target/
+/target-agents/
+/dist/
+
+# Local app data (settings, API keys, galaxy database, upload queues, logs) — never commit
+/nexus-data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.pdb
+
+# Editors / OS
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

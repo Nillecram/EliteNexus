@@ -1,0 +1,31 @@
+# Push a tag like v0.1.0 (GitHub Desktop: History → right-click a commit → Create Tag, then Push)
+# and this builds EliteNexus.exe and publishes it as a GitHub Release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release -p nexus-app
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "EliteNexus-${{ github.ref_name }}-windows-x64"
+          New-Item -ItemType Directory -Force -Path "out\$name" | Out-Null
+          Copy-Item target\release\EliteNexus.exe, README.md, NOTICE.md, docs\USER_GUIDE.md "out\$name"
+          Compress-Archive -Path "out\$name\*" -DestinationPath "out\$name.zip"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.zip
+          generate_release_notes: true

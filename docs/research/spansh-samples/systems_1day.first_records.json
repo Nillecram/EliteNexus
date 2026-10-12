@@ -1,0 +1,35 @@
+[
+  {
+    "id64": 1802559,
+    "name": "Muena AA-A h0",
+    "mainStar": "Wolf-Rayet NC Star",
+    "coords": {
+      "x": -15399.875,
+      "y": 600.125,
+      "z": 26977.4375
+    },
+    "updateTime": "2026-10-11T15:51:43Z"
+  },
+  {
+    "id64": 2523303,
+    "name": "HD 168444",
+    "mainStar": "O (Blue-White) Star",
+    "coords": {
+      "x": -491.625,
+      "y": -18.25,
+      "z": 1654.125
+    },
+    "updateTime": "2026-10-11T12:14:14Z"
+  },
+  {
+    "id64": 2587943,
+    "name": "Great Annihilator",
+    "mainStar": "Black Hole",
+    "coords": {
+      "x": 354.84375,
+      "y": -42.4375,
+      "z": 22997.21875
+    },
+    "updateTime": "2026-10-11T18:23:42Z"
+  }
+]

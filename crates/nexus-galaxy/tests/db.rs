@@ -1,0 +1,1044 @@
+//! End-to-end tests of the galaxy database through its public API.
+
+use nexus_galaxy::*;
+use serde_json::json;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Unique temporary database under the cargo target dir (on the same drive as the build).
+struct TempDb {
+    dir: PathBuf,
+    db: Option<GalaxyDb>,
+}
+
+impl TempDb {
+    fn new(name: &str) -> TempDb {
+        static N: AtomicU64 = AtomicU64::new(0);
+        let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!(
+            "galaxy-{name}-{}-{}",
+            std::process::id(),
+            N.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let db = GalaxyDb::open(dir.join("galaxy.db")).expect("open db");
+        TempDb { dir, db: Some(db) }
+    }
+
+    fn db(&self) -> &GalaxyDb {
+        self.db.as_ref().expect("db")
+    }
+
+    fn reopen(&mut self) {
+        let path = self.db().path().to_path_buf();
+        self.db = None;
+        self.db = Some(GalaxyDb::open(path).expect("reopen"));
+    }
+}
+
+impl Drop for TempDb {
+    fn drop(&mut self) {
+        self.db = None;
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+
+fn now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+const SYS_A: u64 = 1001;
+const SYS_B: u64 = 1002;
+const SYS_C: u64 = 1003;
+
+fn system(id: u64, name: &str, pos: [f64; 3]) -> Ingest {
+    Ingest::System(SystemUpdate {
+        id64: id,
+        name: name.into(),
+        pos: Some(pos),
+        timestamp: now() - 60,
+        details: Some(SystemDetails {
+            population: Some(1_000_000),
+            economy: Some("Industrial".into()),
+            security: Some("High".into()),
+            ..Default::default()
+        }),
+    })
+}
+
+fn station(
+    mid: u64,
+    name: &str,
+    sys: u64,
+    sys_name: &str,
+    kind: &str,
+    services: &[&str],
+    economy: &str,
+) -> Ingest {
+    Ingest::Station(StationUpdate {
+        market_id: mid,
+        name: name.into(),
+        system_id64: Some(sys),
+        system_name: Some(sys_name.into()),
+        station_type: Some(kind.into()),
+        dist_ls: Some(500.0),
+        services: Some(Services::from_names(services)),
+        primary_economy: Some(economy.into()),
+        economies: Some(vec![(economy.to_string(), 1.0)]),
+        timestamp: now() - 60,
+        ..Default::default()
+    })
+}
+
+/// (symbol, buy, sell, stock, demand)
+fn market(
+    mid: u64,
+    sys_name: &str,
+    name: &str,
+    ts: i64,
+    items: &[(&str, i64, i64, i64, i64)],
+) -> Ingest {
+    Ingest::Market(MarketSnapshot {
+        market_id: mid,
+        system_name: sys_name.into(),
+        station_name: name.into(),
+        timestamp: ts,
+        items: items
+            .iter()
+            .map(|&(s, buy, sell, stock, demand)| MarketItem {
+                symbol: s.into(),
+                buy,
+                sell,
+                mean: 0,
+                stock,
+                stock_bracket: Some(2),
+                demand,
+                demand_bracket: Some(2),
+            })
+            .collect(),
+        ..Default::default()
+    })
+}
+
+/// A at the origin, B 10 ly away, C 100 ly away; five stations selling gold.
+fn populate(db: &GalaxyDb) {
+    let t = now() - 30;
+    db.ingest_many(vec![
+        system(SYS_A, "Alpha", [0.0, 0.0, 0.0]),
+        system(SYS_B, "Beta", [10.0, 0.0, 0.0]),
+        system(SYS_C, "Gamma", [0.0, 100.0, 0.0]),
+        station(
+            1,
+            "A Port",
+            SYS_A,
+            "Alpha",
+            "Coriolis",
+            &["commodities", "materialtrader", "facilitator"],
+            "Industrial",
+        ),
+        station(
+            2,
+            "B Outpost",
+            SYS_B,
+            "Beta",
+            "Outpost",
+            &["commodities", "techBroker"],
+            "High Tech",
+        ),
+        station(
+            3,
+            "C Orbis",
+            SYS_C,
+            "Gamma",
+            "Orbis",
+            &["commodities", "materialtrader"],
+            "High Tech",
+        ),
+        station(
+            4,
+            "B-CARRIER",
+            SYS_B,
+            "Beta",
+            "FleetCarrier",
+            &["commodities"],
+            "Private Enterprise",
+        ),
+        station(
+            5,
+            "B Crater",
+            SYS_B,
+            "Beta",
+            "CraterPort",
+            &["commodities"],
+            "Extraction",
+        ),
+        market(
+            1,
+            "Alpha",
+            "A Port",
+            t,
+            &[("gold", 9000, 8900, 100, 0), ("silver", 0, 5000, 0, 400)],
+        ),
+        market(
+            2,
+            "Beta",
+            "B Outpost",
+            t,
+            &[("gold", 8500, 8400, 50, 0), ("silver", 4000, 3900, 900, 0)],
+        ),
+        market(
+            3,
+            "Gamma",
+            "C Orbis",
+            t,
+            &[("gold", 8000, 7900, 1000, 0), ("silver", 0, 6000, 0, 50)],
+        ),
+        market(4, "Beta", "B-CARRIER", t, &[("gold", 7000, 0, 10, 0)]),
+        market(
+            5,
+            "Beta",
+            "B Crater",
+            t,
+            &[("gold", 8200, 8100, 20, 0), ("tritium", 0, 60000, 0, 10000)],
+        ),
+    ]);
+    db.flush().expect("flush");
+}
+
+fn ids(hits: &[CommodityHit]) -> Vec<u64> {
+    hits.iter().map(|h| h.market_id).collect()
+}
+
+#[test]
+fn commodity_search_filters_and_sorts() {
+    let t = TempDb::new("search");
+    let db = t.db();
+    populate(db);
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        ..Default::default()
+    };
+    assert_eq!(
+        ids(&db.search_commodity(&q).expect("q")),
+        vec![4, 3, 5, 2, 1]
+    );
+    // other spellings of the commodity
+    for name in ["Gold", "$gold_name;", " GOLD "] {
+        let q = CommodityQuery {
+            commodity: name.into(),
+            ..Default::default()
+        };
+        assert_eq!(db.search_commodity(&q).expect("q").len(), 5, "{name}");
+    }
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        include_carriers: false,
+        ..Default::default()
+    };
+    assert_eq!(ids(&db.search_commodity(&q).expect("q")), vec![3, 5, 2, 1]);
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        include_planetary: false,
+        ..Default::default()
+    };
+    assert_eq!(ids(&db.search_commodity(&q).expect("q")), vec![4, 3, 2, 1]);
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        min_pad: Some('L'),
+        ..Default::default()
+    };
+    assert_eq!(
+        ids(&db.search_commodity(&q).expect("q")),
+        vec![4, 3, 5, 1],
+        "outposts have no large pad"
+    );
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        min_quantity: 60,
+        ..Default::default()
+    };
+    assert_eq!(ids(&db.search_commodity(&q).expect("q")), vec![3, 1]);
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        origin: Some([0.0, 0.0, 0.0]),
+        max_distance_ly: Some(50.0),
+        ..Default::default()
+    };
+    let hits = db.search_commodity(&q).expect("q");
+    assert_eq!(ids(&hits), vec![4, 5, 2, 1]);
+    assert_eq!(hits[0].distance_ly, Some(10.0));
+    assert_eq!(hits[0].system, "Beta");
+    assert_eq!(hits[0].max_pad, Some('L'));
+    assert!(hits[0].is_carrier);
+    assert_eq!(hits[1].station_type.as_deref(), Some("Planetary Port"));
+    assert!(hits[1].is_planetary);
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        origin: Some([0.0, 0.0, 0.0]),
+        sort: Sort::Nearest,
+        limit: 2,
+        ..Default::default()
+    };
+    let hits = db.search_commodity(&q).expect("q");
+    assert_eq!(hits[0].market_id, 1);
+    assert_eq!(hits[0].distance_ly, Some(0.0));
+    assert_eq!(hits.len(), 2);
+    // sell mode: best price first, needs demand
+    let q = CommodityQuery {
+        commodity: "silver".into(),
+        mode: TradeMode::SellToStation,
+        ..Default::default()
+    };
+    let hits = db.search_commodity(&q).expect("q");
+    assert_eq!(ids(&hits), vec![3, 1]);
+    assert_eq!(hits[0].price, 6000);
+    assert_eq!(hits[0].quantity, 50);
+    let q = CommodityQuery {
+        commodity: "no such commodity".into(),
+        ..Default::default()
+    };
+    assert!(db.search_commodity(&q).expect("q").is_empty());
+}
+
+#[test]
+fn age_filter_and_freshest_sort() {
+    let t = TempDb::new("age");
+    let db = t.db();
+    populate(db);
+    db.ingest(market(
+        2,
+        "Beta",
+        "B Outpost",
+        now() - 10 * 86_400 + 100_000,
+        &[("gold", 8500, 8400, 50, 0)],
+    ));
+    // that snapshot is older than the stored one, so it is ignored
+    db.flush().expect("flush");
+    assert_eq!(db.stats().expect("stats").stale_markets, 1);
+    db.ingest(market(
+        6,
+        "Beta",
+        "Old Station",
+        now() - 10 * 86_400,
+        &[("gold", 100, 0, 5, 0)],
+    ));
+    db.flush().expect("flush");
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        max_age_hours: Some(48.0),
+        ..Default::default()
+    };
+    assert!(!ids(&db.search_commodity(&q).expect("q")).contains(&6));
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        ..Default::default()
+    };
+    assert_eq!(ids(&db.search_commodity(&q).expect("q"))[0], 6);
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        sort: Sort::Freshest,
+        ..Default::default()
+    };
+    assert_eq!(
+        *ids(&db.search_commodity(&q).expect("q"))
+            .last()
+            .expect("hits"),
+        6
+    );
+}
+
+#[test]
+fn station_market_and_history() {
+    let t = TempDb::new("market");
+    let db = t.db();
+    populate(db);
+    let ts = now() - 30;
+    db.ingest(market(
+        1,
+        "Alpha",
+        "A Port",
+        ts + 10,
+        &[("gold", 9100, 8900, 100, 0), ("silver", 0, 5000, 0, 400)],
+    ));
+    db.ingest(market(
+        1,
+        "Alpha",
+        "A Port",
+        ts + 20,
+        &[("gold", 9100, 8900, 90, 0), ("silver", 0, 5000, 0, 400)],
+    ));
+    db.flush().expect("flush");
+    let m = db.station_market(1).expect("q").expect("station");
+    assert_eq!(m.station.name, "A Port");
+    assert_eq!(m.station.station_type.as_deref(), Some("Coriolis Starport"));
+    assert_eq!(m.station.commodity_count, 2);
+    assert_eq!(m.station.market_updated_unix, ts + 20);
+    assert_eq!(m.system.as_ref().map(|s| s.name.as_str()), Some("Alpha"));
+    let gold = m.items.iter().find(|i| i.symbol == "gold").expect("gold");
+    assert_eq!(gold.name, "Gold");
+    assert_eq!(gold.category, "Metals");
+    assert_eq!(gold.stock, 90);
+    let h = db.price_history(1, "Gold").expect("history");
+    assert_eq!(
+        h.iter().map(|p| p.buy).collect::<Vec<_>>(),
+        vec![9000, 9100],
+        "{h:?}"
+    );
+    assert!(
+        db.price_history(1, "silver").expect("history").is_empty(),
+        "unchanged prices add no history"
+    );
+    assert!(db.station_market(999).expect("q").is_none());
+}
+
+#[test]
+fn market_before_system_is_linked_later() {
+    let t = TempDb::new("link");
+    let db = t.db();
+    db.ingest(market(
+        42,
+        "Nowhere",
+        "Lonely Hub",
+        now() - 5,
+        &[("gold", 9000, 0, 10, 0)],
+    ));
+    db.flush().expect("flush");
+    let st = db.station(42).expect("q").expect("station");
+    assert_eq!(st.system_id64, None);
+    let near = CommodityQuery {
+        commodity: "gold".into(),
+        origin: Some([500.0, 0.0, 0.0]),
+        max_distance_ly: Some(20.0),
+        ..Default::default()
+    };
+    assert!(db.search_commodity(&near).expect("q").is_empty());
+    db.ingest(system(77, "NOWHERE", [500.0, 1.0, 0.0]));
+    db.flush().expect("flush");
+    let st = db.station(42).expect("q").expect("station");
+    assert_eq!(st.system_id64, Some(77));
+    assert_eq!(st.pos, Some([500.0, 1.0, 0.0]));
+    let hits = db.search_commodity(&near).expect("q");
+    assert_eq!(ids(&hits), vec![42]);
+    assert_eq!(db.stations_in_system(77).expect("q").len(), 1);
+}
+
+#[test]
+fn carrier_moves_with_its_market() {
+    let t = TempDb::new("carrier");
+    let db = t.db();
+    populate(db);
+    db.ingest(market(
+        4,
+        "Gamma",
+        "B-CARRIER",
+        now() - 1,
+        &[("gold", 7000, 0, 10, 0)],
+    ));
+    db.flush().expect("flush");
+    let st = db.station(4).expect("q").expect("carrier");
+    assert_eq!(st.system, "Gamma");
+    assert_eq!(st.system_id64, Some(SYS_C));
+    assert!(st.is_carrier);
+    let near_c = CommodityQuery {
+        commodity: "gold".into(),
+        origin: Some([0.0, 100.0, 0.0]),
+        max_distance_ly: Some(1.0),
+        ..Default::default()
+    };
+    assert_eq!(ids(&db.search_commodity(&near_c).expect("q")), vec![4, 3]);
+}
+
+#[test]
+fn stations_near_with_services() {
+    let t = TempDb::new("services");
+    let db = t.db();
+    populate(db);
+    let base = StationQuery {
+        origin: [0.0, 0.0, 0.0],
+        include_carriers: true,
+        ..Default::default()
+    };
+    let all = db.stations_near(&base).expect("q");
+    assert_eq!(all.len(), 5);
+    assert_eq!(all[0].station.market_id, 1);
+    let q = StationQuery {
+        material_trader: Some(MaterialTrader::Manufactured),
+        ..base.clone()
+    };
+    let hits = db.stations_near(&q).expect("q");
+    assert_eq!(
+        hits.iter().map(|h| h.station.market_id).collect::<Vec<_>>(),
+        vec![1]
+    );
+    let q = StationQuery {
+        material_trader: Some(MaterialTrader::Encoded),
+        ..base.clone()
+    };
+    let hits = db.stations_near(&q).expect("q");
+    assert_eq!(
+        hits.iter().map(|h| h.station.market_id).collect::<Vec<_>>(),
+        vec![3]
+    );
+    assert_eq!(hits[0].distance_ly, 100.0);
+    let q = StationQuery {
+        tech_broker: Some(TechBroker::Guardian),
+        ..base.clone()
+    };
+    assert_eq!(db.stations_near(&q).expect("q")[0].station.market_id, 2);
+    let q = StationQuery {
+        services: Services::INTERSTELLAR_FACTORS,
+        ..base.clone()
+    };
+    assert_eq!(db.stations_near(&q).expect("q").len(), 1);
+    let q = StationQuery {
+        max_distance_ly: Some(50.0),
+        min_pad: Some('L'),
+        include_carriers: false,
+        ..base.clone()
+    };
+    let ids: Vec<u64> = db
+        .stations_near(&q)
+        .expect("q")
+        .iter()
+        .map(|h| h.station.market_id)
+        .collect();
+    assert_eq!(ids, vec![1, 5]);
+    let q = StationQuery {
+        max_dist_ls: Some(100.0),
+        ..base
+    };
+    assert!(db.stations_near(&q).expect("q").is_empty());
+}
+
+#[test]
+fn trade_routes_find_the_best_hop() {
+    let t = TempDb::new("trade");
+    let db = t.db();
+    let ts = now() - 60;
+    db.ingest_many(vec![
+        system(SYS_A, "Alpha", [0.0, 0.0, 0.0]),
+        system(SYS_B, "Beta", [10.0, 0.0, 0.0]),
+        system(SYS_C, "Gamma", [0.0, 100.0, 0.0]),
+        station(
+            1,
+            "A Port",
+            SYS_A,
+            "Alpha",
+            "Coriolis",
+            &["commodities"],
+            "Industrial",
+        ),
+        station(
+            2,
+            "B Port",
+            SYS_B,
+            "Beta",
+            "Orbis",
+            &["commodities"],
+            "Refinery",
+        ),
+        station(
+            3,
+            "C Port",
+            SYS_C,
+            "Gamma",
+            "Orbis",
+            &["commodities"],
+            "Refinery",
+        ),
+        market(
+            1,
+            "Alpha",
+            "A Port",
+            ts,
+            &[
+                ("gold", 9000, 8900, 1000, 0),
+                ("silver", 4000, 3900, 1000, 0),
+            ],
+        ),
+        market(
+            2,
+            "Beta",
+            "B Port",
+            ts,
+            &[("gold", 0, 12000, 0, 1000), ("silver", 0, 4100, 0, 1000)],
+        ),
+        market(3, "Gamma", "C Port", ts, &[("gold", 0, 20000, 0, 1000)]),
+    ]);
+    db.flush().expect("flush");
+    let q = TradeQuery {
+        origin: [0.0, 0.0, 0.0],
+        radius_ly: 50.0,
+        max_hop_ly: 20.0,
+        cargo_capacity: 100,
+        ..Default::default()
+    };
+    let routes = db.trade_routes(&q).expect("routes");
+    assert_eq!(routes.len(), 1, "one route per station pair: {routes:?}");
+    let r = &routes[0];
+    assert_eq!((r.from.market_id, r.to.market_id), (1, 2));
+    assert_eq!(r.commodity, "gold");
+    assert_eq!(r.commodity_name, "Gold");
+    assert_eq!(r.profit_per_ton, 3000);
+    assert_eq!(r.units, 100);
+    assert_eq!(r.total_profit, 300_000);
+    assert_eq!(r.hop_ly, 10.0);
+    let q = TradeQuery {
+        capital: Some(450_000),
+        ..q.clone()
+    };
+    assert_eq!(db.trade_routes(&q).expect("routes")[0].units, 50);
+    let q = TradeQuery {
+        max_hop_ly: 5.0,
+        ..q
+    };
+    assert!(db.trade_routes(&q).expect("routes").is_empty());
+    // bigger radius: the far, better buyer is in reach of nothing within 20 ly, but within 150 ly
+    let q = TradeQuery {
+        origin: [0.0, 0.0, 0.0],
+        radius_ly: 200.0,
+        max_hop_ly: 150.0,
+        cargo_capacity: 10,
+        ..Default::default()
+    };
+    let routes = db.trade_routes(&q).expect("routes");
+    assert_eq!((routes[0].from.market_id, routes[0].to.market_id), (1, 3));
+    assert_eq!(routes[0].total_profit, 110_000);
+}
+
+#[test]
+fn systems_and_factions() {
+    let t = TempDb::new("systems");
+    let db = t.db();
+    populate(db);
+    let s = db.system_by_name("beta").expect("q").expect("beta");
+    assert_eq!(s.id64, SYS_B);
+    assert_eq!(s.population, Some(1_000_000));
+    let near = db.systems_near([0.0, 0.0, 0.0], 50.0, 10).expect("q");
+    assert_eq!(
+        near.iter().map(|h| h.system.id64).collect::<Vec<_>>(),
+        vec![SYS_A, SYS_B]
+    );
+    assert_eq!(db.find_systems("Ga", 10).expect("q")[0].name, "Gamma");
+    // FSDJump from EDDN with factions, newer than populate()
+    let ts = nexus_journal::Timestamp(now() - 5).to_iso();
+    let v = json!({
+        "$schemaRef": "https://eddn.edcd.io/schemas/journal/1",
+        "header": {"uploaderID": "x", "softwareName": "test", "softwareVersion": "1"},
+        "message": {"timestamp": ts, "event": "FSDJump", "StarSystem": "Beta", "SystemAddress": SYS_B,
+            "StarPos": [10.0, 0.0, 0.0], "SystemAllegiance": "Federation", "SystemGovernment": "$government_Democracy;",
+            "Population": 5000, "SystemFaction": {"Name": "Beta Party", "FactionState": "Boom"},
+            "Factions": [{"Name": "Beta Party", "FactionState": "Boom", "Government": "Democracy", "Influence": 0.6,
+                          "Allegiance": "Federation", "ActiveStates": [{"State": "Boom"}]},
+                         {"Name": "Beta Pirates", "FactionState": "None", "Government": "Anarchy", "Influence": 0.4,
+                          "Allegiance": "Independent"}]}
+    });
+    assert_eq!(db.ingest_eddn(&v), 1);
+    db.flush().expect("flush");
+    let s = db.system_by_id(SYS_B).expect("q").expect("beta");
+    assert_eq!(s.controlling_faction.as_deref(), Some("Beta Party"));
+    assert_eq!(s.controlling_faction_state.as_deref(), Some("Boom"));
+    assert_eq!(s.population, Some(5000));
+    assert_eq!(s.government.as_deref(), Some("Democracy"));
+    let f = db.system_factions(SYS_B).expect("q");
+    assert_eq!(f.len(), 2);
+    assert_eq!(f[0].name, "Beta Party");
+    assert_eq!(f[0].influence, Some(0.6));
+    assert_eq!(f[0].active_states, vec!["Boom".to_string()]);
+    // an older FSDJump does not overwrite newer state
+    let mut old = v.clone();
+    old["message"]["timestamp"] = json!(nexus_journal::Timestamp(now() - 3600).to_iso());
+    old["message"]["Population"] = json!(1);
+    db.ingest_eddn(&old);
+    db.flush().expect("flush");
+    assert_eq!(
+        db.system_by_id(SYS_B).expect("q").expect("beta").population,
+        Some(5000)
+    );
+}
+
+#[test]
+fn factions_replace_on_newer_info() {
+    let t = TempDb::new("factions");
+    let db = t.db();
+    let mk = |ts: i64, names: &[&str]| {
+        Ingest::System(SystemUpdate {
+            id64: 5,
+            name: "Five".into(),
+            pos: Some([1.0, 2.0, 3.0]),
+            timestamp: ts,
+            details: Some(SystemDetails {
+                controlling_faction: Some(names[0].to_string()),
+                factions: Some(
+                    names
+                        .iter()
+                        .map(|n| FactionUpdate {
+                            name: n.to_string(),
+                            influence: Some(0.5),
+                            ..Default::default()
+                        })
+                        .collect(),
+                ),
+                ..Default::default()
+            }),
+        })
+    };
+    db.ingest(mk(1000, &["One", "Two"]));
+    db.ingest(mk(2000, &["Three"]));
+    db.ingest(mk(1500, &["Stale"]));
+    db.flush().expect("flush");
+    let f = db.system_factions(5).expect("q");
+    assert_eq!(
+        f.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
+        vec!["Three"]
+    );
+    assert_eq!(
+        db.system_by_id(5)
+            .expect("q")
+            .expect("sys")
+            .controlling_faction
+            .as_deref(),
+        Some("Three")
+    );
+}
+
+#[test]
+fn ring_hotspots() {
+    let t = TempDb::new("rings");
+    let db = t.db();
+    db.ingest(system(9, "Ringworld", [3.0, 4.0, 0.0]));
+    let saa = json!({"timestamp": "2026-10-12T09:00:00Z", "event": "SAASignalsFound", "BodyName": "Ringworld 1 A Ring",
+        "SystemAddress": 9, "BodyID": 7,
+        "Signals": [{"Type": "Painite", "Count": 2}, {"Type": "LowTemperatureDiamond", "Count": 1}]});
+    assert_eq!(db.ingest_journal("SAASignalsFound", &saa), 1);
+    db.flush().expect("flush");
+    let q = HotspotQuery {
+        origin: [0.0, 0.0, 0.0],
+        signal: "painite".into(),
+        ..Default::default()
+    };
+    let hits = db.hotspots_near(&q).expect("q");
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].distance_ly, 5.0);
+    assert_eq!(hits[0].count, 2);
+    assert_eq!(hits[0].system, "Ringworld");
+    let q = HotspotQuery {
+        origin: [0.0, 0.0, 0.0],
+        signal: "Low Temperature Diamonds".into(),
+        ..Default::default()
+    };
+    assert_eq!(db.hotspots_near(&q).expect("q").len(), 1);
+    let q = HotspotQuery {
+        origin: [0.0, 0.0, 0.0],
+        signal: "painite".into(),
+        min_count: 3,
+        ..Default::default()
+    };
+    assert!(db.hotspots_near(&q).expect("q").is_empty());
+}
+
+#[test]
+fn updates_are_published_after_commit() {
+    let t = TempDb::new("updates");
+    let db = t.db();
+    let rx = db.subscribe_updates();
+    populate(db);
+    let got: Vec<MarketUpdate> = rx.try_iter().collect();
+    assert_eq!(got.len(), 5);
+    let u = got.iter().find(|u| u.market_id == 3).expect("update for 3");
+    assert_eq!(u.system, "Gamma");
+    assert_eq!(u.pos, Some([0.0, 100.0, 0.0]));
+    assert_eq!(u.commodities, 2);
+    let st = db.stats().expect("stats");
+    assert_eq!(st.stations, 5);
+    assert_eq!(st.stations_with_market, 5);
+    assert_eq!(st.market_rows, 9);
+    assert_eq!(st.systems, 3);
+    assert!(st.commodities > 350);
+    assert!(st.db_bytes > 0);
+    assert_eq!(db.recent_markets(2).expect("q").len(), 2);
+    assert_eq!(db.find_stations("b", 10).expect("q").len(), 3);
+    assert_eq!(db.find_stations("B cr", 10).expect("q")[0].market_id, 5);
+    assert!(db.find_stations("100%", 10).expect("q").is_empty());
+}
+
+#[test]
+fn eddn_messages_end_to_end() {
+    let t = TempDb::new("eddn");
+    let db = t.db();
+    let fsd = json!({"$schemaRef": "https://eddn.edcd.io/schemas/journal/1", "header": {"uploaderID": "x", "softwareName": "t", "softwareVersion": "1"},
+        "message": {"timestamp": "2026-10-12T09:00:00Z", "event": "FSDJump", "StarSystem": "Sol", "SystemAddress": 10477373803u64,
+                    "StarPos": [0.0, 0.0, 0.0], "Population": 18320926115u64, "SystemEconomy": "$economy_Refinery;"}});
+    let docked = json!({"$schemaRef": "https://eddn.edcd.io/schemas/journal/1", "header": {"uploaderID": "x", "softwareName": "t", "softwareVersion": "1"},
+        "message": {"timestamp": "2026-10-12T09:01:00Z", "event": "Docked", "StationName": "Daedalus", "StationType": "Orbis",
+                    "StarSystem": "Sol", "SystemAddress": 10477373803u64, "MarketID": 128016384u64, "StarPos": [0.0, 0.0, 0.0],
+                    "StationServices": ["dock", "commodities", "shipyard", "outfitting", "blackmarket"],
+                    "StationEconomy": "$economy_Refinery;", "DistFromStarLS": 230.4,
+                    "LandingPads": {"Small": 10, "Medium": 13, "Large": 6}}});
+    let commodity = json!({"$schemaRef": "https://eddn.edcd.io/schemas/commodity/3", "header": {"uploaderID": "x", "softwareName": "t", "softwareVersion": "1"},
+        "message": {"systemName": "Sol", "stationName": "Daedalus", "marketId": 128016384u64, "timestamp": "2026-10-12T09:02:00Z",
+                    "commodities": [{"name": "tritium", "meanPrice": 50000, "buyPrice": 0, "stock": 0, "stockBracket": 0,
+                                     "sellPrice": 51000, "demand": 3000, "demandBracket": 2}]}});
+    let mut test = commodity.clone();
+    test["$schemaRef"] = json!("https://eddn.edcd.io/schemas/commodity/3/test");
+    assert_eq!(db.ingest_eddn(&test), 0);
+    db.ingest(Ingest::Raw(RawIngest::Eddn(fsd)));
+    assert_eq!(db.ingest_eddn(&docked), 2);
+    assert_eq!(db.ingest_eddn(&commodity), 1);
+    db.flush().expect("flush");
+    let m = db.station_market(128016384).expect("q").expect("Daedalus");
+    assert_eq!(m.station.system_id64, Some(10477373803));
+    assert_eq!(m.station.pos, Some([0.0, 0.0, 0.0]));
+    assert_eq!(m.station.max_pad, Some('L'));
+    assert_eq!(m.station.dist_ls, Some(230.4));
+    assert!(
+        m.station
+            .services
+            .contains(Services::SHIPYARD | Services::BLACK_MARKET)
+    );
+    assert_eq!(m.items.len(), 1);
+    assert_eq!(
+        m.system.as_ref().and_then(|s| s.economy.clone()).as_deref(),
+        Some("Refinery")
+    );
+    let q = CommodityQuery {
+        commodity: "Tritium".into(),
+        mode: TradeMode::SellToStation,
+        origin: Some([1.0, 1.0, 1.0]),
+        max_distance_ly: Some(10.0),
+        ..Default::default()
+    };
+    let hits = db.search_commodity(&q).expect("q");
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].price, 51000);
+}
+
+#[test]
+fn handle_is_clone_send_sync() {
+    fn check<T: Clone + Send + Sync + 'static>() {}
+    check::<GalaxyDb>();
+    check::<MarketUpdate>();
+}
+
+#[test]
+fn data_survives_reopen() {
+    let mut t = TempDb::new("reopen");
+    populate(t.db());
+    t.reopen();
+    assert_eq!(t.db().stats().expect("stats").stations, 5);
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        ..Default::default()
+    };
+    assert_eq!(t.db().search_commodity(&q).expect("q").len(), 5);
+}
+
+#[test]
+fn reads_run_while_writing() {
+    let t = TempDb::new("concurrent");
+    let db = t.db().clone();
+    populate(&db);
+    let writer = {
+        let db = db.clone();
+        std::thread::spawn(move || {
+            for i in 0..400u64 {
+                db.ingest(market(
+                    1000 + i,
+                    "Alpha",
+                    &format!("Station {i}"),
+                    now() - 5,
+                    &[("gold", 9000 + i as i64, 0, 10, 0)],
+                ));
+            }
+            db.flush().expect("flush");
+        })
+    };
+    let q = CommodityQuery {
+        commodity: "gold".into(),
+        origin: Some([0.0; 3]),
+        max_distance_ly: Some(20.0),
+        ..Default::default()
+    };
+    for _ in 0..200 {
+        db.search_commodity(&q).expect("query during writes");
+    }
+    writer.join().expect("writer thread");
+    let q = CommodityQuery { limit: 1000, ..q };
+    assert_eq!(db.search_commodity(&q).expect("q").len(), 404);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Spansh import
+// ---------------------------------------------------------------------------------------------
+
+fn sample(name: &str) -> serde_json::Value {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/research/spansh-samples")
+        .join(name);
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    serde_json::from_str(&text).expect("sample json")
+}
+
+/// Records in the dump framing: `[`, one tab-indented record per line with trailing commas, `]`.
+fn dump_framing(records: &[serde_json::Value]) -> Vec<u8> {
+    let mut s = String::from("[\n");
+    for (i, r) in records.iter().enumerate() {
+        s.push('\t');
+        s.push_str(&r.to_string());
+        if i + 1 < records.len() {
+            s.push(',');
+        }
+        s.push('\n');
+    }
+    s.push_str("]\n");
+    s.into_bytes()
+}
+
+fn gzip(data: &[u8]) -> Vec<u8> {
+    use std::io::Write;
+    let mut e = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    e.write_all(data).expect("gzip");
+    e.finish().expect("gzip")
+}
+
+#[test]
+fn spansh_galaxy_records_import() {
+    let t = TempDb::new("spansh");
+    let db = t.db();
+    let mut records = Vec::new();
+    records.extend(
+        sample("galaxy_populated.first_record.trimmed.json")
+            .as_array()
+            .cloned()
+            .unwrap_or_default(),
+    );
+    records.extend(
+        sample("galaxy_stations.first_record.trimmed.json")
+            .as_array()
+            .cloned()
+            .unwrap_or_default(),
+    );
+    records.push(sample("dump_sol.response.trimmed.json")); // {"system": {...}} wrapper
+    records.extend(
+        sample("systems_1day.first_records.json")
+            .as_array()
+            .cloned()
+            .unwrap_or_default(),
+    );
+    records.extend(
+        sample("factions.first_record.trimmed.json")
+            .as_array()
+            .cloned()
+            .unwrap_or_default(),
+    );
+    let data = gzip(&dump_framing(&records));
+    let mut calls = 0;
+    let summary = db
+        .import_spansh_dump(&data[..], |p| {
+            calls += 1;
+            assert!(p.bytes_read > 0);
+            true
+        })
+        .expect("import");
+    assert!(calls >= 1);
+    assert!(!summary.cancelled);
+    assert_eq!(summary.stream_error, None);
+    let p = &summary.progress;
+    assert_eq!(p.parse_errors, 0);
+    assert_eq!(p.records, records.len() as u64);
+    assert_eq!(p.bytes_read, data.len() as u64);
+    assert_eq!(p.systems, 6); // populated + stations + Sol + 3 systems records
+    assert_eq!(p.stations, 2 + 3 + 3); // HD 219286 + carrier + Sol orbital + Mercury surface
+    assert_eq!(p.faction_presences, 2);
+
+    let sol = db.system_by_name("Sol").expect("q").expect("Sol");
+    assert_eq!(sol.pos, Some([0.0, 0.0, 0.0]));
+    assert_eq!(sol.controlling_power.as_deref(), Some("Jerome Archer"));
+    assert_eq!(sol.powerplay_state.as_deref(), Some("Stronghold"));
+    assert_eq!(sol.security.as_deref(), Some("High"));
+    assert_eq!(sol.controlling_faction.as_deref(), Some("Mother Gaia"));
+    let factions = db.system_factions(sol.id64).expect("q");
+    assert_eq!(factions[0].name, "Mother Gaia");
+    assert_eq!(
+        factions[0].recovering_states,
+        vec!["Public Holiday".to_string()]
+    );
+
+    let daedalus = db.station_market(128016384).expect("q").expect("Daedalus");
+    assert_eq!(
+        daedalus.station.station_type.as_deref(),
+        Some("Orbis Starport")
+    );
+    assert_eq!(daedalus.station.max_pad, Some('L'));
+    assert_eq!(daedalus.items.len(), 3);
+    assert!(
+        daedalus
+            .items
+            .iter()
+            .any(|i| i.symbol == "advancedcatalysers" && i.sell == 3501 && i.demand == 2855292)
+    );
+    assert_eq!(daedalus.prohibited.len(), 3);
+    let walz = db.station(3534389760).expect("q").expect("Walz Depot");
+    assert!(walz.is_planetary);
+    assert_eq!(walz.station_type.as_deref(), Some("Planetary Outpost"));
+    let carrier = db.station(3708716800).expect("q").expect("carrier");
+    assert!(carrier.is_carrier);
+    assert_eq!(carrier.pos, Some([-34608.78125, 513.34375, 26058.59375]));
+    let q = CommodityQuery {
+        commodity: "tritium".into(),
+        ..Default::default()
+    };
+    assert_eq!(ids(&db.search_commodity(&q).expect("q")), vec![3708716800]);
+    // systems dump: coordinates only
+    let ga = db
+        .system_by_name("Great Annihilator")
+        .expect("q")
+        .expect("GA");
+    assert_eq!(ga.pos, Some([354.84375, -42.4375, 22997.21875]));
+    assert_eq!(ga.updated_unix, 0, "no state from a systems dump");
+    // factions dump: presence + controlling faction (the system is only known from that dump)
+    let hip = db
+        .system_by_name("HIP 104256")
+        .expect("q")
+        .expect("HIP 104256");
+    assert_eq!(
+        hip.controlling_faction.as_deref(),
+        Some("\"Fearless\" Bounty Hunters Corp.")
+    );
+
+    // importing the same dump again changes nothing (markets are not newer)
+    let again = db.import_spansh_dump(&data[..], |_| true).expect("import");
+    assert_eq!(again.stale_markets, p.markets);
+}
+
+#[test]
+fn spansh_import_plain_cancel_and_truncation() {
+    let t = TempDb::new("spansh2");
+    let db = t.db();
+    let records = sample("systems_1day.first_records.json")
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let plain = dump_framing(&records);
+    let s = db
+        .import_spansh_dump(&plain[..], |_| false)
+        .expect("import");
+    assert!(s.cancelled);
+    assert_eq!(
+        s.progress.systems, 3,
+        "the first chunk is imported before the callback"
+    );
+    // truncated gzip: what was read is imported, the error is reported
+    let gz = gzip(&dump_framing(&records));
+    let s = db
+        .import_spansh_dump(&gz[..gz.len() - 10], |_| true)
+        .expect("import");
+    assert!(s.stream_error.is_some());
+    // garbage lines are counted, not fatal
+    let s = db.import_spansh_dump(&b"[\n\t{\"id64\": 5, \"name\": \"X\", \"coords\": {\"x\": 1, \"y\": 2, \"z\": 3}},\n\tnot json,\n]\n"[..], |_| true)
+        .expect("import");
+    assert_eq!(s.progress.parse_errors, 1);
+    assert_eq!(s.progress.systems, 1);
+}

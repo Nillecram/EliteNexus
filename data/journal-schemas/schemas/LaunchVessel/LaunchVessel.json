@@ -1,0 +1,36 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "type" : "object",
+  "description": "When written: deploying the Vessel from a ship. (Added in the Rhino update)",
+  "extends" : { "$ref": "../_Event.json"},
+  "allOf": [{ "$ref": "../_Event.json"}],
+  "properties" : {
+    "VesselType" : {
+      "title" : "VesselType",
+      "type" : "string",
+      "examples" : [ "lander01" ]
+    },
+    "VesselType_Localised" : {
+      "title" : "VesselType_Localised",
+      "type" : "string",
+      "examples" : [ "Nomad" ]
+    },
+    "Loadout" : {
+      "title" : "Loadout",
+      "type" : "string",
+      "examples" : [ "base" ]
+    },
+    "ID" : {
+      "title" : "ID",
+      "type" : "integer",
+      "examples" : [ 98 ]
+    },
+    "PlayerControlled" : {
+      "title" : "PlayerControlled",
+      "type" : "boolean",
+      "examples" : [ true ]
+    }
+  },
+  "additionalProperties" : false,
+  "required" : [ "Loadout", "ID", "PlayerControlled", "VesselType", "VesselType_Localised" ]
+}

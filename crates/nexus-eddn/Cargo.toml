@@ -1,0 +1,22 @@
+[package]
+name = "nexus-eddn"
+description = "EDDN live subscriber (ZeroMQ relay -> galaxy database)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+nexus-galaxy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+crossbeam-channel.workspace = true
+rustc-hash.workspace = true
+flate2.workspace = true
+tokio.workspace = true
+zeromq.workspace = true
+
+[dev-dependencies]
+tracing-subscriber.workspace = true

@@ -1,0 +1,16 @@
+Source:    https://github.com/msarilar/EDEngineer  (branch master; repository ARCHIVED, last push 2024-03-22)
+Commit:    2cadd66d19509221ea2e5c2c132b8f04dc8167c8
+Retrieved: 2026-10-12 via https://codeload.github.com/msarilar/EDEngineer/zip/refs/heads/master
+Files:     EDEngineer/Resources/Data/{blueprints.json, entryData.json, equipment.json} (unmodified)
+License:   MIT, Copyright (c) 2016 Max -- full text in ./LICENSE (applies to the whole repository).
+
+Notes (see docs/research/engineering.md for details):
+  * blueprints.json: 1172 entries. Ship blueprints G1-G5 with ingredients + engineers,
+    experimental effects (Grade = null), engineer unlock costs (Type "Unlock"),
+    technology-broker unlocks (Type "Guardian"/"Human"), synthesis recipes
+    (Engineers ["@Synthesis"]), Odyssey suit/weapon upgrades ("@Merchant") and mods.
+  * The Odyssey part predates Frontier's 2022 cost reduction (old, higher costs) and
+    lacks the four Colonia on-foot engineers -- use the tables in engineering.md /
+    EDDiscovery data for on-foot costs.
+  * Known ship-data gaps vs the wiki: Juri Ishmaak's scanners (G3) missing;
+    Lori Jameson Life Support listed as G5 (wiki and EDDiscovery say G4).

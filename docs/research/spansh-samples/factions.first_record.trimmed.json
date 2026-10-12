@@ -1,0 +1,47 @@
+[
+  {
+    "name": "\"Fearless\" Bounty Hunters Corp.",
+    "allegiance": "Independent",
+    "government": "Corporate",
+    "systems": [
+      {
+        "systemName": "HIP 104256",
+        "systemId64": 2175157635443,
+        "isControllingFaction": true,
+        "coords": {
+          "x": 45.875,
+          "y": -115.90625,
+          "z": 123.59375
+        }
+      },
+      {
+        "systemName": "HIP 104256",
+        "systemId64": 2175157635443,
+        "coords": {
+          "x": 45.875,
+          "y": -115.90625,
+          "z": 123.59375
+        }
+      },
+      {
+        "systemName": "HR 7549",
+        "systemId64": 2209517390203,
+        "isControllingFaction": true,
+        "coords": {
+          "x": 49.03125,
+          "y": -102.0,
+          "z": 161.78125
+        }
+      },
+      {
+        "systemName": "HR 7549",
+        "systemId64": 2209517390203,
+        "coords": {
+          "x": 49.03125,
+          "y": -102.0,
+          "z": 161.78125
+        }
+      }
+    ]
+  }
+]

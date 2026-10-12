@@ -1,0 +1,570 @@
+{
+  "count": 10000,
+  "from": 0,
+  "reference": {
+    "id64": 10477373803,
+    "name": "Sol",
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "results": [
+    {
+      "arg_of_periapsis": 159.134002,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Helium",
+          "share": 29.512463
+        },
+        {
+          "name": "Hydrogen",
+          "share": 70.487549
+        }
+      ],
+      "axis_tilt": -0.411346,
+      "body_id": 34,
+      "distance": 10.5191881964579,
+      "distance_to_arrival": 883.71799,
+      "earth_masses": 28.216034,
+      "estimated_mapping_value": 12653,
+      "estimated_scan_value": 3483,
+      "gravity": 0.690871826246559,
+      "id": "1224984464669952848",
+      "id64": 1224984464669952848,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "WISE 1506+7027 3",
+      "orbital_eccentricity": 0.000763,
+      "orbital_inclination": 0.010879,
+      "orbital_period": 2799.5239943266,
+      "orbital_synchronicity": 2798.11271630049,
+      "parents": [
+        {
+          "id64": 5366025177936,
+          "subtype": "T (Brown dwarf) Star",
+          "type": "Star"
+        }
+      ],
+      "radius": 40741.392,
+      "reserve_level": "Depleted",
+      "rings": [
+        {
+          "inner_radius": 74005000.0,
+          "mass": 21043000000.0,
+          "name": "WISE 1506+7027 3 A Ring",
+          "outer_radius": 78400000.0,
+          "signal_count": 15,
+          "signals": [
+            {
+              "count": 8,
+              "name": "Alexandrite"
+            },
+            {
+              "count": 1,
+              "name": "Benitoite"
+            },
+            {
+              "count": 1,
+              "name": "Monazite"
+            },
+            {
+              "count": 2,
+              "name": "Musgravite"
+            },
+            {
+              "count": 3,
+              "name": "Serendibite"
+            }
+          ],
+          "signals_updated_at": "2026-09-28T14:58:53Z",
+          "type": "Rocky"
+        },
+        {
+          "inner_radius": 78500000.0,
+          "mass": 159780000000.0,
+          "name": "WISE 1506+7027 3 B Ring",
+          "outer_radius": 105980000.0,
+          "signal_count": 6,
+          "signals": [
+            {
+              "count": 1,
+              "name": "Alexandrite"
+            },
+            {
+              "count": 2,
+              "name": "Bromellite"
+            },
+            {
+              "count": 1,
+              "name": "Grandidierite"
+            },
+            {
+              "count": 2,
+              "name": "Low Temperature Diamonds"
+            }
+          ],
+          "signals_updated_at": "2026-09-28T14:58:37Z",
+          "type": "Icy"
+        }
+      ],
+      "rotational_period": 1.41127802611111,
+      "semi_major_axis": 1.77221064339964,
+      "signal_count": 2,
+      "signals": [
+        {
+          "count": 2,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2020-12-08T02:49:46Z",
+      "subtype": "Class I gas giant",
+      "surface_pressure": 0.0,
+      "surface_temperature": 15.500237,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 5366025177936,
+      "system_name": "WISE 1506+7027",
+      "system_power_state": "Fortified",
+      "system_region": "Inner Orion Spur",
+      "system_x": -7.375,
+      "system_y": 7.09375,
+      "system_z": -2.4375,
+      "terraforming_state": "Not terraformable",
+      "type": "Planet",
+      "updated_at": "2026-10-12T05:34:47Z"
+    },
+    {
+      "arg_of_periapsis": 16.198623,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Helium",
+          "share": 27.160851
+        },
+        {
+          "name": "Hydrogen",
+          "share": 72.839157
+        }
+      ],
+      "axis_tilt": 0.224503,
+      "body_id": 20,
+      "distance": 12.0662639852814,
+      "distance_to_arrival": 1235.76718,
+      "earth_masses": 169.628616,
+      "estimated_mapping_value": 15520,
+      "estimated_scan_value": 4272,
+      "gravity": 1.57503619863363,
+      "id": "720578810356966825",
+      "id64": 720578810356966825,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "YZ Ceti A 10",
+      "orbital_eccentricity": 0.005732,
+      "orbital_inclination": 0.026469,
+      "orbital_period": 2364.70659297926,
+      "orbital_synchronicity": 2363.3778946751,
+      "parents": [
+        {
+          "id64": 36031666996651433,
+          "subtype": "M (Red dwarf) Star",
+          "type": "Star"
+        }
+      ],
+      "radius": 66159.308,
+      "reserve_level": "Common",
+      "rings": [
+        {
+          "inner_radius": 109160000.0,
+          "mass": 30864000000.0,
+          "name": "YZ Ceti A 10 A Ring",
+          "outer_radius": 114530000.0,
+          "type": "Rocky"
+        },
+        {
+          "inner_radius": 114630000.0,
+          "mass": 868160000000.0,
+          "name": "YZ Ceti A 10 B Ring",
+          "outer_radius": 211770000.0,
+          "signal_count": 4,
+          "signals": [
+            {
+              "count": 1,
+              "name": "Alexandrite"
+            },
+            {
+              "count": 1,
+              "name": "Grandidierite"
+            },
+            {
+              "count": 2,
+              "name": "Low Temperature Diamonds"
+            }
+          ],
+          "signals_updated_at": "2026-09-14T18:35:14Z",
+          "type": "Icy"
+        }
+      ],
+      "rotational_period": 1.32869830415509,
+      "semi_major_axis": 2.46239432274186,
+      "signal_count": 7,
+      "signals": [
+        {
+          "count": 7,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2022-01-26T13:11:51Z",
+      "subtype": "Class I gas giant",
+      "surface_pressure": 0.0,
+      "surface_temperature": 43.100044,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 2869977687465,
+      "system_name": "YZ Ceti",
+      "system_power_state": "Stronghold",
+      "system_region": "Inner Orion Spur",
+      "system_x": -1.1875,
+      "system_y": -11.8125,
+      "system_z": -2.15625,
+      "terraforming_state": "Not terraformable",
+      "type": "Planet",
+      "updated_at": "2026-10-11T20:35:40Z",
+      "volcanism_type": "No volcanism"
+    },
+    {
+      "arg_of_periapsis": 153.870809,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Helium",
+          "share": 27.135632
+        },
+        {
+          "name": "Hydrogen",
+          "share": 72.86438
+        }
+      ],
+      "axis_tilt": -0.452763,
+      "body_id": 32,
+      "distance": 14.0077057476412,
+      "distance_to_arrival": 1493.026671,
+      "earth_masses": 248.024704,
+      "estimated_mapping_value": 16272,
+      "estimated_scan_value": 4479,
+      "gravity": 2.03960416029367,
+      "id": "1152957359933367721",
+      "id64": 1152957359933367721,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "Toolfa A 11",
+      "orbital_eccentricity": 0.035764,
+      "orbital_inclination": -1.880011,
+      "orbital_period": 224.978587141748,
+      "orbital_synchronicity": 222.409139254456,
+      "parents": [
+        {
+          "id64": 1116928562914403753,
+          "type": "Null"
+        }
+      ],
+      "radius": 70300.944,
+      "reserve_level": "Low",
+      "rings": [
+        {
+          "inner_radius": 114120000.0,
+          "mass": 96636000000.0,
+          "name": "Toolfa A 11 A Ring",
+          "outer_radius": 128900000.0,
+          "type": "Rocky"
+        },
+        {
+          "inner_radius": 129000000.0,
+          "mass": 839720000000.0,
+          "name": "Toolfa A 11 B Ring",
+          "outer_radius": 218730000.0,
+          "signal_count": 2,
+          "signals": [
+            {
+              "count": 2,
+              "name": "Low Temperature Diamonds"
+            }
+          ],
+          "signals_updated_at": "2026-07-15T05:01:30Z",
+          "type": "Icy"
+        }
+      ],
+      "rotational_period": 2.56944788729167,
+      "semi_major_axis": 0.00778436982962183,
+      "signal_count": 1,
+      "signals": [
+        {
+          "count": 1,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2022-05-23T13:44:18Z",
+      "subtype": "Class I gas giant",
+      "surface_pressure": 0.0,
+      "surface_temperature": 89.26178,
+      "system_controlling_power": "Zemina Torval",
+      "system_id64": 35855326520745,
+      "system_name": "Toolfa",
+      "system_power_state": "Stronghold",
+      "system_region": "Inner Orion Spur",
+      "system_x": 8.0,
+      "system_y": -11.1875,
+      "system_z": -2.65625,
+      "terraforming_state": "Not terraformable",
+      "type": "Planet",
+      "updated_at": "2026-10-11T03:40:12Z"
+    },
+    {
+      "arg_of_periapsis": 47.92015,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Helium",
+          "share": 27.743404
+        },
+        {
+          "name": "Hydrogen",
+          "share": 72.256599
+        }
+      ],
+      "axis_tilt": -0.113793,
+      "body_id": 14,
+      "distance": 15.3206929612371,
+      "distance_to_arrival": 2659.962071,
+      "earth_masses": 907.395569,
+      "estimated_mapping_value": 112578,
+      "estimated_scan_value": 30985,
+      "gravity": 6.31313174263281,
+      "id": "504414824067769769",
+      "id64": 504414824067769769,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "Ross 780 7",
+      "orbital_eccentricity": 0.017224,
+      "orbital_inclination": -2.90593,
+      "orbital_period": 422.128352026146,
+      "orbital_synchronicity": 420.427702373727,
+      "parents": [
+        {
+          "id64": 468386027048805801,
+          "type": "Null"
+        }
+      ],
+      "radius": 76429.76,
+      "reserve_level": "Low",
+      "rings": [
+        {
+          "inner_radius": 134120000.0,
+          "mass": 343030000000.0,
+          "name": "Ross 780 7 A Ring",
+          "outer_radius": 170490000.0,
+          "type": "Rocky"
+        },
+        {
+          "inner_radius": 170590000.0,
+          "mass": 2617100000000.0,
+          "name": "Ross 780 7 B Ring",
+          "outer_radius": 337040000.0,
+          "signal_count": 4,
+          "signals": [
+            {
+              "count": 1,
+              "name": "Bromellite"
+            },
+            {
+              "count": 2,
+              "name": "Low Temperature Diamonds"
+            },
+            {
+              "count": 1,
+              "name": "Void Opal"
+            }
+          ],
+          "signals_updated_at": "2026-06-17T02:21:11Z",
+          "type": "Icy"
+        }
+      ],
+      "rotational_period": 1.70064965241898,
+      "semi_major_axis": 0.00158305611706952,
+      "signal_count": 2,
+      "signals": [
+        {
+          "count": 2,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2022-03-04T10:57:15Z",
+      "subtype": "Class II gas giant",
+      "surface_pressure": 0.0,
+      "surface_temperature": 171.125366,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 11665802274217,
+      "system_name": "Ross 780",
+      "system_power_state": "Fortified",
+      "system_region": "Inner Orion Spur",
+      "system_x": -6.125,
+      "system_y": -13.28125,
+      "system_z": 4.5625,
+      "terraforming_state": "Not terraformable",
+      "type": "Planet",
+      "updated_at": "2026-10-11T19:17:18Z",
+      "volcanism_type": "No volcanism"
+    },
+    {
+      "arg_of_periapsis": 190.553955,
+      "atmosphere": "Thick Helium",
+      "atmosphere_composition": [
+        {
+          "name": "Helium",
+          "share": 91.37751
+        },
+        {
+          "name": "Hydrogen",
+          "share": 8.620521
+        }
+      ],
+      "axis_tilt": -0.084453,
+      "body_id": 16,
+      "distance": 18.4586213766088,
+      "distance_to_arrival": 6414.835078,
+      "earth_masses": 32.374237,
+      "estimated_mapping_value": 2688,
+      "estimated_scan_value": 640,
+      "gravity": 3.44625135107576,
+      "id": "576461423257855393",
+      "id64": 576461423257855393,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "Wolf 1453 AB 2",
+      "orbital_eccentricity": 0.150699,
+      "orbital_inclination": -3.122685,
+      "orbital_period": 1878.52661366816,
+      "orbital_synchronicity": 1877.98960035294,
+      "parents": [
+        {
+          "id64": 324259844125107617,
+          "type": "Null"
+        }
+      ],
+      "radius": 19539.476,
+      "reserve_level": "Common",
+      "rings": [
+        {
+          "inner_radius": 32333000.0,
+          "mass": 63478000000.0,
+          "name": "Wolf 1453 AB 2 A Ring",
+          "outer_radius": 110950000.0,
+          "signal_count": 19,
+          "signals": [
+            {
+              "count": 5,
+              "name": "Alexandrite"
+            },
+            {
+              "count": 3,
+              "name": "Bromellite"
+            },
+            {
+              "count": 3,
+              "name": "Grandidierite"
+            },
+            {
+              "count": 3,
+              "name": "Low Temperature Diamonds"
+            },
+            {
+              "count": 4,
+              "name": "Void Opal"
+            },
+            {
+              "count": 1,
+              "name": "Tritium"
+            }
+          ],
+          "signals_updated_at": "2026-08-14T17:44:07Z",
+          "type": "Icy"
+        }
+      ],
+      "rotational_period": 0.537013315219907,
+      "semi_major_axis": 0.143940193799747,
+      "signal_count": 2,
+      "signals": [
+        {
+          "count": 2,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2022-01-21T21:50:21Z",
+      "solid_composition": [
+        {
+          "name": "Ice",
+          "share": 68.2256
+        },
+        {
+          "name": "Metal",
+          "share": 10.333
+        },
+        {
+          "name": "Rock",
+          "share": 21.0955
+        }
+      ],
+      "subtype": "Icy body",
+      "surface_pressure": 5.98569948186528,
+      "surface_temperature": 32.249168,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 670954431905,
+      "system_name": "Wolf 1453",
+      "system_power_state": "Fortified",
+      "system_region": "Inner Orion Spur",
+      "system_x": 7.96875,
+      "system_y": -6.0,
+      "system_z": -15.53125,
+      "terraforming_state": "Not terraformable",
+      "type": "Planet",
+      "updated_at": "2026-10-09T17:18:06Z",
+      "volcanism_type": "Water Geysers"
+    }
+  ],
+  "search": {
+    "filters": {
+      "ring_signals": [
+        {
+          "comparison": "<=>",
+          "count": [
+            2,
+            999
+          ],
+          "name": "Low Temperature Diamonds"
+        }
+      ]
+    },
+    "page": 0,
+    "reference_system": "Sol",
+    "reference_system_details": {
+      "id64": 10477373803,
+      "name": "Sol",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "size": 5,
+    "sort": [
+      {
+        "distance": {
+          "direction": "asc"
+        }
+      }
+    ]
+  },
+  "search_reference": "14DE4366-C62C-11F1-A459-A08A4A57B05E",
+  "size": 5
+}

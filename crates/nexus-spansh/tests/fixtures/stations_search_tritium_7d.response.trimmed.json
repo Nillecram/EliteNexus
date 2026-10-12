@@ -1,0 +1,835 @@
+{
+  "count": 5761,
+  "from": 0,
+  "reference": {
+    "id64": 10477373803,
+    "name": "Sol",
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "results": [
+    {
+      "allegiance": "Federation",
+      "controlling_minor_faction": "Mother Gaia",
+      "controlling_minor_faction_influence": 0.315015,
+      "distance": 0.0,
+      "distance_to_arrival": 503.333011,
+      "economies": [
+        {
+          "name": "Refinery",
+          "share": 100.0
+        }
+      ],
+      "export_commodities": [
+        {
+          "name": "Copper"
+        },
+        {
+          "name": "Polymers"
+        },
+        {
+          "name": "Synthetic Fabrics"
+        }
+      ],
+      "government": "Democracy",
+      "has_large_pad": true,
+      "has_market": true,
+      "has_outfitting": true,
+      "has_shipyard": true,
+      "id": "128016640",
+      "import_commodities": [
+        {
+          "name": "Methane Clathrate"
+        },
+        {
+          "name": "Mineral Oil"
+        },
+        {
+          "name": "Hydrogen Peroxide"
+        }
+      ],
+      "is_planetary": false,
+      "large_pads": 6,
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Technology",
+          "commodity": "Advanced Catalysers",
+          "demand": 2807881,
+          "sell_price": 3501,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Medicines",
+          "commodity": "Advanced Medicines",
+          "demand": 241337,
+          "sell_price": 1727,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Chemicals",
+          "commodity": "Agronomic Treatment",
+          "demand": 2256,
+          "sell_price": 3702,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Minerals",
+          "commodity": "Alexandrite",
+          "demand": 20909,
+          "sell_price": 218309,
+          "supply": 0
+        },
+        {
+          "buy_price": 50137,
+          "category": "Chemicals",
+          "commodity": "Tritium",
+          "demand": 1,
+          "sell_price": 49107,
+          "supply": 355413
+        }
+      ],
+      "market_id": 128016640,
+      "market_updated_at": "2026-10-12T10:22:28Z",
+      "medium_pads": 13,
+      "modules": [
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Grade1",
+          "name": "Lightweight Alloy",
+          "rating": "I",
+          "ship": "Adder"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Grade2",
+          "name": "Reinforced Alloy",
+          "price": 35120,
+          "rating": "I",
+          "ship": "Adder"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Grade3",
+          "name": "Military Grade Composite",
+          "price": 79030,
+          "rating": "I",
+          "ship": "Adder"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Mirrored",
+          "name": "Mirrored Surface Composite",
+          "price": 186770,
+          "rating": "I",
+          "ship": "Adder"
+        }
+      ],
+      "name": "Galileo",
+      "outfitting_updated_at": "2026-10-12T10:23:27Z",
+      "primary_economy": "Refinery",
+      "prohibited_commodities": [
+        {
+          "name": "Narcotics"
+        },
+        {
+          "name": "Battle Weapons"
+        },
+        {
+          "name": "Bootleg Liquor"
+        },
+        {
+          "name": "Combat Stabilisers"
+        }
+      ],
+      "services": [
+        {
+          "name": "Dock"
+        },
+        {
+          "name": "Autodock"
+        },
+        {
+          "name": "Market"
+        },
+        {
+          "name": "Contacts"
+        }
+      ],
+      "ships": [
+        {
+          "name": "Adder",
+          "price": 87810,
+          "symbol": "Adder"
+        },
+        {
+          "name": "Beluga Liner",
+          "price": 84532780,
+          "symbol": "BelugaLiner"
+        },
+        {
+          "name": "Cobra MkIV",
+          "price": 764720,
+          "symbol": "CobraMkIV"
+        },
+        {
+          "name": "Cobra MkV",
+          "price": 1989461,
+          "symbol": "CobraMkV"
+        }
+      ],
+      "shipyard_updated_at": "2026-10-12T10:22:28Z",
+      "small_pads": 9,
+      "state": "UnderRepairs",
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 10477373803,
+      "system_is_being_colonised": false,
+      "system_is_colonised": false,
+      "system_name": "Sol",
+      "system_population": 18320926115,
+      "system_power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom"
+      ],
+      "system_power_state": "Stronghold",
+      "system_primary_economy": "Refinery",
+      "system_secondary_economy": "Service",
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "type": "Ocellus Starport",
+      "updated_at": "2026-10-12T10:23:27Z"
+    },
+    {
+      "allegiance": "Federation",
+      "controlling_minor_faction": "Sol Workers' Party",
+      "controlling_minor_faction_influence": 0.233562,
+      "distance": 0.0,
+      "distance_to_arrival": 363.196632,
+      "economies": [
+        {
+          "name": "Refinery",
+          "share": 100.0
+        }
+      ],
+      "export_commodities": [
+        {
+          "name": "Polymers"
+        },
+        {
+          "name": "Copper"
+        },
+        {
+          "name": "Synthetic Fabrics"
+        }
+      ],
+      "government": "Democracy",
+      "has_large_pad": false,
+      "has_market": true,
+      "has_outfitting": true,
+      "id": "3228719104",
+      "import_commodities": [
+        {
+          "name": "Grain"
+        },
+        {
+          "name": "Beer"
+        },
+        {
+          "name": "Wine"
+        }
+      ],
+      "is_planetary": false,
+      "large_pads": 0,
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Technology",
+          "commodity": "Advanced Catalysers",
+          "demand": 117397,
+          "sell_price": 3501,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Medicines",
+          "commodity": "Advanced Medicines",
+          "demand": 599306,
+          "sell_price": 1727,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Chemicals",
+          "commodity": "Agronomic Treatment",
+          "demand": 5601,
+          "sell_price": 3702,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Minerals",
+          "commodity": "Alexandrite",
+          "demand": 1737,
+          "sell_price": 218309,
+          "supply": 0
+        },
+        {
+          "buy_price": 50137,
+          "category": "Chemicals",
+          "commodity": "Tritium",
+          "demand": 1,
+          "sell_price": 49107,
+          "supply": 4696
+        }
+      ],
+      "market_id": 3228719104,
+      "market_updated_at": "2026-10-12T10:04:53Z",
+      "medium_pads": 1,
+      "modules": [
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "DiamondBack_Armour_Grade1",
+          "name": "Lightweight Alloy",
+          "rating": "I",
+          "ship": "Diamondback Scout"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "DiamondBack_Armour_Grade2",
+          "name": "Reinforced Alloy",
+          "price": 225730,
+          "rating": "I",
+          "ship": "Diamondback Scout"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "DiamondBack_Armour_Grade3",
+          "name": "Military Grade Composite",
+          "price": 507900,
+          "rating": "I",
+          "ship": "Diamondback Scout"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "DiamondBack_Armour_Mirrored",
+          "name": "Mirrored Surface Composite",
+          "price": 1185100,
+          "rating": "I",
+          "ship": "Diamondback Scout"
+        }
+      ],
+      "name": "Burnell Station",
+      "outfitting_updated_at": "2026-10-12T10:04:53Z",
+      "primary_economy": "Refinery",
+      "prohibited_commodities": [
+        {
+          "name": "Narcotics"
+        },
+        {
+          "name": "Battle Weapons"
+        },
+        {
+          "name": "Bootleg Liquor"
+        },
+        {
+          "name": "Combat Stabilisers"
+        }
+      ],
+      "services": [
+        {
+          "name": "Dock"
+        },
+        {
+          "name": "Autodock"
+        },
+        {
+          "name": "Market"
+        },
+        {
+          "name": "Contacts"
+        }
+      ],
+      "small_pads": 4,
+      "state": "UnderRepairs",
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 10477373803,
+      "system_is_being_colonised": false,
+      "system_is_colonised": false,
+      "system_name": "Sol",
+      "system_population": 18320926115,
+      "system_power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom"
+      ],
+      "system_power_state": "Stronghold",
+      "system_primary_economy": "Refinery",
+      "system_secondary_economy": "Service",
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "type": "Outpost",
+      "updated_at": "2026-10-12T10:04:53Z"
+    },
+    {
+      "allegiance": "Federation",
+      "controlling_minor_faction": "Mother Gaia",
+      "controlling_minor_faction_influence": 0.315015,
+      "distance": 0.0,
+      "distance_to_arrival": 230.34769,
+      "economies": [
+        {
+          "name": "Refinery",
+          "share": 100.0
+        }
+      ],
+      "export_commodities": [
+        {
+          "name": "Copper"
+        },
+        {
+          "name": "Polymers"
+        },
+        {
+          "name": "Synthetic Fabrics"
+        }
+      ],
+      "government": "Democracy",
+      "has_large_pad": true,
+      "has_market": true,
+      "has_outfitting": true,
+      "has_shipyard": true,
+      "id": "128016384",
+      "import_commodities": [
+        {
+          "name": "Methane Clathrate"
+        },
+        {
+          "name": "Mineral Oil"
+        },
+        {
+          "name": "Hydrogen Peroxide"
+        }
+      ],
+      "is_planetary": false,
+      "large_pads": 6,
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Technology",
+          "commodity": "Advanced Catalysers",
+          "demand": 2855292,
+          "sell_price": 3501,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Medicines",
+          "commodity": "Advanced Medicines",
+          "demand": 220310,
+          "sell_price": 1727,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Chemicals",
+          "commodity": "Agronomic Treatment",
+          "demand": 2060,
+          "sell_price": 3702,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Minerals",
+          "commodity": "Alexandrite",
+          "demand": 21225,
+          "sell_price": 218309,
+          "supply": 0
+        },
+        {
+          "buy_price": 50137,
+          "category": "Chemicals",
+          "commodity": "Tritium",
+          "demand": 1,
+          "sell_price": 49107,
+          "supply": 322985
+        }
+      ],
+      "market_id": 128016384,
+      "market_updated_at": "2026-10-12T10:14:00Z",
+      "medium_pads": 13,
+      "modules": [
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Grade1",
+          "name": "Lightweight Alloy",
+          "rating": "I",
+          "ship": "Adder"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Grade2",
+          "name": "Reinforced Alloy",
+          "price": 35120,
+          "rating": "I",
+          "ship": "Adder"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Grade3",
+          "name": "Military Grade Composite",
+          "price": 79030,
+          "rating": "I",
+          "ship": "Adder"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Mirrored",
+          "name": "Mirrored Surface Composite",
+          "price": 186770,
+          "rating": "I",
+          "ship": "Adder"
+        }
+      ],
+      "name": "Daedalus",
+      "outfitting_updated_at": "2026-10-12T10:14:00Z",
+      "primary_economy": "Refinery",
+      "prohibited_commodities": [
+        {
+          "name": "Narcotics"
+        },
+        {
+          "name": "Battle Weapons"
+        },
+        {
+          "name": "Bootleg Liquor"
+        },
+        {
+          "name": "Combat Stabilisers"
+        }
+      ],
+      "services": [
+        {
+          "name": "Dock"
+        },
+        {
+          "name": "Autodock"
+        },
+        {
+          "name": "Market"
+        },
+        {
+          "name": "Contacts"
+        }
+      ],
+      "ships": [
+        {
+          "name": "Adder",
+          "price": 87810,
+          "symbol": "Adder"
+        },
+        {
+          "name": "Beluga Liner",
+          "price": 84532780,
+          "symbol": "BelugaLiner"
+        },
+        {
+          "name": "Cobra MkIV",
+          "price": 764720,
+          "symbol": "CobraMkIV"
+        },
+        {
+          "name": "Cobra MkV",
+          "price": 1989461,
+          "symbol": "CobraMkV"
+        }
+      ],
+      "shipyard_updated_at": "2026-10-12T10:14:00Z",
+      "small_pads": 10,
+      "state": "UnderRepairs",
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 10477373803,
+      "system_is_being_colonised": false,
+      "system_is_colonised": false,
+      "system_name": "Sol",
+      "system_population": 18320926115,
+      "system_power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom"
+      ],
+      "system_power_state": "Stronghold",
+      "system_primary_economy": "Refinery",
+      "system_secondary_economy": "Service",
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "type": "Orbis Starport",
+      "updated_at": "2026-10-12T10:14:00Z"
+    },
+    {
+      "allegiance": "Federation",
+      "controlling_minor_faction": "Mother Gaia",
+      "controlling_minor_faction_influence": 0.315015,
+      "distance": 0.0,
+      "distance_to_arrival": 2613.451241,
+      "economies": [
+        {
+          "name": "Refinery",
+          "share": 100.0
+        }
+      ],
+      "export_commodities": [
+        {
+          "name": "Polymers"
+        },
+        {
+          "name": "Lithium"
+        },
+        {
+          "name": "Synthetic Fabrics"
+        }
+      ],
+      "government": "Democracy",
+      "has_large_pad": true,
+      "has_market": true,
+      "has_outfitting": true,
+      "has_shipyard": true,
+      "id": "128017920",
+      "import_commodities": [
+        {
+          "name": "Grain"
+        },
+        {
+          "name": "Beer"
+        },
+        {
+          "name": "Wine"
+        }
+      ],
+      "is_planetary": false,
+      "large_pads": 6,
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Technology",
+          "commodity": "Advanced Catalysers",
+          "demand": 110870,
+          "sell_price": 3501,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Medicines",
+          "commodity": "Advanced Medicines",
+          "demand": 565984,
+          "sell_price": 1727,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Chemicals",
+          "commodity": "Agronomic Treatment",
+          "demand": 5290,
+          "sell_price": 3702,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Minerals",
+          "commodity": "Alexandrite",
+          "demand": 1641,
+          "sell_price": 218309,
+          "supply": 0
+        },
+        {
+          "buy_price": 50246,
+          "category": "Chemicals",
+          "commodity": "Tritium",
+          "demand": 1,
+          "sell_price": 49214,
+          "supply": 3238
+        }
+      ],
+      "market_id": 128017920,
+      "market_updated_at": "2026-10-12T09:11:16Z",
+      "medium_pads": 12,
+      "modules": [
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Grade1",
+          "name": "Lightweight Alloy",
+          "rating": "I",
+          "ship": "Adder"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Grade2",
+          "name": "Reinforced Alloy",
+          "price": 35120,
+          "rating": "I",
+          "ship": "Adder"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Grade3",
+          "name": "Military Grade Composite",
+          "price": 79030,
+          "rating": "I",
+          "ship": "Adder"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Adder_Armour_Mirrored",
+          "name": "Mirrored Surface Composite",
+          "price": 186770,
+          "rating": "I",
+          "ship": "Adder"
+        }
+      ],
+      "name": "Columbus",
+      "outfitting_updated_at": "2026-10-12T09:12:55Z",
+      "primary_economy": "Refinery",
+      "prohibited_commodities": [
+        {
+          "name": "Narcotics"
+        },
+        {
+          "name": "Battle Weapons"
+        },
+        {
+          "name": "Bootleg Liquor"
+        },
+        {
+          "name": "Combat Stabilisers"
+        }
+      ],
+      "services": [
+        {
+          "name": "Dock"
+        },
+        {
+          "name": "Autodock"
+        },
+        {
+          "name": "Market"
+        },
+        {
+          "name": "Contacts"
+        }
+      ],
+      "ships": [
+        {
+          "name": "Adder",
+          "price": 87810,
+          "symbol": "Adder"
+        },
+        {
+          "name": "Beluga Liner",
+          "price": 84532780,
+          "symbol": "BelugaLiner"
+        },
+        {
+          "name": "Cobra MkV",
+          "price": 1989461,
+          "symbol": "CobraMkV"
+        },
+        {
+          "name": "Corsair",
+          "price": 79304748,
+          "symbol": "Corsair"
+        }
+      ],
+      "shipyard_updated_at": "2026-10-12T09:11:16Z",
+      "small_pads": 7,
+      "state": "UnderRepairs",
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 10477373803,
+      "system_is_being_colonised": false,
+      "system_is_colonised": false,
+      "system_name": "Sol",
+      "system_population": 18320926115,
+      "system_power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom"
+      ],
+      "system_power_state": "Stronghold",
+      "system_primary_economy": "Refinery",
+      "system_secondary_economy": "Service",
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "type": "Ocellus Starport",
+      "updated_at": "2026-10-12T09:12:55Z"
+    }
+  ],
+  "search": {
+    "filters": {
+      "market": [
+        {
+          "name": "Tritium",
+          "supply": {
+            "comparison": "<=>",
+            "value": [
+              1000,
+              999999999
+            ]
+          }
+        }
+      ],
+      "market_updated_at": {
+        "comparison": "<=>",
+        "value": [
+          "now-7d",
+          "now"
+        ]
+      }
+    },
+    "page": 0,
+    "reference_system": "Sol",
+    "reference_system_details": {
+      "id64": 10477373803,
+      "name": "Sol",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "size": 5,
+    "sort": [
+      {
+        "distance": {
+          "direction": "asc"
+        }
+      }
+    ]
+  },
+  "search_reference": "1449B9D0-C62C-11F1-A459-A08A4A57B05E",
+  "size": 5
+}

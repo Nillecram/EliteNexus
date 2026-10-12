@@ -1,0 +1,13 @@
+Source:    https://github.com/jixxed/ed-journal-schemas  (branch main)
+           rendered docs: https://jixxed.github.io/ed-journal-schemas/
+Commit:    e4976b5f9b46f784029364453622c2668087cfd6  (last upstream push 2026-09-06, "Rhino update")
+Retrieved: 2026-10-12 via https://codeload.github.com/jixxed/ed-journal-schemas/zip/refs/heads/main
+Files:     schemas/** (275 event schemas + _Event.json + common/ShipLockerBackpack.json), unmodified;
+           upstream README.md saved as UPSTREAM-README.md.
+License:   Apache License 2.0 -- full text in ./LICENSE.
+
+JSON Schema (draft 2020-12) per journal event, written for code generation; covers events
+since Odyssey (manual v31+) including undocumented ones (Colonisation*, PowerplayMerits/Rank,
+CarrierLocation, SquadronCarrier "CarrierType", LaunchVessel, GameModeChange, ...).
+Fields are mostly un-validated (no enums) by design; Status/Status.json documents the
+Status.json flags. See docs/research/journal.md.

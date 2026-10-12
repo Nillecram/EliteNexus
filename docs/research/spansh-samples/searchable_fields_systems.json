@@ -1,0 +1,330 @@
+{
+  "fields": [
+    {
+      "field": "controlling_minor_faction",
+      "field_values": "autocomplete_controlling_minor_faction",
+      "field_values_url": "/api/systems/field_values/autocomplete_controlling_minor_faction",
+      "type": "group"
+    },
+    {
+      "field": "security",
+      "type": "group"
+    },
+    {
+      "field": "controlling_minor_faction_state",
+      "type": "group"
+    },
+    {
+      "field": "stations",
+      "multiple": true,
+      "subfields": {
+        "controlling_minor_faction": {
+          "autocomplete": true,
+          "autocomplete_url": "/api/systems/field_values/stations/controlling_minor_faction",
+          "order": 3,
+          "type": "group"
+        },
+        "controlling_minor_faction_state": {
+          "order": 4,
+          "type": "group"
+        },
+        "distance_to_arrival": {
+          "order": 6,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "large_pads": {
+          "order": 9,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "market_id": {
+          "hidden": true,
+          "order": 10,
+          "type": "keyword"
+        },
+        "medium_pads": {
+          "order": 8,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "name": {
+          "order": 1,
+          "type": "string"
+        },
+        "services": {
+          "multiple": true,
+          "order": 5,
+          "type": "group"
+        },
+        "small_pads": {
+          "order": 7,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "type": {
+          "order": 2,
+          "type": "group"
+        }
+      },
+      "type": "combined"
+    },
+    {
+      "field": "secondary_economy",
+      "type": "group"
+    },
+    {
+      "field": "power_state",
+      "type": "group"
+    },
+    {
+      "field": "y",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "state",
+      "type": "group"
+    },
+    {
+      "field": "thargoid_war_progress",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "landmark_value",
+      "is_logarithmic": true,
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "landmarks",
+      "multiple": true,
+      "path": "bodies.landmarks",
+      "subfields": {
+        "count": {
+          "order": 3,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "subtype": {
+          "order": 2,
+          "type": "group"
+        },
+        "type": {
+          "order": 1,
+          "type": "group"
+        },
+        "value": {
+          "order": 4,
+          "subtype": "integer",
+          "type": "numeric"
+        }
+      },
+      "type": "combined"
+    },
+    {
+      "field": "estimated_mapping_value",
+      "is_logarithmic": true,
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "is_colonised",
+      "type": "boolean"
+    },
+    {
+      "field": "estimated_scan_value",
+      "is_logarithmic": true,
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "primary_economy",
+      "type": "group"
+    },
+    {
+      "field": "thargoid_war_state",
+      "type": "group"
+    },
+    {
+      "field": "name",
+      "type": "string"
+    },
+    {
+      "field": "thargoid_war_success_reached",
+      "type": "boolean"
+    },
+    {
+      "field": "population",
+      "is_logarithmic": true,
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "bodies",
+      "multiple": true,
+      "subfields": {
+        "distance_to_arrival": {
+          "order": 3,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "subtype": {
+          "order": 2,
+          "type": "group"
+        },
+        "type": {
+          "order": 1,
+          "type": "group"
+        }
+      },
+      "type": "combined"
+    },
+    {
+      "field": "distance",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "region",
+      "type": "group"
+    },
+    {
+      "field": "body_count",
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "nearest_populated_distance",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "thargoid_war_success_state",
+      "type": "group"
+    },
+    {
+      "field": "thargoid_war_failure_state",
+      "type": "group"
+    },
+    {
+      "field": "thargoid_war_days_remaining",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "id64",
+      "type": "keyword"
+    },
+    {
+      "field": "minor_faction_presences",
+      "multiple": true,
+      "subfields": {
+        "allegiance": {
+          "order": 2,
+          "type": "group"
+        },
+        "government": {
+          "order": 3,
+          "type": "group"
+        },
+        "influence": {
+          "order": 4,
+          "subtype": "real",
+          "type": "numeric"
+        },
+        "name": {
+          "autocomplete": true,
+          "autocomplete_url": "/api/systems/field_values/minor_faction_presences/name",
+          "order": 1,
+          "primary": true,
+          "type": "group"
+        },
+        "state": {
+          "order": 5,
+          "type": "group"
+        }
+      },
+      "type": "combined"
+    },
+    {
+      "field": "government",
+      "type": "group"
+    },
+    {
+      "field": "allegiance",
+      "type": "group"
+    },
+    {
+      "field": "updated_at",
+      "type": "timestamp"
+    },
+    {
+      "field": "needs_permit",
+      "type": "boolean"
+    },
+    {
+      "field": "power_state_undermining",
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "known_permit",
+      "type": "boolean"
+    },
+    {
+      "field": "z",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "thargoid_war_ports_remaining",
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "power_state_reinforcement",
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "synthesis_recipes",
+      "multiple": true,
+      "subfields": {
+        "level": {
+          "order": 2,
+          "type": "group"
+        },
+        "name": {
+          "order": 1,
+          "primary": true,
+          "type": "group"
+        }
+      },
+      "type": "combined"
+    },
+    {
+      "field": "x",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "power_state_control_progress",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "power",
+      "type": "group"
+    },
+    {
+      "field": "controlling_power",
+      "type": "group"
+    },
+    {
+      "field": "is_being_colonised",
+      "type": "boolean"
+    }
+  ]
+}

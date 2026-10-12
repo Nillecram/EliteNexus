@@ -1,0 +1,1 @@
+{"filters":{"market":[{"name":"Tritium","supply":{"value":["1000","999999999"],"comparison":"<=>"}}],"has_large_pad":{"value":true},"distance":{"min":"0","max":"100"}},"sort":[{"distance":{"direction":"asc"}}],"size":3,"page":0,"reference_system":"Sol"}

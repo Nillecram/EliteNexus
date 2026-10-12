@@ -1,0 +1,439 @@
+{
+  "fields": [
+    {
+      "field": "system_z",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "arg_of_periapsis",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "luminosity_class",
+      "type": "group"
+    },
+    {
+      "display_field": "parents",
+      "field": "parent_type",
+      "multiple": true,
+      "type": "group"
+    },
+    {
+      "field": "axis_tilt",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "gravity",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "system_region",
+      "type": "group"
+    },
+    {
+      "field": "atmosphere_composition",
+      "multiple": true,
+      "subfield": {
+        "name": "name",
+        "type": "group"
+      },
+      "type": "value_struct",
+      "valuefield": {
+        "name": "share",
+        "subtype": "real",
+        "type": "numeric"
+      }
+    },
+    {
+      "field": "system_x",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "landmark_value",
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "age",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "surface_temperature",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "orbital_period",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "volcanism_type",
+      "type": "group"
+    },
+    {
+      "field": "rings",
+      "subtype": "ring",
+      "type": "special"
+    },
+    {
+      "field": "terraforming_state",
+      "type": "group"
+    },
+    {
+      "field": "genuses",
+      "multiple": true,
+      "subfield": "name",
+      "type": "group"
+    },
+    {
+      "field": "stations",
+      "multiple": true,
+      "subfields": {
+        "controlling_minor_faction": {
+          "autocomplete": true,
+          "autocomplete_url": "/api/bodies/field_values/stations/controlling_minor_faction",
+          "order": 3,
+          "type": "group"
+        },
+        "controlling_minor_faction_state": {
+          "order": 4,
+          "type": "group"
+        },
+        "distance_to_arrival": {
+          "order": 6,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "large_pads": {
+          "order": 9,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "market_id": {
+          "hidden": true,
+          "order": 10,
+          "type": "keyword"
+        },
+        "medium_pads": {
+          "order": 8,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "name": {
+          "order": 1,
+          "type": "string"
+        },
+        "services": {
+          "multiple": true,
+          "order": 5,
+          "type": "group"
+        },
+        "small_pads": {
+          "order": 7,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "type": {
+          "order": 2,
+          "type": "group"
+        }
+      },
+      "type": "combined"
+    },
+    {
+      "field": "radius",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "ascending_node",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "belts",
+      "subtype": "belt",
+      "type": "special"
+    },
+    {
+      "field": "earth_masses",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "name",
+      "type": "string"
+    },
+    {
+      "field": "spectral_class",
+      "type": "group"
+    },
+    {
+      "field": "estimated_scan_value",
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "estimated_mapping_value",
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "landmarks",
+      "multiple": true,
+      "subfields": {
+        "subtype": {
+          "order": 2,
+          "type": "group"
+        },
+        "type": {
+          "order": 1,
+          "type": "group"
+        },
+        "value": {
+          "order": 4,
+          "subtype": "integer",
+          "type": "numeric"
+        },
+        "variant": {
+          "order": 3,
+          "type": "group"
+        }
+      },
+      "type": "combined"
+    },
+    {
+      "field": "system_y",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "solar_radius",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "display_field": "parents",
+      "field": "parent_subtype",
+      "multiple": true,
+      "type": "group"
+    },
+    {
+      "field": "distance_to_arrival",
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "signal_count",
+      "subtype": "integer",
+      "type": "numeric"
+    },
+    {
+      "field": "mean_anomaly",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "is_rotational_period_tidally_locked",
+      "type": "boolean"
+    },
+    {
+      "field": "distance",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "subtype",
+      "type": "group"
+    },
+    {
+      "field": "updated_at",
+      "type": "timestamp"
+    },
+    {
+      "field": "surface_pressure",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "system_name",
+      "type": "string"
+    },
+    {
+      "field": "signals_updated_at",
+      "type": "timestamp"
+    },
+    {
+      "field": "solid_composition",
+      "multiple": true,
+      "subfield": {
+        "name": "name",
+        "type": "group"
+      },
+      "type": "value_struct",
+      "valuefield": {
+        "name": "share",
+        "subtype": "real",
+        "type": "numeric"
+      }
+    },
+    {
+      "field": "signals",
+      "multiple": true,
+      "subfield": {
+        "name": "name",
+        "type": "group"
+      },
+      "type": "value_struct",
+      "valuefield": {
+        "name": "count",
+        "subtype": "integer",
+        "type": "numeric"
+      }
+    },
+    {
+      "field": "is_main_star",
+      "type": "boolean"
+    },
+    {
+      "field": "id64",
+      "type": "keyword"
+    },
+    {
+      "field": "type",
+      "type": "group"
+    },
+    {
+      "field": "synthesis_recipes",
+      "multiple": true,
+      "subfields": {
+        "level": {
+          "order": 2,
+          "type": "group"
+        },
+        "name": {
+          "order": 1,
+          "primary": true,
+          "type": "group"
+        }
+      },
+      "type": "combined"
+    },
+    {
+      "field": "orbital_synchronicity",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "atmosphere",
+      "type": "group"
+    },
+    {
+      "field": "orbital_inclination",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "system_controlling_power",
+      "type": "group"
+    },
+    {
+      "field": "is_landable",
+      "type": "boolean"
+    },
+    {
+      "field": "materials",
+      "multiple": true,
+      "subfield": {
+        "name": "name",
+        "type": "group"
+      },
+      "type": "value_struct",
+      "valuefield": {
+        "name": "share",
+        "subtype": "real",
+        "type": "numeric"
+      }
+    },
+    {
+      "field": "orbital_eccentricity",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "parents",
+      "multiple": true,
+      "subfields": {
+        "subtype": {
+          "order": 2,
+          "type": "group"
+        },
+        "type": {
+          "order": 1,
+          "type": "group"
+        }
+      },
+      "type": "combined"
+    },
+    {
+      "field": "solar_masses",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "semi_major_axis",
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "system_id64",
+      "type": "keyword"
+    },
+    {
+      "field": "rotational_period",
+      "is_logarithmic": true,
+      "subtype": "real",
+      "type": "numeric"
+    },
+    {
+      "field": "system_power_state",
+      "type": "group"
+    },
+    {
+      "display_field": "rings",
+      "field": "ring_signals",
+      "multiple": true,
+      "path": "rings.signals",
+      "subfield": {
+        "name": "name",
+        "type": "group"
+      },
+      "type": "value_struct",
+      "valuefield": {
+        "name": "count",
+        "subtype": "integer",
+        "type": "numeric"
+      }
+    },
+    {
+      "field": "reserve_level",
+      "type": "group"
+    }
+  ]
+}
