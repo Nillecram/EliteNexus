@@ -21,6 +21,8 @@ fn slider(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, de
     ui.add(egui::Slider::new(value, range).show_value(false)).changed()
 }
 
+const UI_SCALES: [(f32, &str); 6] = [(0.9, "90 %"), (1.0, "100 %"), (1.1, "110 %"), (1.25, "125 %"), (1.5, "150 %"), (1.75, "175 %")];
+
 pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
     cards(ui, 2, 420.0, |c| {
         c.add(|ui| {
@@ -62,8 +64,18 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
             });
             section(ui, "Display");
             group(ui, |g| {
-                g.row("Text and controls size", "", |ui| cx.changed |= slider(ui, &mut s.ui_scale, 0.75..=1.75, 2, "×"));
+                // Fixed steps, not a slider: zooming while dragging rescales the slider under the
+                // pointer, which runs the value off to either end.
+                g.content(|ui| {
+                    ui.label(RichText::new("Text and controls size").color(pal::TEXT));
+                    let mut scale = s.ui_scale;
+                    if widgets::segmented(ui, &mut scale, &UI_SCALES) {
+                        s.ui_scale = scale;
+                        cx.changed = true;
+                    }
+                });
             });
+            footnote(ui, "Ctrl + and Ctrl − also change the size; Ctrl 0 goes back to 100 %.");
         });
         c.add(|ui| {
             let st = cx.status;

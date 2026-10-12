@@ -235,9 +235,18 @@ impl Group<'_> {
             .horizontal(|ui| {
                 ui.set_min_height(26.0);
                 let full = ui.available_width();
+                // Keep room for the title (up to half the row), so a long value such as a path
+                // truncates instead of squeezing the title into one letter per line.
+                let title_w = ui.painter().layout_no_wrap(title.to_owned(), FontId::proportional(size::BODY), pal::TEXT).size().x;
+                let reserve = (title_w + 16.0).min(full * 0.5);
                 // Trailing control first (right-to-left), then the text in the remaining width.
                 let r = ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let r = trailing(ui);
+                    let r = ui
+                        .scope(|ui| {
+                            ui.set_max_width(full - reserve);
+                            trailing(ui)
+                        })
+                        .inner;
                     let rest = ui.available_width();
                     ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                         ui.set_max_width(rest);
@@ -251,7 +260,6 @@ impl Group<'_> {
                     });
                     r
                 });
-                let _ = full;
                 r.inner
             })
             .inner;

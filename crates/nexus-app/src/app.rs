@@ -834,6 +834,13 @@ impl eframe::App for NexusApp {
         self.auto_copy_next();
         let here = self.core.model.read().active().and_then(|g| g.location.star_pos);
         self.market.set_origin(here);
+        // egui's Ctrl +/−/0 zoom changes the factor directly; keep the setting in step with it.
+        let zoom = ctx.zoom_factor();
+        if self.applied_scale > 0.0 && (zoom - self.applied_scale).abs() > 1e-3 {
+            self.settings.ui_scale = zoom;
+            self.applied_scale = zoom;
+            self.settings_dirty = Some(Instant::now());
+        }
         if (self.settings.ui_scale - self.applied_scale).abs() > f32::EPSILON {
             ctx.set_zoom_factor(self.settings.ui_scale);
             self.applied_scale = self.settings.ui_scale;
