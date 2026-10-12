@@ -339,9 +339,32 @@ pub struct SystemScan {
     pub bodies: BTreeMap<u32, Body>,
     pub signals: Vec<FssSignal>,
     pub sold: bool,
+    /// When the data was last sold (Universal Cartographics).
+    pub sold_at: Option<Timestamp>,
+    /// The data was lost when the ship was destroyed.
+    pub lost: bool,
     /// Scanned before a sale but not included in it. The game sells everything it will buy, so
     /// this data is very likely not sellable (shown separately, excluded from unsold totals).
     pub skipped_in_sale: bool,
+}
+
+/// Where a system's cartographic data stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataStatus {
+    Unsold,
+    Sold(Timestamp),
+    /// Left out of a sale: the game won't buy it.
+    NotSellable,
+    /// Lost with the ship.
+    Lost,
+}
+
+/// One sale of cartographic data.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataSale {
+    pub ts: Timestamp,
+    pub systems: usize,
+    pub earnings: i64,
 }
 
 impl SystemScan {
@@ -360,7 +383,18 @@ impl SystemScan {
             bodies: BTreeMap::new(),
             signals: Vec::new(),
             sold: false,
+            sold_at: None,
+            lost: false,
             skipped_in_sale: false,
+        }
+    }
+
+    pub fn status(&self) -> DataStatus {
+        match (self.sold, self.lost, self.sold_at) {
+            (true, true, _) => DataStatus::Lost,
+            (true, false, Some(ts)) => DataStatus::Sold(ts),
+            _ if self.skipped_in_sale => DataStatus::NotSellable,
+            _ => DataStatus::Unsold,
         }
     }
 
@@ -558,6 +592,8 @@ pub struct Exploration {
     pub current: Option<u64>,
     pub codex: Vec<CodexRecord>,
     pub sold_total: i64,
+    /// Every sale of cartographic data, oldest first.
+    pub sales: Vec<DataSale>,
     pub odyssey: bool,
 }
 
@@ -593,6 +629,7 @@ impl Exploration {
         body.apply_scan(s, ts, odyssey);
         if !was_scanned && s.scan_type != "NavBeaconDetail" {
             sys.sold = false;
+            sys.lost = false;
             sys.skipped_in_sale = false;
         }
         let is_star = s.is_star();
@@ -677,6 +714,7 @@ impl Exploration {
         body.efficiency_target = Some(s.efficiency_target);
         body.recompute_value(odyssey);
         sys.sold = false;
+        sys.lost = false;
     }
 
     pub fn on_fss_signal(&mut self, f: &ev::FSSSignalDiscovered, system_name: &str, ts: Timestamp) {
@@ -733,6 +771,7 @@ impl Exploration {
     /// journals: data the game refuses stays unlisted across every later sale).
     pub fn on_sell(&mut self, systems: &[String], earnings: i64, ts: Timestamp) -> usize {
         self.sold_total += earnings;
+        self.sales.push(DataSale { ts, systems: systems.len(), earnings });
         let mut matched = 0;
         for s in self.systems.values_mut() {
             if s.sold {
@@ -740,6 +779,7 @@ impl Exploration {
             }
             if systems.iter().any(|n| n.eq_ignore_ascii_case(&s.name)) {
                 s.sold = true;
+                s.sold_at = Some(ts);
                 s.skipped_in_sale = false;
                 matched += 1;
             } else if s.last_visit <= ts && s.scanned_bodies() > 0 && self.current != Some(s.address) {
@@ -754,8 +794,18 @@ impl Exploration {
         for s in self.systems.values_mut() {
             if !s.sold {
                 s.sold = true;
+                s.lost = s.scanned_bodies() > 0;
             }
         }
+    }
+
+    /// Every system with scanned bodies, whatever became of the data.
+    pub fn history(&self) -> impl Iterator<Item = &SystemScan> {
+        self.systems.values().filter(|s| s.scanned_bodies() > 0)
+    }
+
+    pub fn last_sale(&self) -> Option<&DataSale> {
+        self.sales.last()
     }
 
     pub fn unsold(&self) -> impl Iterator<Item = &SystemScan> {

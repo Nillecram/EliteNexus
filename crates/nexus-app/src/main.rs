@@ -17,6 +17,7 @@ mod sync;
 #[cfg(test)]
 mod testutil;
 mod theme;
+mod tours;
 mod tts;
 mod untouched;
 mod widgets;

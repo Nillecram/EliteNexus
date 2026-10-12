@@ -139,8 +139,8 @@ impl NexusApp {
             speaker,
             applied_scale: 0.0,
             settings_dirty: None,
-            explo: Default::default(),
-            exo: pages::exobio::ExobioUi::new(ov.tab.as_deref() == Some("untouched") && shot.is_some()),
+            explo: pages::exploration::ExplorationUi::new(ov.tab.as_deref(), shot.is_some()),
+            exo: pages::exobio::ExobioUi::new(ov.tab.as_deref(), shot.is_some()),
             fleet: Default::default(),
             eng: Default::default(),
             log: Default::default(),
@@ -172,6 +172,10 @@ impl NexusApp {
         let next = {
             let model = self.core.model.read();
             let Some(gs) = model.active() else { return };
+            // Arrivals tick off planned waypoints.
+            if let Some(p) = self.nav.planned.as_mut() {
+                p.advance(&gs.location.system);
+            }
             let jumps = gs.history.jumps.len();
             let prev = self.last_jump_count.replace(jumps);
             if !(self.settings.auto_copy_next_system && prev.is_some_and(|p| jumps > p)) {
@@ -431,15 +435,16 @@ impl NexusApp {
         let mut test_voice = false;
         let mut restart = false;
         let mut map_action = None;
+        let mut follow = None;
         let route = if page == Page::GalaxyMap { pages::navigation::active_route(gs, self.nav.planned.as_ref()) } else { Vec::new() };
         let mut body = |ui: &mut Ui| match page {
             Page::Dashboard => pages::dashboard::show(ui, gs),
-            Page::Exploration => pages::exploration::show(ui, gs, &mut self.explo, high_value),
-            Page::Exobiology => {
-                if let Some(pages::exobio::ExoAction::PlotTo(s)) = pages::exobio::show(ui, gs, &mut self.exo, &self.spansh, self.rt.handle(), self.market.db.as_ref()) {
-                    map_action = Some(pages::galaxy_map::MapAction::PlotTo(s));
-                }
-            }
+            Page::Exploration => follow = pages::exploration::show(ui, gs, &mut self.explo, high_value, &self.spansh, self.rt.handle()),
+            Page::Exobiology => match pages::exobio::show(ui, gs, &mut self.exo, &self.spansh, self.rt.handle(), self.market.db.as_ref()) {
+                Some(pages::exobio::ExoAction::PlotTo(s)) => map_action = Some(pages::galaxy_map::MapAction::PlotTo(s)),
+                Some(pages::exobio::ExoAction::Follow(r)) => follow = Some(r),
+                None => {}
+            },
             Page::GalaxyMap => map_action = pages::galaxy_map::show(ui, gs, &mut self.map, &route),
             Page::Mining => pages::mining::show(ui, gs),
             Page::Colonisation => pages::colonisation::show(ui, gs, &self.market, &mut self.colo),
@@ -511,6 +516,23 @@ impl NexusApp {
             self.nav.to = system;
             self.nav.planner = pages::navigation::Planner::Exact;
             self.page = Page::Navigation;
+        }
+        // A tour picked on Exploration or Exobiology becomes the active route.
+        if let Some(route) = follow {
+            self.nav.planned = Some(route);
+            self.nav.planner = pages::navigation::Planner::InGame;
+            self.page = Page::Navigation;
+        }
+        match self.nav.goto.take() {
+            Some(pages::navigation::Goto::Exploration) => {
+                self.explo.tab = pages::exploration::Tab::Find;
+                self.page = Page::Exploration;
+            }
+            Some(pages::navigation::Goto::Exobiology) => {
+                self.exo.tab = pages::exobio::Tab::Find;
+                self.page = Page::Exobiology;
+            }
+            None => {}
         }
         if settings_changed {
             self.settings_dirty = Some(Instant::now());

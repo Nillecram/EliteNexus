@@ -1,18 +1,81 @@
+use crate::jobs::Slot;
+use crate::pages::navigation::PlannedRoute;
 use crate::theme::{display, pal, size};
-use crate::widgets::{self, GAP, badge, bar, card, card_tinted, cards, empty, kv, short_credits, th};
+use crate::tours::{self, Tour, limits};
+use crate::widgets::{self, GAP, badge, bar, card, card_tinted, cards, empty, footnote, kv, short_credits, th};
 use egui::{Grid, RichText, Sense, Ui};
 use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular as icon;
-use nexus_model::exploration::{interesting, Body, BodyKind, Interest, SystemScan};
+use nexus_model::exploration::{interesting, Body, BodyKind, DataStatus, Interest, SystemScan};
 use nexus_model::GameState;
+use nexus_spansh::RichesRouteRequest;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tab {
     #[default]
     Current,
+    Find,
     Unsold,
-    Skipped,
+    History,
     Codex,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HistoryFilter {
+    #[default]
+    All,
+    Unsold,
+    Sold,
+    NotSellable,
+    Lost,
+}
+
+/// Which bodies a Road to Riches tour looks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BodyFilter {
+    #[default]
+    All,
+    EarthLike,
+    Ammonia,
+    RockyHmc,
+}
+
+/// "Find valuable bodies": Spansh's Road to Riches.
+pub struct FindBodies {
+    kind: BodyFilter,
+    from: String,
+    radius: u32,
+    systems: u32,
+    /// Least a body must be worth (all valuable bodies only), cr.
+    min_value: u64,
+    /// Furthest a body may be from the arrival star, ls.
+    max_ls: u32,
+    /// Rank by the DSS mapping value.
+    mapping: bool,
+    /// Jump range, ly (0 = the current ship's).
+    range: f64,
+    show_options: bool,
+    job: Slot<Result<Tour, String>>,
+    /// Search on the first frame (screenshot runs: `--tab find`).
+    autorun: bool,
+}
+
+impl Default for FindBodies {
+    fn default() -> Self {
+        FindBodies {
+            kind: BodyFilter::All,
+            from: String::new(),
+            radius: 50,
+            systems: 25,
+            min_value: 1_000_000,
+            max_ls: 50_000,
+            mapping: true,
+            range: 0.0,
+            show_options: false,
+            job: Slot::default(),
+            autorun: false,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -21,18 +84,44 @@ pub struct ExplorationUi {
     pub selected_body: Option<u32>,
     /// Show this system instead of the current one (from the unsold list).
     pub system: Option<u64>,
+    pub history: HistoryFilter,
+    pub find: FindBodies,
 }
 
-pub fn show(ui: &mut Ui, gs: &GameState, st: &mut ExplorationUi, high_value: i64) {
+impl ExplorationUi {
+    /// Opens on a tab by name (`find`, `history`, `unsold`); `autorun` starts the Find search on
+    /// the first frame (screenshot runs).
+    pub fn new(tab: Option<&str>, autorun: bool) -> Self {
+        let tab = match tab {
+            Some("find") => Tab::Find,
+            Some("history") => Tab::History,
+            Some("unsold") => Tab::Unsold,
+            _ => Tab::Current,
+        };
+        let mut ui = ExplorationUi { tab, ..Default::default() };
+        ui.find.autorun = autorun && tab == Tab::Find;
+        ui
+    }
+}
+
+/// Returns a route to follow when the commander picks one.
+pub fn show(ui: &mut Ui, gs: &GameState, st: &mut ExplorationUi, high_value: i64, spansh: &nexus_spansh::Spansh, rt: &tokio::runtime::Handle) -> Option<PlannedRoute> {
+    let mut follow = None;
     ui.horizontal(|ui| {
-        if let Some(t) = widgets::tabs(ui, st.tab, &[(Tab::Current, "Current system"), (Tab::Unsold, "Unsold data"), (Tab::Skipped, "Not sellable"), (Tab::Codex, "Codex")]) {
+        if let Some(t) = widgets::tabs(ui, st.tab, &[(Tab::Current, "Current system"), (Tab::Find, "Find valuable bodies"), (Tab::Unsold, "Unsold data"), (Tab::History, "History"), (Tab::Codex, "Codex")]) {
             st.tab = t;
             if t == Tab::Current {
                 st.system = None;
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(RichText::new(format!("{} unsold · {}", gs.exploration.unsold().count(), short_credits(gs.exploration.unsold_value()))).font(display(size::CALLOUT)).color(pal::GOLD));
+            let ex = &gs.exploration;
+            let unsold = ex.unsold().count();
+            if unsold > 0 {
+                ui.label(RichText::new(format!("{unsold} unsold · {}", short_credits(ex.unsold_value()))).font(display(size::CALLOUT)).color(pal::GOLD));
+            } else if let Some(s) = ex.last_sale() {
+                ui.label(RichText::new(format!("All sold · last sale {} · {}", s.ts.to_local_string("%d %b"), short_credits(s.earnings))).font(display(size::CALLOUT)).color(pal::DIM));
+            }
         });
     });
     ui.add_space(GAP);
@@ -41,17 +130,299 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut ExplorationUi, high_value: i64
             let addr = st.system.or(gs.exploration.current);
             match addr.and_then(|a| gs.exploration.systems.get(&a)) {
                 Some(sys) => system_view(ui, gs, sys, st, high_value),
-                None => empty(ui, icon::PLANET, "No exploration data here yet", "Honk (FSS discovery scan) or scan bodies and they will appear instantly."),
+                None => nothing_scanned(ui, gs, None, st),
             }
         }
-        Tab::Unsold => systems_list(ui, gs.exploration.unsold().collect(), st, "No unsold cartographic data."),
-        Tab::Skipped => {
-            ui.add(egui::Label::new(RichText::new("Data scanned before a sale that Universal Cartographics did not buy. The game keeps refusing it, so it is excluded from unsold totals.").color(pal::DIM)).wrap());
-            ui.add_space(8.0);
-            systems_list(ui, gs.exploration.skipped().collect(), st, "Nothing here.");
+        Tab::Find => {
+            egui::ScrollArea::vertical().id_salt("find-bodies").auto_shrink([false, false]).show(ui, |ui| follow = find_bodies(ui, gs, &mut st.find, spansh, rt));
         }
+        Tab::Unsold => systems_list(ui, gs.exploration.unsold().collect(), st, "No unsold cartographic data."),
+        Tab::History => history(ui, gs, st),
         Tab::Codex => codex(ui, gs),
     }
+    follow
+}
+
+/// The current system has nothing scanned: say why the numbers are empty and where to go instead.
+fn nothing_scanned(ui: &mut Ui, gs: &GameState, sys: Option<&SystemScan>, st: &mut ExplorationUi) {
+    let name = sys.map_or(gs.location.system.as_str(), |s| s.name.as_str());
+    let here = sys.is_none_or(|s| s.address == gs.location.system_address);
+    let populated = here && gs.location.info.population > 0;
+    let (title, hint) = if populated {
+        (
+            format!("{name} is populated"),
+            "Every body here was discovered long ago, so scanning pays very little. Explorers earn in unpopulated space: Find valuable bodies plans a tour there.".to_string(),
+        )
+    } else {
+        (
+            format!("Nothing scanned in {name} yet"),
+            match sys.and_then(|s| s.fss_body_count) {
+                Some(n) if n > 0 => format!("{n} bodies detected by the discovery scan. Open the FSS to resolve them: values, signals and first-discovery flags appear here as you scan."),
+                _ => "Honk (discovery scan) and open the FSS: every body appears here as you resolve it.".to_string(),
+            },
+        )
+    };
+    empty(ui, icon::PLANET, &title, &hint);
+    ui.vertical_centered(|ui| {
+        if widgets::primary_button(ui, &format!("{} Find valuable bodies", icon::MAGNIFYING_GLASS)).clicked() {
+            st.tab = Tab::Find;
+        }
+    });
+}
+
+fn status_badge(ui: &mut Ui, s: DataStatus) -> egui::Response {
+    match s {
+        DataStatus::Unsold => badge(ui, "Unsold", pal::GOLD),
+        DataStatus::Sold(ts) => badge(ui, &format!("Sold {}", ts.to_local_string("%d %b")), pal::GOOD),
+        DataStatus::NotSellable => badge(ui, "Not sellable", pal::WARN)
+            .on_hover_text("Scanned before a sale that Universal Cartographics didn't buy. The game keeps refusing it, so it's left out of unsold totals."),
+        DataStatus::Lost => badge(ui, "Lost", pal::BAD).on_hover_text("Unsold when the ship was destroyed."),
+    }
+}
+
+/// Every system with scans, and what became of the data.
+fn history(ui: &mut Ui, gs: &GameState, st: &mut ExplorationUi) {
+    let ex = &gs.exploration;
+    let all: Vec<&SystemScan> = ex.history().collect();
+    if all.is_empty() {
+        empty(ui, icon::CLOCK_COUNTER_CLOCKWISE, "No scans yet", "Every system you scan is listed here, sold or not.");
+        return;
+    }
+    let count = |f: HistoryFilter| all.iter().filter(|s| keep(f, s.status())).count();
+    ui.horizontal_wrapped(|ui| {
+        ui.label(
+            RichText::new(format!("{} systems scanned · {} sales · {} earned", all.len(), ex.sales.len(), short_credits(ex.sold_total)))
+                .font(display(size::HEADLINE))
+                .color(pal::GOLD),
+        );
+    });
+    ui.add_space(6.0);
+    let mut options = vec![
+        (HistoryFilter::All, format!("All {}", all.len())),
+        (HistoryFilter::Unsold, format!("Unsold {}", count(HistoryFilter::Unsold))),
+        (HistoryFilter::Sold, format!("Sold {}", count(HistoryFilter::Sold))),
+        (HistoryFilter::NotSellable, format!("Not sellable {}", count(HistoryFilter::NotSellable))),
+    ];
+    let lost = count(HistoryFilter::Lost);
+    if lost > 0 {
+        options.push((HistoryFilter::Lost, format!("Lost {lost}")));
+    }
+    let opts: Vec<(HistoryFilter, &str)> = options.iter().map(|(f, l)| (*f, l.as_str())).collect();
+    widgets::segmented(ui, &mut st.history, &opts);
+    if st.history == HistoryFilter::NotSellable {
+        footnote(ui, "Data scanned before a sale that Universal Cartographics didn't buy. The game keeps refusing it, so it's left out of unsold totals.");
+    }
+    ui.add_space(6.0);
+    let mut list: Vec<&SystemScan> = all.into_iter().filter(|s| keep(st.history, s.status())).collect();
+    list.sort_by_key(|s| std::cmp::Reverse(s.last_visit));
+    if list.is_empty() {
+        empty(ui, icon::CHECK_CIRCLE, "Nothing here", "");
+        return;
+    }
+    TableBuilder::new(ui)
+        .id_salt("history")
+        .striped(true)
+        .resizable(false)
+        .sense(Sense::click())
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+        .column(Column::initial(280.0).at_least(160.0).clip(true))
+        .column(Column::initial(70.0))
+        .column(Column::initial(100.0))
+        .column(Column::initial(130.0))
+        .column(Column::remainder())
+        .header(30.0, |mut h| {
+            for t in ["System", "Bodies", "Value", "Data", "Last visit"] {
+                h.col(|ui| th(ui, t));
+            }
+        })
+        .body(|body| {
+            body.rows(30.0, list.len(), |mut row| {
+                let s = list[row.index()];
+                row.col(|ui| {
+                    ui.label(&s.name);
+                });
+                row.col(|ui| {
+                    ui.label(s.scanned_bodies().to_string());
+                });
+                row.col(|ui| {
+                    ui.label(RichText::new(short_credits(s.value())).color(pal::GOLD));
+                });
+                row.col(|ui| {
+                    status_badge(ui, s.status());
+                });
+                row.col(|ui| {
+                    ui.label(RichText::new(s.last_visit.to_local_string("%d %b %H:%M")).color(pal::DIM));
+                });
+                if row.response().clicked() {
+                    st.system = Some(s.address);
+                    st.selected_body = None;
+                    st.tab = Tab::Current;
+                }
+            });
+        });
+}
+
+fn keep(f: HistoryFilter, s: DataStatus) -> bool {
+    match f {
+        HistoryFilter::All => true,
+        HistoryFilter::Unsold => s == DataStatus::Unsold,
+        HistoryFilter::Sold => matches!(s, DataStatus::Sold(_)),
+        HistoryFilter::NotSellable => s == DataStatus::NotSellable,
+        HistoryFilter::Lost => s == DataStatus::Lost,
+    }
+}
+
+/// Road to Riches: a tour of systems with valuable bodies to scan.
+fn find_bodies(ui: &mut Ui, gs: &GameState, f: &mut FindBodies, spansh: &nexus_spansh::Spansh, rt: &tokio::runtime::Handle) -> Option<PlannedRoute> {
+    f.job.tick();
+    if f.range <= 0.0 {
+        f.range = tours::jump_range(gs);
+    }
+    let mut follow = None;
+    card_tinted(ui, icon::COINS, "Find valuable bodies", pal::GOLD, |ui| {
+        ui.add(
+            egui::Label::new(
+                RichText::new("A tour of systems with bodies worth scanning: Earth-likes, water and ammonia worlds, terraformables (Spansh's Road to Riches). Spansh skips populated systems, so from the bubble the search widens until it finds some.")
+                    .color(pal::DIM),
+            )
+            .wrap(),
+        );
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
+            ui.add(egui::TextEdit::singleline(&mut f.from).hint_text(format!("From {}", gs.location.system)).desired_width(200.0).margin(egui::Margin::symmetric(10, 6)));
+            widgets::segmented(ui, &mut f.kind, &[(BodyFilter::All, "All valuable"), (BodyFilter::EarthLike, "Earth-likes"), (BodyFilter::Ammonia, "Ammonia worlds"), (BodyFilter::RockyHmc, "Rocky & metal-rich")]);
+        });
+        ui.add_space(6.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
+            ui.label(RichText::new("Within").color(pal::DIM));
+            widgets::segmented(ui, &mut f.radius, &[(25, "25 ly"), (50, "50 ly"), (100, "100 ly"), (250, "250 ly"), (500, "500 ly"), (1000, "1,000 ly")]);
+            ui.label(RichText::new("Stops").color(pal::DIM));
+            widgets::segmented(ui, &mut f.systems, &[(10, "10"), (25, "25"), (50, "50"), (100, "100")]);
+        });
+        ui.add_space(6.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
+            widgets::toggle(ui, &mut f.mapping, "I'll map planets (DSS)").on_hover_text("Rank bodies by what they pay once mapped with the Detailed Surface Scanner. Off: by the FSS scan alone, quicker but much less.");
+            let busy = f.job.busy();
+            let label = if busy { format!("{} Searching…", icon::HOURGLASS) } else { format!("{} Search", icon::MAGNIFYING_GLASS) };
+            let clicked = ui.add_enabled_ui(!busy, |ui| widgets::primary_button(ui, &label)).inner.clicked();
+            if (clicked || std::mem::take(&mut f.autorun)) && !busy {
+                let from = match f.from.trim() {
+                    "" => gs.location.system.clone(),
+                    s => s.to_string(),
+                };
+                let range = f.range.clamp(*limits::RANGE_LY.start(), *limits::RANGE_LY.end());
+                let base = match f.kind {
+                    BodyFilter::All => RichesRouteRequest::road_to_riches(from, range).min_value(f.min_value),
+                    BodyFilter::EarthLike => RichesRouteRequest::earth_likes(from, range),
+                    BodyFilter::Ammonia => RichesRouteRequest::ammonia_worlds(from, range),
+                    BodyFilter::RockyHmc => RichesRouteRequest::rocky_hmc(from, range),
+                };
+                let req = base.radius(f.radius).max_results(f.systems).max_distance(f.max_ls).use_mapping_value(f.mapping);
+                let sp = spansh.clone();
+                f.job.run_async(ui.ctx(), rt, async move { tours::riches(&sp, req).await });
+            }
+            if busy {
+                ui.spinner();
+            }
+        });
+        ui.add_space(4.0);
+        if widgets::disclosure(ui, &mut f.show_options, "Options") {
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = egui::vec2(10.0, 8.0);
+                ui.label("Jump range");
+                ui.add(egui::DragValue::new(&mut f.range).range(limits::RANGE_LY).speed(0.1).suffix(" ly")).on_hover_text("Spansh plans with 10 to 100 ly. Starts at your ship's range.");
+                ui.label("Within");
+                ui.add(egui::DragValue::new(&mut f.radius).range(limits::RADIUS_LY).suffix(" ly")).on_hover_text("Spansh searches up to 1,000 ly around the start.");
+                ui.label("Stops");
+                ui.add(egui::DragValue::new(&mut f.systems).range(limits::SYSTEMS)).on_hover_text("Spansh plans up to 2,000 systems.");
+                if f.kind == BodyFilter::All {
+                    ui.label("Bodies worth at least");
+                    let mut m = f.min_value as f64 / 1e6;
+                    if ui.add(egui::DragValue::new(&mut m).range(0.0..=50.0).speed(0.05).suffix(" M Cr")).changed() {
+                        f.min_value = (m * 1e6).round() as u64;
+                    }
+                }
+                ui.label("At most");
+                ui.add(egui::DragValue::new(&mut f.max_ls).range(100..=1_000_000).speed(100.0).suffix(" ls from the star")).on_hover_text("Bodies further out take long to reach in supercruise.");
+            });
+        }
+        ui.add_space(6.0);
+        match &f.job.last {
+            None => {}
+            Some(Err(e)) => {
+                ui.add(egui::Label::new(RichText::new(format!("{} {e}", icon::WARNING_CIRCLE)).color(pal::BAD)).wrap());
+            }
+            Some(Ok(t)) if t.is_empty() => {
+                empty(
+                    ui,
+                    icon::PLANET,
+                    &format!("Nothing worth scanning within {} ly", t.radius),
+                    "Spansh skips populated systems and found no bodies that match, even with the search widened. Lower the minimum value under Options, or start from somewhere further out.",
+                );
+            }
+            Some(Ok(t)) => follow = tour_results(ui, t, f.mapping),
+        }
+        ui.add_space(2.0);
+        ui.label(RichText::new("Route data © Spansh (spansh.co.uk)").size(size::CAPTION).color(pal::FAINT));
+    });
+    follow
+}
+
+/// The systems of a Road to Riches tour and the bodies to scan in each.
+fn tour_results(ui: &mut Ui, t: &Tour, mapping: bool) -> Option<PlannedRoute> {
+    let mut follow = None;
+    let stops: Vec<_> = t.route.systems.iter().filter(|s| !s.bodies.is_empty()).collect();
+    ui.horizontal_wrapped(|ui| {
+        ui.label(
+            RichText::new(format!(
+                "{} systems · {} bodies · ~{} {} · about {} jumps",
+                stops.len(),
+                t.route.body_count(),
+                short_credits(t.route.total_value() as i64),
+                if mapping { "if you map them" } else { "from FSS scans" },
+                t.route.total_jumps()
+            ))
+            .font(display(size::HEADLINE))
+            .color(pal::GOLD),
+        );
+        if widgets::primary_button(ui, &format!("{} Follow this route", icon::NAVIGATION_ARROW)).on_hover_text("Shows it on the Navigation page and copies the next system after every jump").clicked() {
+            follow = Some(t.planned("Road to riches"));
+        }
+        ui.hyperlink_to(format!("{} Open on Spansh", icon::ARROW_SQUARE_OUT), &t.web_url);
+    });
+    if let Some(asked) = t.widened_from {
+        ui.add(egui::Label::new(RichText::new(format!("{} Nothing within {asked} ly (Spansh skips populated systems), so the search was widened to {} ly.", icon::INFO, t.radius)).color(pal::WARN)).wrap());
+    }
+    ui.add_space(6.0);
+    // The wrapping column goes last: a grid gives the last column the width that's left.
+    Grid::new("riches").max_col_width(ui.available_width()).num_columns(5).striped(true).spacing([14.0, 8.0]).show(ui, |ui| {
+        for h in ["#", "System", "Jumps", "Value", "Bodies to scan"] {
+            th(ui, h);
+        }
+        ui.end_row();
+        for (i, s) in stops.iter().enumerate() {
+            ui.label(RichText::new((i + 1).to_string()).color(pal::FAINT));
+            if ui.link(RichText::new(&s.name).color(pal::TEXT)).on_hover_text("Click to copy").clicked() {
+                ui.ctx().copy_text(s.name.clone());
+            }
+            ui.label(RichText::new(s.jumps.max(1).to_string()).color(pal::DIM));
+            ui.label(RichText::new(short_credits(s.value() as i64)).color(pal::GOLD));
+            ui.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = 2.0;
+                for b in &s.bodies {
+                    let short = b.name.strip_prefix(&s.name).map(str::trim).filter(|n| !n.is_empty()).unwrap_or(&b.name);
+                    let kind = b.subtype.as_deref().unwrap_or("Body");
+                    let terra = if b.is_terraformable { " (terraformable)" } else { "" };
+                    ui.add(egui::Label::new(RichText::new(format!("{short} · {kind}{terra} · {:.0} ls · {}", b.distance_to_arrival, short_credits(b.exploration_value() as i64))).color(pal::DIM)).wrap());
+                }
+            });
+            ui.end_row();
+        }
+    });
+    follow
 }
 
 fn systems_list(ui: &mut Ui, mut list: Vec<&SystemScan>, st: &mut ExplorationUi, empty_text: &str) {
@@ -106,6 +477,15 @@ fn systems_list(ui: &mut Ui, mut list: Vec<&SystemScan>, st: &mut ExplorationUi,
 }
 
 fn system_view(ui: &mut Ui, gs: &GameState, sys: &SystemScan, st: &mut ExplorationUi, high_value: i64) {
+    if sys.bodies.values().all(|b| b.kind == BodyKind::BeltCluster) {
+        // Nothing scanned: four cards of zeros would only look broken.
+        if st.system.is_some() && Some(sys.address) != gs.exploration.current && widgets::button(ui, &format!("{} Back to the current system", icon::ARROW_U_UP_LEFT)).clicked() {
+            st.system = None;
+        }
+        nothing_scanned(ui, gs, Some(sys), st);
+        signals_list(ui, sys);
+        return;
+    }
     let scanned = sys.scanned_bodies();
     let total = sys.fss_body_count.unwrap_or(0) as usize;
     let big = |ui: &mut Ui, text: String, color: egui::Color32| {
@@ -159,40 +539,36 @@ fn system_view(ui: &mut Ui, gs: &GameState, sys: &SystemScan, st: &mut Explorati
     // System-map order: walk the parent chain root-first so moons follow their planet.
     bodies.sort_by_cached_key(|b| tree_key(b));
 
-    if bodies.is_empty() {
-        let hint = match sys.fss_body_count {
-            Some(n) if n > 0 => format!("{n} bodies detected by the discovery scan — open the FSS to resolve them; values, signals and first-discovery flags appear here as you scan."),
-            _ => "Honk (discovery scan) and open the FSS: every body appears here as you resolve it.".to_string(),
-        };
-        empty(ui, icon::PLANET, "Nothing scanned in this system yet", &hint);
-    } else {
-        let selected = st.selected_body.and_then(|id| sys.bodies.get(&id));
-        match selected {
-            // Wide windows: the table with the body's details beside it; narrow: details first.
-            Some(b) if ui.available_width() >= 1000.0 => {
-                let dw = 360.0;
-                ui.horizontal_top(|ui| {
-                    let tw = ui.available_width() - dw - GAP;
-                    ui.vertical(|ui| {
-                        ui.set_width(tw);
-                        body_table(ui, sys, &bodies, st, high_value);
-                    });
-                    ui.add_space(GAP - ui.spacing().item_spacing.x);
-                    ui.vertical(|ui| {
-                        ui.set_width(dw);
-                        body_detail(ui, sys, b, st);
-                    });
+    let selected = st.selected_body.and_then(|id| sys.bodies.get(&id));
+    match selected {
+        // Wide windows: the table with the body's details beside it; narrow: details first.
+        Some(b) if ui.available_width() >= 1000.0 => {
+            let dw = 360.0;
+            ui.horizontal_top(|ui| {
+                let tw = ui.available_width() - dw - GAP;
+                ui.vertical(|ui| {
+                    ui.set_width(tw);
+                    body_table(ui, sys, &bodies, st, high_value);
                 });
-            }
-            Some(b) => {
-                body_detail(ui, sys, b, st);
-                ui.add_space(GAP);
-                body_table(ui, sys, &bodies, st, high_value);
-            }
-            None => body_table(ui, sys, &bodies, st, high_value),
+                ui.add_space(GAP - ui.spacing().item_spacing.x);
+                ui.vertical(|ui| {
+                    ui.set_width(dw);
+                    body_detail(ui, sys, b, st);
+                });
+            });
         }
+        Some(b) => {
+            body_detail(ui, sys, b, st);
+            ui.add_space(GAP);
+            body_table(ui, sys, &bodies, st, high_value);
+        }
+        None => body_table(ui, sys, &bodies, st, high_value),
     }
+    signals_list(ui, sys);
+}
 
+/// The FSS signals of a system (stations, carriers, USSs…), collapsed.
+fn signals_list(ui: &mut Ui, sys: &SystemScan) {
     if !sys.signals.is_empty() {
         ui.add_space(8.0);
         egui::CollapsingHeader::new(RichText::new(format!("{} FSS signals ({})", icon::BROADCAST, sys.signals.len())).font(display(size::CALLOUT)).color(pal::TEXT)).show(ui, |ui| {

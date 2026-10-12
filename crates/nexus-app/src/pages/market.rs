@@ -137,6 +137,10 @@ impl Default for MarketUi {
     }
 }
 
+/// Farthest a local-database search can reach, ly: the whole galaxy (it's about 100,000 ly
+/// across, and the database itself has no limit).
+const MAX_SEARCH_LY: f64 = 100_000.0;
+
 const SERVICES: &[(&str, &str)] = &[
     ("Raw material trader", "raw"),
     ("Manufactured material trader", "manufactured"),
@@ -252,7 +256,7 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
             if st.show_options {
                 ui.horizontal_wrapped(|ui| {
                     ui.label("within");
-                    ui.add(egui::DragValue::new(&mut st.max_dist).range(1.0..=1000.0).suffix(" ly"));
+                    ui.add(egui::DragValue::new(&mut st.max_dist).range(1.0..=MAX_SEARCH_LY).suffix(" ly")).on_hover_text("Searches every market Elite Nexus knows, up to the whole galaxy.");
                     let before = st.min_pad;
                     pad_combo(ui, "mpad", &mut st.min_pad);
                     if st.min_pad != before {
@@ -300,9 +304,9 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
             let cargo = gs.fleet.current().map(|s| s.cargo_capacity as i64).unwrap_or(100);
             ui.horizontal_wrapped(|ui| {
                 ui.label("Routes within");
-                ui.add(egui::DragValue::new(&mut st.radius).range(5.0..=200.0).suffix(" ly"));
+                ui.add(egui::DragValue::new(&mut st.radius).range(5.0..=1000.0).suffix(" ly")).on_hover_text("Up to 1,000 ly. Every market in the area is loaded, so wide areas take a few seconds.");
                 ui.label("of here, hop up to");
-                ui.add(egui::DragValue::new(&mut st.hop).range(1.0..=200.0).suffix(" ly"));
+                ui.add(egui::DragValue::new(&mut st.hop).range(1.0..=500.0).suffix(" ly")).on_hover_text("Longest trip between buying and selling, up to 500 ly.");
                 pad_combo(ui, "rpad", &mut st.min_pad);
                 ui.label(format!("cargo {cargo} t, capital {}", short_credits(gs.cmdr.credits)));
                 crate::widgets::toggle(ui, &mut st.carriers, "Carriers");
@@ -352,7 +356,7 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
                 ui.label("at least");
                 ui.add(egui::DragValue::new(&mut st.hotspot_min).range(1..=6));
                 ui.label("hotspots within");
-                ui.add(egui::DragValue::new(&mut st.max_dist).range(1.0..=1000.0).suffix(" ly"));
+                ui.add(egui::DragValue::new(&mut st.max_dist).range(1.0..=MAX_SEARCH_LY).suffix(" ly")).on_hover_text("Searches every market Elite Nexus knows, up to the whole galaxy.");
                 if crate::widgets::primary_button(ui, "Find hotspots").clicked()
                     && let Some(o) = origin {
                         let q = HotspotQuery { origin: o, signal: st.hotspot_signal.clone(), max_distance_ly: Some(st.max_dist), min_count: st.hotspot_min, limit: 50 };
@@ -1058,7 +1062,7 @@ fn sell_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) {
         ui.label(RichText::new(format!("{} {} t of {} commodities", icon::PACKAGE, nexus_data::names::group_digits(tons), hold.len())).font(display(15.0)));
         ui.add_space(12.0);
         ui.label("buyers within");
-        search |= ui.add(egui::DragValue::new(&mut st.sell_radius).range(5.0..=500.0).suffix(" ly")).changed();
+        search |= ui.add(egui::DragValue::new(&mut st.sell_radius).range(5.0..=MAX_SEARCH_LY).suffix(" ly")).changed();
         ui.label(RichText::new(format!("· {} pad · prices up to {:.0} h old", pad.unwrap_or('L'), st.max_age_h)).color(pal::DIM));
         search |= ui.button(RichText::new(format!("{} Refresh", icon::ARROWS_CLOCKWISE)).color(pal::ACCENT)).clicked();
     });

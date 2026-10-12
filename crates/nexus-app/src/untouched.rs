@@ -3,10 +3,12 @@
 //! still there.
 //!
 //! Only the opposite can be known for sure: Spansh lists a body's genera once someone DSS-maps it
-//! with a tool that uploads to EDDN (EDMC, EDDiscovery, …), and biology landmarks once someone logs
-//! samples there; a footfall flag says someone landed. A body with biology signals but none of that
-//! has never been mapped or sampled by a commander who shares data. Players without such tools
-//! leave no trace, so this is a strong lead, not a guarantee.
+//! with a tool that uploads to EDDN (EDMC, EDDiscovery, …), and biology landmarks once a sample
+//! adds a codex entry; a footfall flag says someone landed. A body with biology signals but none
+//! of that has never been mapped or sampled by a commander who shares data. Two blind spots stay:
+//! players without such tools, and samples of a species the commander already had in their codex
+//! for that region (the game writes no codex entry then). So this is a strong lead, not a
+//! guarantee.
 
 use crate::ai_tools::{STANDARD_ATM, STANDARD_G, journal_planet_class};
 use nexus_data::bio_predict::{self as bp, BodyFacts};
@@ -19,13 +21,32 @@ use serde_json::json;
 pub enum Evidence {
     /// Never DSS-mapped or sampled by anyone sharing data; the species is predicted from conditions.
     NoTrace,
-    /// DSS-mapped (so the genus is confirmed there) but nobody has logged samples.
+    /// DSS-mapped (so the genus is confirmed there) but no samples on record.
     GenusConfirmed,
+}
+
+impl Evidence {
+    pub fn label(self) -> &'static str {
+        match self {
+            Evidence::NoTrace => "No record",
+            Evidence::GenusConfirmed => "Mapped, no samples",
+        }
+    }
+
+    pub fn explain(self) -> &'static str {
+        match self {
+            Evidence::NoTrace => "No commander who shares data has mapped or sampled this planet. The species is predicted from its conditions.",
+            Evidence::GenusConfirmed => {
+                "Someone mapped it with the DSS, so the genus is confirmed there, but no samples are on record. They may have sampled without leaving a record, so the bonus may be gone."
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Candidate {
     pub system: String,
+    pub system_pos: Option<[f64; 3]>,
     pub body: String,
     pub distance_ly: f64,
     pub distance_ls: Option<f64>,
@@ -50,8 +71,8 @@ pub struct Stats {
     pub examined: usize,
     /// Someone logged samples there (they landed).
     pub sampled: usize,
-    /// DSS-mapped without the target genus, or mapped while `include_mapped` is off.
-    pub mapped: usize,
+    /// DSS-mapped, and the target genus isn't there.
+    pub mapped_without: usize,
     pub populated: usize,
     /// Your journal or live EDDN data say someone set foot there.
     pub footfalled: usize,
@@ -65,8 +86,7 @@ pub struct Query {
     pub species: &'static Species,
     pub origin: [f64; 3],
     pub radius_ly: f64,
-    /// Also list planets mapped by someone (genus confirmed) where nobody has logged samples.
-    pub include_mapped: bool,
+    /// Candidates to collect before the search stops reading further out.
     pub limit: usize,
 }
 
@@ -194,7 +214,7 @@ pub enum Verdict {
 }
 
 /// Judges one Spansh body for `species`.
-pub fn classify(b: &BodyRecord, species: &Species, include_mapped: bool) -> Verdict {
+pub fn classify(b: &BodyRecord, species: &Species) -> Verdict {
     // A biology landmark means someone logged samples there, on foot.
     let sampled = b.landmarks.iter().any(|l| l.value > 0 || exobio::genus(&l.kind).is_some());
     if sampled {
@@ -202,7 +222,7 @@ pub fn classify(b: &BodyRecord, species: &Species, include_mapped: bool) -> Verd
     }
     let genera = &b.genuses;
     let has_genus = genera.iter().any(|g| exobio::genus(g).is_some_and(|x| x.name == species.genus));
-    if !genera.is_empty() && (!include_mapped || !has_genus) {
+    if !genera.is_empty() && !has_genus {
         return Verdict::Mapped;
     }
     let chance = bp::predict(&facts(b), genera).iter().find(|p| p.species == species.name).map_or(0.0, |p| p.likelihood);
@@ -215,9 +235,9 @@ pub fn classify(b: &BodyRecord, species: &Species, include_mapped: bool) -> Verd
 /// Pages of 500 bodies read at most (nearest first).
 const MAX_PAGES: u32 = 4;
 
-/// Searches Spansh nearest-first until enough candidates turn up (at most 2,000 bodies), drops
-/// populated systems and bodies your own data says were footfalled, and ranks the rest by expected
-/// first-logged value against distance.
+/// Searches Spansh nearest-first until `limit` candidates turn up (at most 2,000 bodies), drops
+/// populated systems and bodies your own data says were footfalled, and ranks every candidate
+/// found by expected first-logged value against distance (all of them, so they match `Stats`).
 pub async fn find(spansh: &Spansh, q: &Query, footfalled: impl Fn(&str) -> bool) -> Result<(Vec<Candidate>, Stats), String> {
     let mut stats = Stats::default();
     let mut out: Vec<Candidate> = Vec::new();
@@ -233,9 +253,9 @@ pub async fn find(spansh: &Spansh, q: &Query, footfalled: impl Fn(&str) -> bool)
         }
         let mut found: Vec<(BodyRecord, Evidence, f32)> = Vec::new();
         for b in res.results {
-            match classify(&b, q.species, q.include_mapped) {
+            match classify(&b, q.species) {
                 Verdict::Sampled => stats.sampled += 1,
-                Verdict::Mapped => stats.mapped += 1,
+                Verdict::Mapped => stats.mapped_without += 1,
                 Verdict::RuledOut => stats.ruled_out += 1,
                 Verdict::Candidate(e, c) => found.push((b, e, c)),
             }
@@ -261,7 +281,6 @@ pub async fn find(spansh: &Spansh, q: &Query, footfalled: impl Fn(&str) -> bool)
         f64::from(c.chance) * c.value_first_logged as f64 * trust / (1.0 + c.distance_ly / 250.0)
     };
     out.sort_by(|a, b| score(b).total_cmp(&score(a)));
-    out.truncate(q.limit.max(1));
     Ok((out, stats))
 }
 
@@ -282,8 +301,13 @@ async fn populated_systems(spansh: &Spansh, found: &[(BodyRecord, Evidence, f32)
 
 fn candidate(b: BodyRecord, evidence: Evidence, chance: f32, species: &Species) -> Candidate {
     let last = [b.updated_at.as_deref(), b.signals_updated_at.as_deref()].into_iter().flatten().filter_map(nexus_spansh::parse_timestamp).max();
+    let system_pos = match (b.system_x, b.system_y, b.system_z) {
+        (Some(x), Some(y), Some(z)) => Some([x, y, z]),
+        _ => None,
+    };
     Candidate {
         bio_signals: b.signal("Biological"),
+        system_pos,
         system: b.system_name,
         body: b.name,
         distance_ly: b.distance.unwrap_or(0.0),
@@ -339,7 +363,7 @@ mod tests {
 
     #[test]
     fn the_request_follows_the_species_envelope() {
-        let q = Query { species: stratum(), origin: [0.0, 0.0, 0.0], radius_ly: 500.0, include_mapped: true, limit: 10 };
+        let q = Query { species: stratum(), origin: [0.0, 0.0, 0.0], radius_ly: 500.0, limit: 10 };
         let j = request(&q, 0).to_json();
         let f = &j["filters"];
         assert_eq!(f["subtype"]["value"], json!(["High metal content world"]));
@@ -351,22 +375,24 @@ mod tests {
     #[test]
     fn evidence_of_samples_or_another_genus_excludes_a_body() {
         let sp = stratum();
-        assert!(matches!(classify(&hmc(json!({})), sp, true), Verdict::Candidate(Evidence::NoTrace, c) if c > 0.0));
+        assert!(matches!(classify(&hmc(json!({})), sp), Verdict::Candidate(Evidence::NoTrace, c) if c > 0.0));
         // someone logged samples (a biology landmark) → they landed
         let sampled = hmc(json!({"landmarks": [{"type": "Bacterium", "subtype": "Bacterium Aurasus", "value": 1000000}]}));
-        assert_eq!(classify(&sampled, sp, true), Verdict::Sampled);
+        assert_eq!(classify(&sampled, sp), Verdict::Sampled);
         // a settlement is not evidence of biology sampling
         let settlement = hmc(json!({"landmarks": [{"type": "Surface Station", "subtype": "Settlement", "value": 0}]}));
-        assert!(matches!(classify(&settlement, sp, true), Verdict::Candidate(..)));
+        assert!(matches!(classify(&settlement, sp), Verdict::Candidate(..)));
         // mapped: genera known
         let with_stratum = hmc(json!({"genuses": [{"name": "Stratum"}, {"name": "Bacterial"}]}));
-        assert!(matches!(classify(&with_stratum, sp, true), Verdict::Candidate(Evidence::GenusConfirmed, _)));
-        assert_eq!(classify(&with_stratum, sp, false), Verdict::Mapped);
+        assert!(matches!(classify(&with_stratum, sp), Verdict::Candidate(Evidence::GenusConfirmed, _)));
         let without = hmc(json!({"genuses": [{"name": "Bacterial"}]}));
-        assert_eq!(classify(&without, sp, true), Verdict::Mapped, "mapped and no Stratum there");
+        assert_eq!(classify(&without, sp), Verdict::Mapped, "mapped and no Stratum there");
         // too cold for Stratum
         let cold = hmc(json!({"surface_temperature": 140.0}));
-        assert_eq!(classify(&cold, sp, true), Verdict::RuledOut);
+        assert_eq!(classify(&cold, sp), Verdict::RuledOut);
+        // candidates carry their system's position for tours
+        let c = candidate(hmc(json!({})), Evidence::NoTrace, 0.9, sp);
+        assert_eq!(c.system_pos, Some([1000.0, 0.0, 3000.0]));
     }
 
     /// Live: `cargo test -p nexus-app untouched -- --ignored --nocapture` (needs the internet).
@@ -374,7 +400,7 @@ mod tests {
     #[ignore]
     fn live_search_three_thousand_ly_out() {
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("runtime");
-        let q = Query { species: stratum(), origin: [1200.0, -40.0, 2800.0], radius_ly: 400.0, include_mapped: true, limit: 10 };
+        let q = Query { species: stratum(), origin: [1200.0, -40.0, 2800.0], radius_ly: 400.0, limit: 10 };
         let started = std::time::Instant::now();
         let (list, st) = rt.block_on(find(&Spansh::new(), &q, |_| false)).expect("search");
         println!("{:?} in {:.1} s", st, started.elapsed().as_secs_f64());

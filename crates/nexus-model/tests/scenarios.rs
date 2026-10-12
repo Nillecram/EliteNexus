@@ -63,6 +63,15 @@ fn unsold_data_and_sale_skipping() {
     assert_eq!(gs.exploration.unsold().count(), 0);
     assert_eq!(gs.exploration.skipped().count(), 1);
     assert_eq!(gs.exploration.sold_total, 700_000);
+
+    // Sold data stays in the history, with what became of it.
+    use nexus_model::exploration::DataStatus;
+    let ex = &gs.exploration;
+    assert_eq!(ex.history().count(), 2);
+    let sale = ex.last_sale().expect("sale recorded");
+    assert_eq!((sale.systems, sale.earnings), (1, 700_000));
+    assert_eq!(ex.systems[&100].status(), DataStatus::Sold(sale.ts));
+    assert_eq!(ex.systems[&200].status(), DataStatus::NotSellable);
 }
 
 #[test]

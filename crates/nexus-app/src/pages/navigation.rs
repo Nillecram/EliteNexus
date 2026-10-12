@@ -1,8 +1,11 @@
-//! Navigation: the in-game route plus Spansh route planners (neutron, exact, carrier, riches,
-//! exobiology). Whatever route is active drives the "next system → clipboard" automation.
+//! Navigation: the in-game route plus the Spansh travel planners (neutron, exact, carrier).
+//! Scan tours are planned where they're used (Exploration › Find valuable bodies, Exobiology ›
+//! Find planets) and land here. Whatever route is active drives the "next system → clipboard"
+//! automation.
 
 use crate::jobs::Slot;
 use crate::theme::{display, pal, size};
+use crate::tours::limits;
 use crate::widgets::{self, GAP, badge, card, card_tinted, cards, empty, short_credits, th, toggle};
 use egui::{RichText, Ui};
 use egui_extras::{Column, TableBuilder};
@@ -10,9 +13,7 @@ use egui_phosphor::regular as icon;
 use nexus_data::exploration::{is_scoopable, star_description};
 use nexus_model::location::distance;
 use nexus_model::GameState;
-use nexus_spansh::{
-    CarrierRouteRequest, ExobiologyRouteRequest, GalaxyAlgorithm, GalaxyRouteRequest, NeutronRouteRequest, RichesRouteRequest, RouteWaypoints, ShipProfile, Spansh,
-};
+use nexus_spansh::{CarrierRouteRequest, GalaxyAlgorithm, GalaxyRouteRequest, NeutronRouteRequest, RouteWaypoints, ShipProfile, Spansh};
 
 /// A route waypoint, whichever planner produced it.
 #[derive(Debug, Clone)]
@@ -32,8 +33,36 @@ pub struct Waypoint {
 pub struct PlannedRoute {
     pub kind: &'static str,
     pub summary: String,
+    /// The route on Spansh's website; empty for tours planned here.
     pub web_url: String,
     pub waypoints: Vec<Waypoint>,
+    /// Waypoints already reached.
+    done: usize,
+    /// The system we were in when progress was last checked.
+    at: String,
+}
+
+impl PlannedRoute {
+    pub fn new(kind: &'static str, summary: String, web_url: String, waypoints: Vec<Waypoint>) -> Self {
+        PlannedRoute { kind, summary, web_url, waypoints, done: 0, at: String::new() }
+    }
+
+    /// Follows the commander along the route: arriving at a waypoint (or one further on) marks it
+    /// reached. Only arrivals count, so a loop that starts and ends here isn't finished at once.
+    pub fn advance(&mut self, here: &str) {
+        if here.is_empty() || self.at.eq_ignore_ascii_case(here) {
+            return;
+        }
+        self.at = here.to_string();
+        if let Some(i) = self.waypoints[self.done.min(self.waypoints.len())..].iter().position(|w| w.system.eq_ignore_ascii_case(here)) {
+            self.done += i + 1;
+        }
+    }
+
+    /// Waypoints still ahead.
+    pub fn remaining(&self) -> &[Waypoint] {
+        &self.waypoints[self.done.min(self.waypoints.len())..]
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -43,17 +72,13 @@ pub enum Planner {
     Neutron,
     Exact,
     Carrier,
-    Riches,
-    Exobiology,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum RichesKind {
-    #[default]
-    All,
-    EarthLike,
-    Ammonia,
-    RockyHmc,
+/// Pages the Navigation page can send the commander to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Goto {
+    Exploration,
+    Exobiology,
 }
 
 pub struct NavUi {
@@ -62,17 +87,14 @@ pub struct NavUi {
     pub to: String,
     pub range: f64,
     pub efficiency: u8,
-    pub riches_kind: RichesKind,
-    pub radius: u32,
-    pub max_results: u32,
-    pub min_value: u64,
-    pub use_mapping: bool,
     /// Exact plotter options (as on spansh.co.uk/exact-plotter).
     pub exact: ExactOptions,
     /// The planner's advanced options are shown (hidden by default).
     pub show_options: bool,
     pub job: Slot<Result<PlannedRoute, String>>,
     pub planned: Option<PlannedRoute>,
+    /// A link to another page was clicked.
+    pub goto: Option<Goto>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -109,15 +131,11 @@ impl Default for NavUi {
             to: String::new(),
             range: 0.0,
             efficiency: 60,
-            riches_kind: RichesKind::All,
-            radius: 25,
-            max_results: 25,
-            min_value: 1_000_000,
-            use_mapping: true,
             exact: ExactOptions::default(),
             show_options: false,
             job: Slot::default(),
             planned: None,
+            goto: None,
         }
     }
 }
@@ -156,9 +174,7 @@ pub(crate) fn from_spansh(w: &nexus_spansh::Waypoint) -> Waypoint {
 /// Remaining waypoints of the active route (planner route if set, else the in-game route).
 pub fn active_route(gs: &GameState, planned: Option<&PlannedRoute>) -> Vec<Waypoint> {
     if let Some(p) = planned {
-        let here = gs.location.system.to_ascii_lowercase();
-        let start = p.waypoints.iter().rposition(|w| w.system.to_ascii_lowercase() == here).map(|i| i + 1).unwrap_or(0);
-        return p.waypoints[start.min(p.waypoints.len())..].to_vec();
+        return p.remaining().to_vec();
     }
     let start = gs.nav_route.iter().position(|h| h.system_address == gs.location.system_address).map(|i| i + 1).unwrap_or(0);
     gs.nav_route[start.min(gs.nav_route.len())..]
@@ -188,22 +204,24 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut NavUi, auto_copy: &mut bool, s
         st.from = gs.location.system.clone();
     }
     if st.range <= 0.0 {
-        st.range = gs.fleet.current().map(|s| s.max_jump_range).filter(|r| *r > 0.0).unwrap_or(30.0);
+        st.range = crate::tours::jump_range(gs);
     }
-    if let Some(p) = widgets::tabs(
-        ui,
-        st.planner,
-        &[
-            (Planner::InGame, "In-game route"),
-            (Planner::Neutron, "Neutron"),
-            (Planner::Exact, "Exact plotter"),
-            (Planner::Carrier, "Fleet carrier"),
-            (Planner::Riches, "Road to riches"),
-            (Planner::Exobiology, "Exobiology"),
-        ],
-    ) {
+    if let Some(p) = widgets::tabs(ui, st.planner, &[(Planner::InGame, "In-game route"), (Planner::Neutron, "Neutron"), (Planner::Exact, "Exact plotter"), (Planner::Carrier, "Fleet carrier")]) {
         st.planner = p;
     }
+    // Scan tours live with the activity they serve; their routes come back here.
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        ui.label(RichText::new("Looking for something to scan? Plan a tour in").size(size::FOOTNOTE).color(pal::DIM));
+        if ui.link(RichText::new("Exploration › Find valuable bodies").size(size::FOOTNOTE)).clicked() {
+            st.goto = Some(Goto::Exploration);
+        }
+        ui.label(RichText::new("or").size(size::FOOTNOTE).color(pal::DIM));
+        if ui.link(RichText::new("Exobiology › Find planets").size(size::FOOTNOTE)).clicked() {
+            st.goto = Some(Goto::Exobiology);
+        }
+        ui.label(RichText::new("and it shows up here.").size(size::FOOTNOTE).color(pal::DIM));
+    });
     ui.add_space(GAP);
     if st.planner != Planner::InGame {
         planner_form(ui, gs, st, spansh, rt);
@@ -231,8 +249,10 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
     let ship_name = gs.fleet.current().map(|s| s.display_name());
     // Smart defaults: start here, with the current ship's jump range.
     if st.range <= 0.0 {
-        st.range = gs.fleet.current().map(|s| (s.max_jump_range * 10.0).round() / 10.0).filter(|r| *r > 0.0).unwrap_or(20.0);
+        st.range = crate::tours::jump_range(gs);
     }
+    // The exact plotter keeps at most a full main tank in reserve.
+    let tank = gs.fleet.current().map(|s| s.fuel_main_capacity).filter(|t| *t > 0.0).unwrap_or(32.0);
     card(ui, "", |ui| {
         // The simple surface: where from, where to, go.
         ui.horizontal_wrapped(|ui| {
@@ -258,8 +278,6 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
             Planner::Exact => ship_name.clone().map(|n| format!("Plans every jump for {n}: its real FSD, mass, fuel and cargo, scooping stops and neutron boosts.")),
             Planner::Neutron => Some(format!("Follows neutron stars with a {:.1} ly jump range.", st.range)),
             Planner::Carrier => Some(format!("Tritium in the tank {} t · cargo {} t.", gs.carrier.fuel, gs.carrier.space.cargo)),
-            Planner::Riches => Some(format!("Valuable bodies to scan within {} ly.", st.radius)),
-            Planner::Exobiology => Some(format!("Planets with valuable species within {} ly.", st.radius)),
             Planner::InGame => None,
         };
         if let Some(h) = hint {
@@ -273,7 +291,7 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
             ui.horizontal_wrapped(|ui| match st.planner {
                 Planner::Neutron => {
                     ui.label("Range");
-                    ui.add(egui::DragValue::new(&mut st.range).range(5.0..=120.0).suffix(" ly"));
+                    ui.add(egui::DragValue::new(&mut st.range).range(limits::RANGE_LY).suffix(" ly")).on_hover_text("Spansh plans with jump ranges from 10 to 100 ly.");
                     ui.label("Efficiency");
                     ui.add(egui::DragValue::new(&mut st.efficiency).range(1..=100).suffix(" %"))
                         .on_hover_text("Lower = more neutron detours for fewer jumps; higher = straighter route.");
@@ -297,36 +315,7 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
                     toggle(ui, &mut o.already_supercharged, "Already supercharged");
                     ui.end_row();
                     ui.label("Reserve");
-                    ui.add(egui::DragValue::new(&mut o.reserve).range(0.0..=64.0).speed(0.1).suffix(" t"));
-                }
-                Planner::Riches | Planner::Exobiology => {
-                    if st.planner == Planner::Riches {
-                        egui::ComboBox::from_id_salt("rk")
-                            .selected_text(match st.riches_kind {
-                                RichesKind::All => "All valuable bodies",
-                                RichesKind::EarthLike => "Earth-likes",
-                                RichesKind::Ammonia => "Ammonia worlds",
-                                RichesKind::RockyHmc => "Terraformable rocky/HMC",
-                            })
-                            .show_ui(ui, |ui| {
-                                ui.selectable_value(&mut st.riches_kind, RichesKind::All, "All valuable bodies");
-                                ui.selectable_value(&mut st.riches_kind, RichesKind::EarthLike, "Earth-likes");
-                                ui.selectable_value(&mut st.riches_kind, RichesKind::Ammonia, "Ammonia worlds");
-                                ui.selectable_value(&mut st.riches_kind, RichesKind::RockyHmc, "Terraformable rocky/HMC");
-                            });
-                        toggle(ui, &mut st.use_mapping, "Count mapping value");
-                    }
-                    ui.label("Range");
-                    ui.add(egui::DragValue::new(&mut st.range).range(5.0..=120.0).suffix(" ly"));
-                    ui.label("Radius");
-                    ui.add(egui::DragValue::new(&mut st.radius).range(5..=500).suffix(" ly"));
-                    ui.label("Systems");
-                    ui.add(egui::DragValue::new(&mut st.max_results).range(1..=100));
-                    ui.label("Min value");
-                    let mut mv = st.min_value as f64 / 1e6;
-                    if ui.add(egui::DragValue::new(&mut mv).range(0.0..=100.0).speed(0.1).suffix(" M")).changed() {
-                        st.min_value = (mv * 1e6) as u64;
-                    }
+                    ui.add(egui::DragValue::new(&mut o.reserve).range(0.0..=tank).speed(0.1).suffix(" t")).on_hover_text("Fuel to keep in the tank, up to a full main tank.");
                 }
                 Planner::Carrier | Planner::InGame => {
                     ui.label(RichText::new("No extra options for this planner.").size(size::FOOTNOTE).color(pal::DIM));
@@ -368,16 +357,12 @@ fn make_request(gs: &GameState, st: &NavUi, spansh: &Spansh) -> Option<PlanFutur
             if to.is_empty() {
                 return None;
             }
-            let req = NeutronRouteRequest::new(from, to, st.range).efficiency(st.efficiency);
+            let req = NeutronRouteRequest::new(from, to, st.range.clamp(*limits::RANGE_LY.start(), *limits::RANGE_LY.end())).efficiency(st.efficiency);
             Some(Box::pin(async move {
                 let p = sp.neutron_route(&req).await.map_err(|e| e.to_string())?;
                 let wps: Vec<Waypoint> = p.route.waypoints().iter().map(from_spansh).collect();
-                Ok(PlannedRoute {
-                    kind: "Neutron",
-                    summary: format!("{} waypoints · {} jumps · {} neutron boosts", wps.len(), p.route.total_jumps(), p.route.neutron_count()),
-                    web_url: p.web_url,
-                    waypoints: wps,
-                })
+                let summary = format!("{} waypoints · {} jumps · {} neutron boosts", wps.len(), p.route.total_jumps(), p.route.neutron_count());
+                Ok(PlannedRoute::new("Neutron", summary, p.web_url, wps))
             }))
         }
         Planner::Exact => {
@@ -400,19 +385,15 @@ fn make_request(gs: &GameState, st: &NavUi, spansh: &Spansh) -> Option<PlanFutur
                     .reserve(o.reserve);
                 let p = sp.galaxy_route(&req).await.map_err(|e| e.to_string())?;
                 let wps: Vec<Waypoint> = p.route.waypoints().iter().map(from_spansh).collect();
-                Ok(PlannedRoute {
-                    kind: "Exact",
-                    summary: format!(
-                        "{} jumps · {:.0} ly · {} refuels · {} neutron boosts · {:.1} t fuel",
-                        p.route.jump_count(),
-                        p.route.distance(),
-                        p.route.refuel_stops(),
-                        p.route.neutron_boosts(),
-                        p.route.fuel_used()
-                    ),
-                    web_url: p.web_url,
-                    waypoints: wps,
-                })
+                let summary = format!(
+                    "{} jumps · {:.0} ly · {} refuels · {} neutron boosts · {:.1} t fuel",
+                    p.route.jump_count(),
+                    p.route.distance(),
+                    p.route.refuel_stops(),
+                    p.route.neutron_boosts(),
+                    p.route.fuel_used()
+                );
+                Ok(PlannedRoute::new("Exact", summary, p.web_url, wps))
             }))
         }
         Planner::Carrier => {
@@ -424,46 +405,8 @@ fn make_request(gs: &GameState, st: &NavUi, spansh: &Spansh) -> Option<PlanFutur
             Some(Box::pin(async move {
                 let p = sp.carrier_route(&req).await.map_err(|e| e.to_string())?;
                 let wps: Vec<Waypoint> = p.route.waypoints().iter().map(from_spansh).collect();
-                Ok(PlannedRoute {
-                    kind: "Carrier",
-                    summary: format!("{} carrier jumps · {:.0} ly · {} t tritium", p.route.jump_count(), p.route.distance(), p.route.tritium_used()),
-                    web_url: p.web_url,
-                    waypoints: wps,
-                })
-            }))
-        }
-        Planner::Riches => {
-            let base = match st.riches_kind {
-                RichesKind::All => RichesRouteRequest::road_to_riches(from, st.range),
-                RichesKind::EarthLike => RichesRouteRequest::earth_likes(from, st.range),
-                RichesKind::Ammonia => RichesRouteRequest::ammonia_worlds(from, st.range),
-                RichesKind::RockyHmc => RichesRouteRequest::rocky_hmc(from, st.range),
-            };
-            let req = base.radius(st.radius).max_results(st.max_results).min_value(st.min_value).use_mapping_value(st.use_mapping);
-            Some(Box::pin(async move {
-                let p = sp.riches_route(&req).await.map_err(|e| e.to_string())?;
-                let wps: Vec<Waypoint> = p.route.waypoints().iter().map(from_spansh).collect();
-                let value: u64 = wps.iter().filter_map(|w| w.value).sum();
-                Ok(PlannedRoute {
-                    kind: "Road to riches",
-                    summary: format!("{} systems · ~{} Cr", wps.len(), nexus_data::names::compact_credits(value as i64)),
-                    web_url: p.web_url,
-                    waypoints: wps,
-                })
-            }))
-        }
-        Planner::Exobiology => {
-            let req = ExobiologyRouteRequest::new(from, st.range).radius(st.radius).max_results(st.max_results).min_value(st.min_value);
-            Some(Box::pin(async move {
-                let p = sp.exobiology_route(&req).await.map_err(|e| e.to_string())?;
-                let wps: Vec<Waypoint> = p.route.waypoints().iter().map(from_spansh).collect();
-                let value: u64 = wps.iter().filter_map(|w| w.value).sum();
-                Ok(PlannedRoute {
-                    kind: "Exobiology",
-                    summary: format!("{} systems · ~{} Cr in species", wps.len(), nexus_data::names::compact_credits(value as i64)),
-                    web_url: p.web_url,
-                    waypoints: wps,
-                })
+                let summary = format!("{} carrier jumps · {:.0} ly · {} t tritium", p.route.jump_count(), p.route.distance(), p.route.tritium_used());
+                Ok(PlannedRoute::new("Carrier", summary, p.web_url, wps))
             }))
         }
     }
@@ -475,9 +418,15 @@ fn route_view(ui: &mut Ui, gs: &GameState, st: &NavUi) {
         ui.horizontal_wrapped(|ui| {
             badge(ui, p.kind, pal::CYAN);
             ui.label(RichText::new(&p.summary).font(display(size::HEADLINE)));
-            ui.hyperlink_to(format!("{} Open on Spansh", icon::ARROW_SQUARE_OUT), &p.web_url);
+            if !p.web_url.is_empty() {
+                ui.hyperlink_to(format!("{} Open on Spansh", icon::ARROW_SQUARE_OUT), &p.web_url);
+            }
         });
         ui.add_space(8.0);
+        if route.is_empty() && !p.waypoints.is_empty() {
+            empty(ui, icon::FLAG_CHECKERED, "Route complete", "You've reached every stop. Go back to the in-game route, or plan another one.");
+            return;
+        }
     }
     if route.is_empty() {
         empty(ui, icon::NAVIGATION_ARROW, "No route", "Plot a route in the galaxy map, or use a Spansh planner above.");

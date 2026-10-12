@@ -6,18 +6,19 @@
 //! cargo run -p nexus-spansh --example smoke -- --only neutron,dump --record target/spansh-responses
 //! ```
 //!
-//! Steps: neutron, carrier, galaxy, tritium, ltd, dump, system.
+//! Steps: neutron, carrier, galaxy, riches, exobio, tritium, ltd, dump, system.
 
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Context as _;
 use nexus_spansh::{
-    CarrierRouteRequest, GalaxyRouteRequest, HotspotQuery, JobOptions, MarketQuery,
-    NeutronRouteRequest, RouteWaypoints, ShipProfile, Spansh, parse_timestamp,
+    CarrierRouteRequest, ExobiologyRouteRequest, GalaxyRouteRequest, HotspotQuery, JobOptions,
+    MarketQuery, NeutronRouteRequest, RichesRouteRequest, RouteWaypoints, ShipProfile, Spansh,
+    parse_timestamp,
 };
 
-const STEPS: [&str; 7] = [
-    "neutron", "carrier", "galaxy", "tritium", "ltd", "dump", "system",
+const STEPS: [&str; 9] = [
+    "neutron", "carrier", "galaxy", "riches", "exobio", "tritium", "ltd", "dump", "system",
 ];
 
 /// An engineered Krait Phantom: 5A SCO drive (Mass Manager, optimal mass 2117.5 t) and a size-3
@@ -87,6 +88,8 @@ async fn main() -> anyhow::Result<()> {
             "neutron" => neutron(&spansh).await,
             "carrier" => carrier(&spansh).await,
             "galaxy" => galaxy(&spansh).await,
+            "riches" => riches(&spansh).await,
+            "exobio" => exobio(&spansh).await,
             "tritium" => tritium(&spansh).await,
             "ltd" => ltd(&spansh).await,
             "dump" => dump(&spansh).await,
@@ -192,6 +195,66 @@ async fn carrier(spansh: &Spansh) -> anyhow::Result<()> {
         );
     }
     Ok(())
+}
+
+/// Road to Riches with the app's defaults (25 ly radius, 25 systems, ≥ 1 M cr, mapping value).
+async fn riches(spansh: &Spansh) -> anyhow::Result<()> {
+    let req = RichesRouteRequest::road_to_riches("Brestla", 60.0)
+        .radius(25)
+        .max_results(25)
+        .min_value(1_000_000)
+        .use_mapping_value(true);
+    let p = spansh.riches_route(&req).await?;
+    scan_route("riches", &p.route, &p.job, p.elapsed, p.polls, &p.web_url);
+    Ok(())
+}
+
+/// The exobiology planner ("Expressway to Exomastery") with the app's defaults.
+async fn exobio(spansh: &Spansh) -> anyhow::Result<()> {
+    let req = ExobiologyRouteRequest::new("Brestla", 60.0)
+        .radius(25)
+        .max_results(25)
+        .min_value(1_000_000);
+    let p = spansh.exobiology_route(&req).await?;
+    scan_route("exobio", &p.route, &p.job, p.elapsed, p.polls, &p.web_url);
+    Ok(())
+}
+
+fn scan_route(
+    what: &str,
+    r: &nexus_spansh::ScanRoute,
+    job: &str,
+    elapsed: Duration,
+    polls: u32,
+    url: &str,
+) {
+    println!(
+        "   {what}: {} systems, {} bodies, {} cr, ~{} jumps (job {} {:.1}s, {polls} polls)",
+        r.systems.len(),
+        r.body_count(),
+        r.total_value(),
+        r.total_jumps(),
+        short(job),
+        elapsed.as_secs_f64(),
+    );
+    for s in r.systems.iter().take(6) {
+        println!("     {:<34} {:>2} jumps {:>12} cr", s.name, s.jumps, s.value());
+        for b in s.bodies.iter().take(3) {
+            println!(
+                "       {:<30} {:<26} scan {:>9} map {:>9} landmarks {:>10} ({} species)",
+                b.name,
+                b.subtype.as_deref().unwrap_or("?"),
+                b.estimated_scan_value,
+                b.estimated_mapping_value,
+                b.landmark_value,
+                b.species().len()
+            );
+        }
+    }
+    for w in r.waypoints().iter().take(3) {
+        println!("     waypoint {} value {:?} note {:?}", w.system, w.value, w.note);
+    }
+    println!("   {url}");
 }
 
 async fn galaxy(spansh: &Spansh) -> anyhow::Result<()> {

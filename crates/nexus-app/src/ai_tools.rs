@@ -179,26 +179,25 @@ impl NexusTools {
             Some(n) => nexus_data::exobio::species(&n).ok_or_else(|| format!("Unknown species \"{n}\"."))?,
             None => nexus_data::exobio::species("Stratum Tectonicas").ok_or("Species data missing.")?,
         };
-        let q = crate::untouched::Query {
-            species,
-            origin,
-            radius_ly: arg_f64(a, "max_distance_ly").unwrap_or(500.0).clamp(20.0, 5000.0),
-            include_mapped: arg_bool(a, "include_mapped").unwrap_or(true),
-            limit: arg_f64(a, "limit").map(|v| v as usize).unwrap_or(10).clamp(1, 25),
-        };
+        let include_mapped = arg_bool(a, "include_mapped").unwrap_or(true);
+        let limit = arg_f64(a, "limit").map(|v| v as usize).unwrap_or(10).clamp(1, 25);
+        let q = crate::untouched::Query { species, origin, radius_ly: arg_f64(a, "max_distance_ly").unwrap_or(500.0).clamp(20.0, 5000.0), limit: limit * 4 };
         let db = self.db.clone();
         let footfalled = move |name: &str| {
             db.as_ref().and_then(|d| d.body_by_name(name).ok().flatten()).is_some_and(|b| b.was_footfalled.is_some_and(|s| s.value))
         };
-        let (list, st) = self.rt.block_on(crate::untouched::find(&self.spansh, &q, footfalled))?;
+        let (mut list, st) = self.rt.block_on(crate::untouched::find(&self.spansh, &q, footfalled))?;
+        let mapped_never_sampled = list.iter().filter(|c| c.evidence == crate::untouched::Evidence::GenusConfirmed).count();
+        list.retain(|c| include_mapped || c.evidence == crate::untouched::Evidence::NoTrace);
+        list.truncate(limit);
         Ok(json!({
             "near": near,
             "species": species.name,
             "value_cr": species.value,
             "value_if_first_logged_cr": bp::payout(species.value, true),
             "radius_ly": q.radius_ly,
-            "how_to_read": "no_trace = no commander who shares data (EDMC, EDDiscovery, …) has DSS-mapped or sampled the planet; mapped_never_sampled = someone DSS-mapped it (the genus is confirmed there) but nobody logged samples. Players without such tools leave no trace, so both are strong leads, not guarantees. Populated systems and planets your data says were footfalled are already left out.",
-            "searched": { "matching_planets": st.matched, "examined_nearest": st.examined, "examined_out_to_ly": r1(st.reach_ly), "already_sampled": st.sampled, "mapped_without_this_genus": st.mapped, "populated_system": st.populated, "footfalled": st.footfalled, "conditions_rule_it_out": st.ruled_out },
+            "how_to_read": "no_trace = no commander who shares data (EDMC, EDDiscovery, …) has DSS-mapped or sampled the planet; mapped_never_sampled = someone DSS-mapped it (the genus is confirmed there) but no samples are on record. A sample only leaves a record when the tool uploads it and it added a codex entry for that commander, so someone may have sampled without a trace: both are leads, not guarantees, and no_trace is the better bet. Populated systems and planets your data says were footfalled are already left out.",
+            "searched": { "matching_planets": st.matched, "examined_nearest": st.examined, "examined_out_to_ly": r1(st.reach_ly), "already_sampled": st.sampled, "mapped_without_this_genus": st.mapped_without, "mapped_never_sampled": mapped_never_sampled, "populated_system": st.populated, "footfalled": st.footfalled, "conditions_rule_it_out": st.ruled_out },
             "candidates": list.iter().map(|c| json!({
                 "system": c.system, "body": c.body, "distance_ly": r1(c.distance_ly), "distance_ls": c.distance_ls.map(|d| d.round()),
                 "evidence": match c.evidence { crate::untouched::Evidence::NoTrace => "no_trace", crate::untouched::Evidence::GenusConfirmed => "mapped_never_sampled" },
@@ -387,10 +386,12 @@ impl NexusTools {
             if me.jump_range <= 0.0 {
                 return Err("The ship's jump range is not known yet (fly it once).".into());
             }
-            let req = NeutronRouteRequest::new(from.clone(), to.clone(), me.jump_range).efficiency(60);
+            let range = me.jump_range.clamp(*crate::tours::limits::RANGE_LY.start(), *crate::tours::limits::RANGE_LY.end());
+            let req = NeutronRouteRequest::new(from.clone(), to.clone(), range).efficiency(60);
             let p = self.rt.block_on(self.spansh.neutron_route(&req)).map_err(|e| format!("Spansh: {e}"))?;
             let w: Vec<_> = p.route.waypoints().iter().map(from_spansh).collect();
-            PlannedRoute { kind: "Neutron", summary: format!("{} waypoints · {} jumps · {} neutron boosts", w.len(), p.route.total_jumps(), p.route.neutron_count()), web_url: p.web_url, waypoints: w }
+            let summary = format!("{} waypoints · {} jumps · {} neutron boosts", w.len(), p.route.total_jumps(), p.route.neutron_count());
+            PlannedRoute::new("Neutron", summary, p.web_url, w)
         } else {
             let profile = ShipProfile::from_loadout_json(me.loadout.as_deref().unwrap_or_default()).map_err(|e| format!("Ship profile: {e:?}"))?;
             let cargo = {
@@ -400,18 +401,8 @@ impl NexusTools {
             let req = GalaxyRouteRequest::new(from.as_str(), to.as_str(), &profile).cargo(cargo);
             let p = self.rt.block_on(self.spansh.galaxy_route(&req)).map_err(|e| format!("Spansh: {e}"))?;
             let w: Vec<_> = p.route.waypoints().iter().map(from_spansh).collect();
-            PlannedRoute {
-                kind: "Exact",
-                summary: format!(
-                    "{} jumps · {:.0} ly · {} refuels · {} neutron boosts",
-                    p.route.jump_count(),
-                    p.route.distance(),
-                    p.route.refuel_stops(),
-                    p.route.neutron_boosts()
-                ),
-                web_url: p.web_url,
-                waypoints: w,
-            }
+            let summary = format!("{} jumps · {:.0} ly · {} refuels · {} neutron boosts", p.route.jump_count(), p.route.distance(), p.route.refuel_stops(), p.route.neutron_boosts());
+            PlannedRoute::new("Exact", summary, p.web_url, w)
         };
         let out = json!({
             "from": from, "to": to, "planner": planned.kind, "summary": planned.summary, "spansh_url": planned.web_url,
@@ -426,28 +417,34 @@ impl NexusTools {
     fn money_routes(&self, a: &Value) -> Result<Value, String> {
         let me = self.me()?;
         let from = arg_str(a, "near_system").unwrap_or_else(|| me.system.clone());
-        let range = if me.jump_range > 0.0 { me.jump_range } else { 20.0 };
-        let radius = arg_f64(a, "radius_ly").unwrap_or(30.0).clamp(5.0, 500.0) as u32;
+        let range = (if me.jump_range > 0.0 { me.jump_range } else { 20.0 }).clamp(*crate::tours::limits::RANGE_LY.start(), *crate::tours::limits::RANGE_LY.end());
+        let radius = (arg_f64(a, "radius_ly").unwrap_or(30.0) as u32).clamp(*crate::tours::limits::RADIUS_LY.start(), *crate::tours::limits::RADIUS_LY.end());
         let count = arg_f64(a, "max_systems").unwrap_or(15.0).clamp(1.0, 50.0) as u32;
         let kind = arg_str(a, "kind").unwrap_or_else(|| "exobiology".into()).to_lowercase();
-        let (label, plotted) = if kind.contains("exo") || kind.contains("bio") {
+        let exo = kind.contains("exo") || kind.contains("bio");
+        let (label, tour) = if exo {
             let req = ExobiologyRouteRequest::new(from.clone(), range).radius(radius).max_results(count).min_value(1_000_000);
-            ("Exobiology", self.rt.block_on(self.spansh.exobiology_route(&req)))
+            ("Exobiology", self.rt.block_on(crate::tours::known_species(&self.spansh, req)))
         } else {
             let base = match kind.as_str() {
                 "earth_likes" | "earth-likes" | "elw" => RichesRouteRequest::earth_likes(from.clone(), range),
                 "ammonia_worlds" | "ammonia" => RichesRouteRequest::ammonia_worlds(from.clone(), range),
                 _ => RichesRouteRequest::road_to_riches(from.clone(), range),
             };
-            ("Road to riches", self.rt.block_on(self.spansh.riches_route(&base.radius(radius).max_results(count).min_value(300_000).use_mapping_value(true))))
+            ("Road to riches", self.rt.block_on(crate::tours::riches(&self.spansh, base.radius(radius).max_results(count).min_value(300_000).use_mapping_value(true))))
         };
-        let p = plotted.map_err(|e| format!("Spansh: {e}"))?;
-        let w: Vec<_> = p.route.waypoints().iter().map(from_spansh).collect();
+        let tour = tour.map_err(|e| format!("Spansh: {e}"))?;
+        if tour.is_empty() {
+            return Err(format!("Spansh found nothing worth scanning within {} ly of {from}, even after widening the search (it skips populated systems).", tour.radius));
+        }
+        let planned = tour.planned(label);
+        let w = &planned.waypoints;
         let total: u64 = w.iter().filter_map(|x| x.value).sum();
         // waypoints() maps the route's systems one to one
         let stops: Vec<Value> = w
             .iter()
-            .zip(&p.route.systems)
+            .zip(&tour.route.systems)
+            .filter(|(_, s)| !s.bodies.is_empty())
             .take(20)
             .map(|(x, s)| {
                 let mut stop = json!({ "system": x.system, "value_cr": x.value, "bodies": x.note });
@@ -458,16 +455,23 @@ impl NexusTools {
                 stop
             })
             .collect();
-        let mut note = "Values assume the first discovery/mapping or first-logged bonuses where Spansh expects them. The route is now on the Navigation page.".to_string();
+        let mut note = if exo {
+            "These planets are on Spansh because commanders already logged these species there, so the species are certain but the first-logged bonus has most likely been claimed: values are base values. For bonus hunting use untouched_biology. The route is now on the Navigation page.".to_string()
+        } else {
+            "Values are Spansh's estimates for scanning (and mapping) the bodies listed. The route is now on the Navigation page.".to_string()
+        };
+        if let Some(asked) = tour.widened_from {
+            note.push_str(&format!(" Nothing turned up within {asked} ly (Spansh skips populated systems), so the search was widened to {} ly.", tour.radius));
+        }
         if stops.iter().any(|s| s.get("footfall").is_some()) {
             note.push_str(" Footfall: from scans commanders shared over EDDN and your own journal, as of the age given; it can be out of date, and bodies without it are unknown.");
         }
         let out = json!({
-            "kind": label, "from": from, "systems": w.len(), "total_value_cr": total, "total_value_text": compact_credits(total as i64), "spansh_url": p.web_url,
+            "kind": label, "from": from, "radius_ly": tour.radius, "systems": stops.len(), "total_value_cr": total, "total_value_text": compact_credits(total as i64), "spansh_url": tour.web_url,
             "stops": stops,
             "note": note,
         });
-        *self.routes.lock() = Some(PlannedRoute { kind: label, summary: format!("{} systems · ~{} Cr", w.len(), compact_credits(total as i64)), web_url: p.web_url, waypoints: w });
+        *self.routes.lock() = Some(planned);
         Ok(out)
     }
 
@@ -1545,12 +1549,12 @@ pub fn specs() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "money_routes",
-            description: "Plans a money-making exploration trip with Spansh near a system: valuable exobiology targets, or road-to-riches bodies (earth-likes, water/ammonia worlds, terraformables). Returns stops with values, the total and, where known, whether anyone has set foot on the listed bodies; the route goes to the Navigation page.",
+            description: "Plans a money-making exploration trip with Spansh near a system: exobiology (planets where commanders already logged valuable species: certain, but base value only; for the first-logged bonus use untouched_biology), or road-to-riches bodies (earth-likes, water/ammonia worlds, terraformables). Spansh skips populated systems, so from the bubble the search widens itself until it finds something. Returns stops with values, the total and, where known, whether anyone has set foot on the listed bodies; the route goes to the Navigation page.",
             parameters: schema(
                 json!({
                     "kind": { "type": "string", "enum": ["exobiology", "road_to_riches", "earth_likes", "ammonia_worlds"] },
                     "near_system": { "type": "string", "description": NEAR },
-                    "radius_ly": { "type": "number", "description": "Default 30." },
+                    "radius_ly": { "type": "number", "description": "Search radius, 1 to 1,000 ly. Default 30; widened automatically when nothing is found." },
                     "max_systems": { "type": "integer", "description": "Default 15." }
                 }),
                 &[],
