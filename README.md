@@ -7,6 +7,17 @@ EDAstro, ED Tools, EDRefCard).
 
 Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendered UI (egui/wgpu).
 
+![Elite Nexus dashboard: commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Ask: the AI co-pilot answering an exobiology question](docs/screenshots/ask.png) **Ask** — the AI co-pilot | ![Market: stations paying far above the galactic average](docs/screenshots/market.png) **Market** — abnormal prices across the galaxy |
+| ![Fleet: every ship with its full engineered loadout](docs/screenshots/fleet.png) **Fleet** — loadouts, engineering, one-click EDSY/Coriolis | ![Galaxy map: everywhere you've been, with your ship and carrier](docs/screenshots/galaxy-map.png) **Galaxy map** — your travels, ship and carrier |
+| ![Fleet carrier: tritium, finances, capacity and crew](docs/screenshots/carrier.png) **Fleet carrier** — tritium, finances, crew | ![Statistics: credits over time, income by category, jumps per day](docs/screenshots/statistics.png) **Statistics** — credits, income, jumps |
+| ![Logbook: every journal event, searchable](docs/screenshots/logbook.png) **Logbook** — every journal event, searchable | |
+
 ## Why it's faster
 
 | | Elite Nexus |
@@ -79,7 +90,10 @@ cargo build --release -p nexus-app     # target\release\EliteNexus.exe
 On the original dev machine the toolchain is not on PATH: run `. .\tools\env.ps1` first. Pushing a tag such as `v0.1.0`
 makes GitHub Actions build the exe and publish a Release (`.github/workflows/release.yml`).
 
-Command-line options: `--page <name>`, `--journal-dir <dir>`, `--mute`, `--screenshot <png> [--shot-delay <s>]`.
+Command-line options: `--page <name>`, `--tab <name>`, `--journal-dir <dir>`, `--mute`,
+`--screenshot <png> [--shot-delay <s>] [--size <w>x<h>] [--demo]`. A screenshot run renders off-screen, saves the PNG
+and exits; it never uploads. The images in `docs/screenshots/` were made this way, e.g.
+`EliteNexus.exe --page market --tab abnormal --screenshot docs\screenshots\market.png --shot-delay 8 --mute`.
 Data (settings, DB, logs) is kept in `nexus-data\` next to the executable.
 
 Dev tools: `cargo run --release -p nexus-journal --example scan_journals` (parse stats),
@@ -93,8 +107,9 @@ your journals), `cargo run -p nexus-eddn --example live -- <db> <seconds>` (watc
 ## Accounts you may want
 
 * **EDSM** API key: https://www.edsm.net/en/settings/api
-* **Inara** API key: https://inara.cz/elite/cmdr-settings-api/ (Inara also asks app authors to have the app name
-  whitelisted before public release — keep "Developer mode" on until then; see docs/research/inara.md)
+* **Inara** API key: https://inara.cz/elite/cmdr-settings-api/ (Inara only accepts whitelisted app names: until
+  "Elite Nexus" is approved, every request is rejected with "This application has no access allowed" and sync pauses.
+  Keep "Developer mode" on for the first weeks after approval; see docs/research/inara.md)
 * **Frontier Companion API (CAPI)** needs a client ID approved by Frontier (docs/research/capi.md) — optional; the
   journal already provides almost everything.
 
