@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://uruskan.github.io/EliteNexus/</loc></url>
-  <url><loc>https://uruskan.github.io/EliteNexus/hud-colours.html</loc></url>
-  <url><loc>https://uruskan.github.io/EliteNexus/cockpit-lights.html</loc></url>
-  <url><loc>https://uruskan.github.io/EliteNexus/odyssey-glare.html</loc></url>
-  <url><loc>https://uruskan.github.io/EliteNexus/exobiology.html</loc></url>
-  <url><loc>https://uruskan.github.io/EliteNexus/trading.html</loc></url>
-  <url><loc>https://uruskan.github.io/EliteNexus/alternatives.html</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/alternatives.html</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/cockpit-lights.html</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/commander.html</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/companion.html</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/exobiology.html</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/exploration.html</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/hud-colours.html</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/odyssey-glare.html</loc></url>
+<url><loc>https://uruskan.github.io/EliteNexus/trading.html</loc></url>
 </urlset>

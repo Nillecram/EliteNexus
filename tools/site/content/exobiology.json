@@ -1,0 +1,50 @@
+{
+  "slug": "exobiology",
+  "title": "Elite Dangerous Exobiology Radar, Species Predictions & Routes | Elite Nexus",
+  "description": "Track sample spacing with a live radar, see species predictions, plan first-logged bonus hunts or known-species tours, and follow unsold Vista Genomics value.",
+  "kicker": "Odyssey exobiology",
+  "heading": "Find the planet. Finish the samples.",
+  "lead": "Choose promising worlds before you land. Know when you've travelled far enough for the next sample. Keep your progress and unsold value in view from the first biological signal to Vista Genomics.",
+  "hero_image": "exobiology.png",
+  "hero_alt": "Elite Nexus Exobiology page showing sample progress, a live sampling radar with colony-range circles and unsold biological data.",
+  "hero_caption": "The sampling radar shows previous sample locations, required spacing and whether you are far enough away.",
+  "toc": [
+    {
+      "id": "sampling-radar",
+      "label": "Sampling radar"
+    },
+    {
+      "id": "species-predictions",
+      "label": "Species predictions"
+    },
+    {
+      "id": "bonus-hunt",
+      "label": "Bonus hunt"
+    },
+    {
+      "id": "known-species",
+      "label": "Known-species tours"
+    },
+    {
+      "id": "unsold-value",
+      "label": "Unsold value"
+    }
+  ],
+  "related": [
+    {
+      "href": "exploration.html",
+      "label": "Explore the whole system",
+      "description": "Compare scanning and mapping values, plan valuable-body tours and view your travels."
+    },
+    {
+      "href": "companion.html",
+      "label": "Keep the essentials in view",
+      "description": "Use the compact HUD, spoken alerts and optional AI co-pilot while you play."
+    },
+    {
+      "href": "trading.html#services",
+      "label": "Make the selling stop",
+      "description": "Find nearby Vista Genomics and the other services you need."
+    }
+  ]
+}

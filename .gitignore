@@ -18,3 +18,9 @@
 Thumbs.db
 desktop.ini
 __pycache__/
+
+# Website assets assembled from their canonical sources by tools/site/build.py
+/site/screenshots/
+/site/fonts/
+/site/social-preview.png
+/site/user-guide.md

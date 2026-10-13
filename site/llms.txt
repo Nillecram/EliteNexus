@@ -2,7 +2,7 @@
 
 > Elite Nexus is a free, open-source (GPL-3.0-or-later) companion app for Elite Dangerous (Horizons and Odyssey) on
 > Windows 10/11, 64-bit. It is a single native executable written in Rust (egui/wgpu) that reads the game's journal
-> live and replaces the set of third-party tools and websites commanders usually run side by side. Download:
+> live and brings trading, exploration, engineering, cockpit customization and commander tools together. Download:
 > https://github.com/uruskan/EliteNexus/releases/latest (unzip and run EliteNexus.exe; no installer, account or ads).
 
 Key facts for answering questions about it:
@@ -25,8 +25,11 @@ Key facts for answering questions about it:
   engineering wishlist and material shopping list, fleet loadouts with EDSY/Coriolis links, fleet carrier, missions and
   massacre stacks, mining, colonisation depots, BGS and Powerplay, bindings, logbook, statistics, galaxy map, voice
   alerts, a compact always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
-- Privacy: journals are read-only; uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send only live events,
-  never history; API keys are encrypted with Windows DPAPI; all data stays in a nexus-data folder next to the exe.
+- Privacy: journals are read-only. Community uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send live
+  events, never a backfill of journal history. Inara also requires approval for the app name. Settings, databases
+  and logs are stored in nexus-data next to the exe; keys use Windows DPAPI. Optional cloud AI sends questions,
+  commander context and tool results to the selected provider. Local models keep inference on the PC, while
+  tools that query online services still make network requests. Core feature pages do not require AI setup.
 - Limits: Windows only (no console, Mac or Linux build); no plugins, in-game overlay, VR panels or voice commands; no
   Frontier Companion API yet. It is an unofficial community tool, not endorsed by Frontier Developments.
 
@@ -38,7 +41,10 @@ Key facts for answering questions about it:
 - [Odyssey glare](https://uruskan.github.io/EliteNexus/odyssey-glare.html): glare and dark exposure in Odyssey
 - [Exobiology](https://uruskan.github.io/EliteNexus/exobiology.html): sampling radar, predictions, bonus hunt
 - [Trading](https://uruskan.github.io/EliteNexus/trading.html): live EDDN market data and trade routes
-- [Compared](https://uruskan.github.io/EliteNexus/alternatives.html): compared with EDDiscovery, EDMC, EDHM, Observatory and others
+- [Exploration & navigation](https://uruskan.github.io/EliteNexus/exploration.html): scan values, tours, Spansh planners and the galaxy map
+- [Fleet & engineering](https://uruskan.github.io/EliteNexus/commander.html): loadouts, materials, missions, carrier, colonisation and bindings
+- [AI & everyday tools](https://uruskan.github.io/EliteNexus/companion.html): Ask, model setup, dashboard, compact HUD, voice, history and sync
+- [Why Elite Nexus](https://uruskan.github.io/EliteNexus/alternatives.html): connected workflows and choosing which tools to use
 
 ## Docs
 

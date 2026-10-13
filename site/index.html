@@ -1,214 +1,126 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Elite Nexus: the all-in-one Elite Dangerous companion app</title>
-<meta name="description" content="Elite Nexus is a free, open-source, all-in-one Elite Dangerous companion app: one fast native Windows exe instead of EDDiscovery, EDMC, Observatory, Odyssey Materials Helper and browser tabs. Exobiology, exploration, live EDDN trading, Spansh routes, engineering, fleet, AI co-pilot and HUD colours that keep hostile red.">
-<link rel="canonical" href="https://uruskan.github.io/EliteNexus/">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Elite Nexus: the all-in-one Elite Dangerous companion app">
-<meta property="og:description" content="HUD colours that keep hostile red, a cockpit-light dimmer, Odyssey glare fixes, exobiology, exploration, live trading and Spansh routes. One fast native Windows app.">
-<meta property="og:url" content="https://uruskan.github.io/EliteNexus/">
-<meta property="og:image" content="https://uruskan.github.io/EliteNexus/social-preview.png">
-<meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='4' fill='%23ff9f0a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css">
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Elite Nexus",
-  "applicationCategory": "GameApplication",
-  "operatingSystem": "Windows 10, Windows 11 (64-bit)",
-  "description": "A free companion app for Elite Dangerous and Odyssey: HUD colours that keep hostile red, friendly green and shield blue; a cockpit-light dimmer; Odyssey glare and exposure fixes; exobiology sampling radar and species predictions; exploration values; a live EDDN market database with trade routes; Spansh route planners; engineering, fleet and fleet carrier tracking; and an AI co-pilot.",
-  "url": "https://uruskan.github.io/EliteNexus/",
-  "downloadUrl": "https://github.com/uruskan/EliteNexus/releases/latest",
-  "codeRepository": "https://github.com/uruskan/EliteNexus",
-  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-  "screenshot": "https://uruskan.github.io/EliteNexus/screenshots/dashboard.png"
-}
-</script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    { "@type": "Question", "name": "Is Elite Nexus free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Elite Nexus is free and open source under the GNU GPL version 3 or later, with no ads, accounts or subscriptions. The source code is on GitHub." } },
-    { "@type": "Question", "name": "Can I change the Elite Dangerous HUD colour without hostile contacts changing colour?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, with Elite Nexus. The game's own colour setting moves every HUD colour together, so a blue theme also turns hostile contacts blue. Elite Nexus can install an optional graphics hook (3Dmigoto) that applies your theme only to the HUD's orange, so hostile red, friendly green and shield blue keep their colours. It can't run alongside EDHM." } },
-    { "@type": "Question", "name": "Is Elite Nexus allowed by Frontier?", "acceptedAnswer": { "@type": "Answer", "text": "Elite Nexus reads the game's journal files, which Frontier publishes for third-party tools. HUD colours and glare use the game's own settings file. The optional cockpit-light dimmer and colour protection use 3Dmigoto, a graphics hook that Frontier tolerates without having approved it." } },
-    { "@type": "Question", "name": "Does Elite Nexus upload my data?", "acceptedAnswer": { "@type": "Answer", "text": "Only if you switch an upload on. Sharing with EDDN, EDSM, Inara and EDAstro is opt-in, sends only live events (never your history) and follows each service's rules. API keys are stored encrypted with Windows DPAPI." } },
-    { "@type": "Question", "name": "Does Elite Nexus work on consoles or Mac?", "acceptedAnswer": { "@type": "Answer", "text": "No. It is a Windows app and reads the journal files the PC version of Elite Dangerous writes." } }
-  ]
-}
-</script>
-</head>
-<body>
-<header class="top">
-  <div class="wrap">
-    <a class="brand" href="./">Elite Nexus</a>
-    <nav class="links">
-      <a href="hud-colours.html">HUD colours</a>
-      <a href="cockpit-lights.html">Cockpit lights</a>
-      <a href="odyssey-glare.html">Glare</a>
-      <a href="exobiology.html">Exobiology</a>
-      <a href="trading.html">Trading</a>
-      <a href="alternatives.html">Compared</a>
-      <a href="https://github.com/uruskan/EliteNexus">GitHub</a>
-    </nav>
-    <a class="btn primary small" href="https://github.com/uruskan/EliteNexus/releases/latest">Download</a>
-  </div>
-</header>
-
-<main>
-<div class="wrap">
-  <section class="hero">
-    <h1>One companion app for <em>Elite Dangerous</em></h1>
-    <p class="lead">HUD colours that keep hostile red, a cockpit-light dimmer, Odyssey glare fixes, exobiology,
-      exploration, live trading, Spansh routes, engineering and your fleet. One fast native Windows app instead of a
-      pile of tools and browser tabs.</p>
-    <div class="ctas">
-      <a class="btn primary" href="https://github.com/uruskan/EliteNexus/releases/latest">Download for Windows</a>
-      <a class="btn ghost" href="https://github.com/uruskan/EliteNexus">Source on GitHub</a>
-    </div>
-    <p class="meta">Free and open source (GPL-3.0) · no installer, no account, no ads · Windows 10/11, 64-bit · Horizons and Odyssey</p>
-    <img class="shot" src="screenshots/dashboard.png" width="1480" height="920" alt="Elite Nexus dashboard: commander ranks, active ship, location and session stats">
-  </section>
-</div>
-
-<section>
-  <div class="wrap">
-    <div class="split">
-      <div>
-        <h2>Pick a HUD colour. Keep hostile red.</h2>
-        <p class="sub">The game's colour setting moves every HUD colour together, so a blue theme turns hostile
-          contacts blue as well. Elite Nexus can recolour only the HUD's orange.</p>
-        <div class="swatches">
-          <span class="swatch"><i style="background:#3d8bff"></i>Your theme</span>
-          <span class="swatch"><i style="background:#ff453a"></i>Hostile stays red</span>
-          <span class="swatch"><i style="background:#30d158"></i>Friendly stays green</span>
-          <span class="swatch"><i style="background:#64d2ff"></i>Shields stay blue</span>
-        </div>
-        <p><a href="hud-colours.html">How the HUD colours work →</a></p>
+<html lang="en" id="top"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b0d10">
+<title>Elite Nexus — One app. Your whole galaxy.</title><meta name="description" content="The free, open-source Elite Dangerous companion for Windows. Live trading, exploration, exobiology, engineering, fleet tracking, AI, HUD colours, cockpit lights and glare control."><link rel="canonical" href="https://uruskan.github.io/EliteNexus/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Elite Nexus"><meta property="og:title" content="Elite Nexus — One app. Your whole galaxy."><meta property="og:description" content="The free, open-source Elite Dangerous companion for Windows. Live trading, exploration, exobiology, engineering, fleet tracking, AI, HUD colours, cockpit lights and glare control."><meta property="og:url" content="https://uruskan.github.io/EliteNexus/"><meta property="og:image" content="https://uruskan.github.io/EliteNexus/assets/social-preview.jpg"><meta property="og:image:width" content="1280"><meta property="og:image:height" content="640"><meta property="og:image:alt" content="Elite Nexus: cockpit customization, trading, exploration, engineering and more in one Windows companion app."><meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="preload" href="fonts/Inter-Regular.ttf" as="font" type="font/ttf" crossorigin><link rel="stylesheet" href="style.css"><script>document.documentElement.classList.add('js');</script><script src="site.js" defer></script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Elite Nexus", "applicationCategory": "GameApplication", "operatingSystem": "Windows 10, Windows 11 (64-bit)", "description": "The free, open-source Elite Dangerous companion for Windows. Live trading, exploration, exobiology, engineering, fleet tracking, AI, HUD colours, cockpit lights and glare control.", "url": "https://uruskan.github.io/EliteNexus/", "downloadUrl": "https://github.com/uruskan/EliteNexus/releases/latest", "codeRepository": "https://github.com/uruskan/EliteNexus", "license": "https://github.com/uruskan/EliteNexus/blob/main/LICENSE", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}</script></head><body class="home">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><div class="header-inner">
+<a class="brand" href="index.html" aria-label="Elite Nexus home"><span class="brand-mark" aria-hidden="true"></span><span>Elite Nexus</span></a>
+<button class="menu-toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Open navigation"><span></span><span></span><span></span></button>
+<nav id="primary-nav" class="primary-nav" aria-label="Main navigation">
+<a href="index.html#features">Features</a>
+<details class="nav-dropdown"><summary>Cockpit <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel"><a href="hud-colours.html">HUD colours</a><a href="cockpit-lights.html">Cockpit lights</a><a href="odyssey-glare.html">Glare &amp; exposure</a></div></details>
+<a href="trading.html">Trading</a>
+<details class="nav-dropdown"><summary>Explore <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel"><a href="exploration.html">Exploration &amp; navigation</a><a href="exobiology.html">Exobiology</a></div></details>
+<details class="nav-dropdown"><summary>Commander <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel"><a href="commander.html">Fleet &amp; engineering</a><a href="companion.html">AI &amp; everyday tools</a><a href="alternatives.html">Why Elite Nexus</a></div></details>
+<a class="nav-source" href="https://github.com/uruskan/EliteNexus">GitHub <span aria-hidden="true">↗</span></a>
+<a class="button button-small" href="https://github.com/uruskan/EliteNexus/releases/latest">Download <span aria-hidden="true">↓</span></a>
+</nav></div></header><main id="main"><section class="hero">
+  <div class="container">
+    <div class="hero-layout">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Your Elite Dangerous companion</p>
+        <h1>One app.<br>Your whole<br><span>galaxy.</span></h1>
+        <p class="lead">Trading, exploration, engineering, cockpit control and a co-pilot that knows your ship. Bring your everyday tools together in one fast, native Windows app.</p>
+        <div class="actions"><a class="button" href="https://github.com/uruskan/EliteNexus/releases/latest">Download for Windows <span aria-hidden="true">↓</span></a><a class="button button-secondary" href="#tour">Take a closer look <span aria-hidden="true">↗</span></a></div>
+        <div class="hero-note"><span>Free &amp; open source</span><span>Windows 10/11 · 64-bit</span><span>Horizons &amp; Odyssey</span></div>
       </div>
-      <img class="shot" src="screenshots/hud-colours.png" width="1480" height="920" loading="lazy" alt="Elite Dangerous HUD colour editor: an Empire blue theme in a live cockpit preview, with hostile contacts still red and friendly ones still green">
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="split rev">
-      <div>
-        <h2>Dim the cockpit lights. Tame Odyssey's glare.</h2>
-        <p class="sub">The game has no setting for its cockpit lights. Elite Nexus dims the cockpit's own lamps and
-          nothing else, with in-game keys (F9, F10, F11). For glare and dark exposure it sets the game's own
-          tone-mapping values, starting from community presets.</p>
-        <p><a href="cockpit-lights.html">Cockpit lights →</a> &nbsp; <a href="odyssey-glare.html">Glare and exposure →</a></p>
+      <div class="hero-product">
+        <div class="product-overline"><span>YOUR COMMANDER. IN CONTEXT.</span><span>ONE NATIVE APP</span></div>
+        <figure class="screenshot"><a href="screenshots/dashboard.png" data-lightbox data-caption="Your commander, ship, location and session at a glance." aria-label="Enlarge the Elite Nexus dashboard screenshot"><img src="screenshots/dashboard.png" width="1480" height="920" fetchpriority="high" alt="Elite Nexus dashboard showing commander ranks, ship fuel and hull, location, and session statistics"></a><figcaption>Your flight, brought together.<span class="enlarge-hint">View full size ↗</span></figcaption></figure>
       </div>
-      <img class="shot" src="screenshots/cockpit-lights.png" width="1480" height="920" loading="lazy" alt="Elite Dangerous cockpit lights dimmer in Elite Nexus: light kept, reach and the in-game keys">
     </div>
+    <div class="hero-index"><span>CHOOSE YOUR NEXT MOVE</span><a href="trading.html">Find a better trade <span>↗</span></a><a href="exobiology.html">Chase a discovery <span>↗</span></a><a href="hud-colours.html">Make it yours <span>↗</span></a></div>
   </div>
 </section>
 
-<section id="features">
-  <div class="wrap">
-    <h2>Everything else you alt-tab for</h2>
-    <p class="sub">Elite Nexus reads the journal the game writes, follows it live, and brings in Spansh, EDDN, EDSM
-      and Inara where they help. Each page shows the thing you usually need; every advanced option is one click
-      away.</p>
-    <div class="grid">
-      <div class="card"><h3>Exobiology</h3><p>A live sampling radar with colony-range circles, species predictions
-        before you land, and a hunt for planets where the ×5 first-logged bonus may still be open.</p>
-        <a class="more" href="exobiology.html">Exobiology →</a></div>
-      <div class="card"><h3>Exploration</h3><p>Every body with its value now and if mapped, Observatory-style
-        highlights, valuable-body tours from Spansh, and a history of which data you sold or lost.</p></div>
-      <div class="card"><h3>Market and trading</h3><p>A local market database fed live by EDDN: abnormal prices,
-        sell my cargo, trade routes, price alerts and nearest services, in milliseconds.</p>
-        <a class="more" href="trading.html">Trading →</a></div>
-      <div class="card"><h3>Navigation</h3><p>Your plotted route with scoopable stars and hazards, the next system
-        copied to the clipboard after every jump, and Spansh's neutron, exact and carrier planners.</p></div>
-      <div class="card"><h3>Engineering</h3><p>A blueprint wishlist, the shopping list of materials, a
-        material-trader plan, engineers by distance, Odyssey suits and weapons.</p></div>
-      <div class="card"><h3>Fleet and carrier</h3><p>Every ship and its engineered loadout, one click to EDSY or
-        Coriolis; your fleet carrier's tritium, finances, crew and jumps.</p></div>
-      <div class="card"><h3>Ask, the AI co-pilot</h3><p>Ask in plain words ("where should I sell my cargo?") and it
-        answers from your ship, journal, the market database and Spansh. Bring a free Gemini key, Claude or a
-        local model.</p></div>
-      <div class="card"><h3>And more</h3><p>Missions and massacre stacks, mining sessions, colonisation depots,
-        BGS and Powerplay, bindings, logbook, statistics, a galaxy map, voice alerts and a compact HUD for a second
-        screen.</p></div>
-    </div>
+<div class="value-strip"><div class="container">
+  <div class="value"><span class="value-symbol" aria-hidden="true">◇</span><div><strong>One download. Ready to fly.</strong><p>Unzip, launch, connect to your journal.</p></div></div>
+  <div class="value"><span class="value-symbol" aria-hidden="true">↗</span><div><strong>Built for the desktop.</strong><p>Native Rust. A responsive, GPU-rendered interface.</p></div></div>
+  <div class="value"><span class="value-symbol" aria-hidden="true">⌁</span><div><strong>Free. Open. Yours.</strong><p>No app subscription, ads or Elite Nexus account.</p></div></div>
+</div></div>
+
+<section class="section tour container" id="tour" data-tour>
+  <div class="heading-row"><div class="section-heading"><p class="eyebrow">Inside Elite Nexus</p><h2>A clearer view of your next move.</h2><p>Real tools, working with your ship and your session. Explore the app below, or open any screenshot to see the details.</p></div><a class="text-link" href="#features">Explore every feature</a></div>
+  <div class="gallery-tabs" role="tablist" aria-label="Product tour">
+    <button id="tab-market" role="tab" aria-selected="true" aria-controls="tour-market">01 · Trading</button>
+    <button id="tab-biology" role="tab" aria-selected="false" aria-controls="tour-biology">02 · Exobiology</button>
+    <button id="tab-engineering" role="tab" aria-selected="false" aria-controls="tour-engineering">03 · Engineering</button>
+    <button id="tab-ask" role="tab" aria-selected="false" aria-controls="tour-ask">04 · AI co-pilot</button>
+  </div>
+  <div class="gallery-panel" id="tour-market" role="tabpanel" aria-labelledby="tab-market" tabindex="0">
+    <figure class="screenshot"><a href="screenshots/market.png" data-lightbox data-caption="Market: find stations paying above the galactic average."><img src="screenshots/market.png" width="1480" height="920" loading="lazy" decoding="async" alt="Market page with abnormal commodity prices, station distances and trading filters"></a><figcaption>Live market intelligence, right on your PC.<span class="enlarge-hint">View full size ↗</span></figcaption></figure>
+    <div class="gallery-copy"><p class="tour-number">01 / THE NEXT PAYDAY</p><h3>Put your cargo to work.</h3><p>Find where to buy, where to sell and which route suits your ship. Your local market database keeps receiving new prices from EDDN.</p><ul><li>Sell your whole hold at one stop</li><li>Find unusually high and low prices</li><li>Set commodity price alerts</li></ul><a class="text-link" href="trading.html">Explore trading tools</a></div>
+  </div>
+  <div class="gallery-panel" id="tour-biology" role="tabpanel" aria-labelledby="tab-biology" tabindex="0">
+    <figure class="screenshot"><a href="screenshots/exobiology.png" data-lightbox data-caption="Exobiology: a live sampling radar with colony-range circles."><img src="screenshots/exobiology.png" width="1480" height="920" loading="lazy" decoding="async" alt="Exobiology sampling radar showing recorded samples, distance and colony ranges"></a><figcaption>Know when you are far enough away to sample again.<span class="enlarge-hint">View full size ↗</span></figcaption></figure>
+    <div class="gallery-copy"><p class="tour-number">02 / BEYOND THE BUBBLE</p><h3>Make every landing count.</h3><p>Predict what might grow before you land. Follow your sample spacing on the surface, then find promising planets for your next trip.</p><ul><li>Live radar and colony-range circles</li><li>Species predictions and bonus hunts</li><li>Routes to recorded valuable biology</li></ul><a class="text-link" href="exobiology.html">Explore exobiology</a></div>
+  </div>
+  <div class="gallery-panel" id="tour-engineering" role="tabpanel" aria-labelledby="tab-engineering" tabindex="0">
+    <figure class="screenshot"><a href="screenshots/engineering.png" data-lightbox data-caption="Engineering: blueprint wishlist and combined material requirements."><img src="screenshots/engineering.png" width="1480" height="920" loading="lazy" decoding="async" alt="Engineering blueprint wishlist with the required materials shopping list"></a><figcaption>Turn a ship build into a practical shopping list.<span class="enlarge-hint">View full size ↗</span></figcaption></figure>
+    <div class="gallery-copy"><p class="tour-number">03 / YOUR NEXT BUILD</p><h3>A plan for every upgrade.</h3><p>Build a blueprint wishlist, see the materials you still need and work out the trades that get you there.</p><ul><li>Blueprints and quick G5 targets</li><li>Material shopping and trader plans</li><li>Ships, suits, weapons and synthesis</li></ul><a class="text-link" href="commander.html">Explore commander tools</a></div>
+  </div>
+  <div class="gallery-panel" id="tour-ask" role="tabpanel" aria-labelledby="tab-ask" tabindex="0">
+    <figure class="screenshot"><a href="screenshots/ask.png" data-lightbox data-caption="Ask: the AI co-pilot answers with your commander context."><img src="screenshots/ask.png" width="1480" height="920" loading="lazy" decoding="async" alt="Ask assistant answering an exobiology question using information from the current game session"></a><figcaption>A co-pilot with your ship and journal in the conversation.<span class="enlarge-hint">View full size ↗</span></figcaption></figure>
+    <div class="gallery-copy"><p class="tour-number">04 / A SECOND PAIR OF EYES</p><h3>Ask with context.</h3><p>Ask about your cargo, your ship or your next destination. The co-pilot can query the market and route planners instead of relying on a generic answer.</p><ul><li>Your ship, journal and cargo as context</li><li>Market lookups and route planning</li><li>Gemini, Claude or your local model</li></ul><a class="text-link" href="companion.html#ask">Meet your co-pilot</a></div>
   </div>
 </section>
 
-<section>
-  <div class="wrap">
-    <h2>Screenshots</h2>
-    <div class="shots">
-      <figure><img class="shot" src="screenshots/exobiology.png" width="1480" height="920" loading="lazy" alt="Exobiology sampling radar with two samples and colony-range circles"><figcaption>Exobiology: sampling radar, colony range, species value</figcaption></figure>
-      <figure><img class="shot" src="screenshots/exploration.png" width="1480" height="920" loading="lazy" alt="Exploration: every body in the system with value now and mapped value"><figcaption>Exploration: every body, value now and if mapped</figcaption></figure>
-      <figure><img class="shot" src="screenshots/market.png" width="1480" height="920" loading="lazy" alt="Market: stations paying far above the galactic average"><figcaption>Market: abnormal prices across the galaxy</figcaption></figure>
-      <figure><img class="shot" src="screenshots/navigation.png" width="1480" height="920" loading="lazy" alt="Navigation: plotted route with star classes and scoopable stars"><figcaption>Navigation: route, fuel stars, next system to the clipboard</figcaption></figure>
-      <figure><img class="shot" src="screenshots/engineering.png" width="1480" height="920" loading="lazy" alt="Engineering: blueprint wishlist and materials shopping list"><figcaption>Engineering: wishlist and shopping list</figcaption></figure>
-      <figure><img class="shot" src="screenshots/glare.png" width="1480" height="920" loading="lazy" alt="Odyssey glare and auto-exposure settings with community presets"><figcaption>Glare and exposure: less glare, brighter darks</figcaption></figure>
-    </div>
+<section class="section container" id="features">
+  <div class="section-heading"><p class="eyebrow">One connected toolkit</p><h2>Whatever you fly for.</h2><p>Pick a part of your game. See what Elite Nexus does for it, how the tools work together, and what to expect when you launch.</p></div>
+  <div class="feature-directory">
+    <a class="directory-link" href="hud-colours.html"><span class="directory-number">01 / MAKE IT YOURS</span><span class="arrow" aria-hidden="true">↗</span><h3>HUD colours</h3><p>Find your palette, preview it live, and preserve the contact colours you rely on.</p></a>
+    <a class="directory-link" href="cockpit-lights.html"><span class="directory-number">02 / SET THE MOOD</span><span class="arrow" aria-hidden="true">↗</span><h3>Cockpit lights</h3><p>Dim the cockpit’s own lamps and glow. Adjust their intensity and reach from in-game keys.</p></a>
+    <a class="directory-link" href="odyssey-glare.html"><span class="directory-number">03 / SEE THE GALAXY</span><span class="arrow" aria-hidden="true">↗</span><h3>Glare &amp; exposure</h3><p>Reduce glare from bright lights and lift dark detail with Odyssey’s tone-mapping settings.</p></a>
+    <a class="directory-link" href="trading.html"><span class="directory-number">04 / FIND YOUR EDGE</span><span class="arrow" aria-hidden="true">↗</span><h3>Trading &amp; markets</h3><p>Cargo sell plans, commodity search, trade routes, abnormal prices, alerts and supply runs.</p></a>
+    <a class="directory-link" href="exploration.html"><span class="directory-number">05 / GO FURTHER</span><span class="arrow" aria-hidden="true">↗</span><h3>Exploration &amp; navigation</h3><p>Know what to scan, plan a neutron route, track unsold discoveries and map your travels.</p></a>
+    <a class="directory-link" href="exobiology.html"><span class="directory-number">06 / FIND SOMETHING NEW</span><span class="arrow" aria-hidden="true">↗</span><h3>Exobiology</h3><p>Species predictions, a live sampling radar, first-logged bonus hunting and valuable biology tours.</p></a>
+    <a class="directory-link" href="commander.html"><span class="directory-number">07 / BUILD YOUR COMMAND</span><span class="arrow" aria-hidden="true">↗</span><h3>Fleet &amp; engineering</h3><p>Your ships, loadouts, upgrade wishlist, material trades, carrier, missions and faction activity.</p></a>
+    <a class="directory-link" href="companion.html"><span class="directory-number">08 / FLY WITH CONTEXT</span><span class="arrow" aria-hidden="true">↗</span><h3>AI &amp; everyday tools</h3><p>A grounded co-pilot, spoken alerts, compact HUD, searchable history and opt-in community sync.</p></a>
+    <a class="directory-link" href="alternatives.html"><span class="directory-number">09 / BRING IT TOGETHER</span><span class="arrow" aria-hidden="true">↗</span><h3>Why Elite Nexus?</h3><p>Follow the connected workflows behind the idea: one commander, one place to plan the next move.</p></a>
   </div>
 </section>
 
-<section>
-  <div class="wrap narrow">
-    <h2>Fast, and careful with your game</h2>
-    <ul>
-      <li><strong>Fast.</strong> Written in Rust with a GPU-drawn interface: no browser engine, Python or Node.js.
-        Your whole journal history loads in well under a second, and it follows the game every 100 ms.</li>
-      <li><strong>One exe.</strong> Unzip and run. Everything it keeps lives in a <code>nexus-data</code> folder next to
-        it, so it's easy to move or remove.</li>
-      <li><strong>Read-only journals.</strong> Your journals are only ever read. Game settings change only when you
-        click, only the values you change, and your original file is kept.</li>
-      <li><strong>Opt-in uploads.</strong> EDDN, EDSM, Inara and EDAstro are off until you switch them on, and only live
-        events are sent, never your history. API keys are encrypted with Windows DPAPI.</li>
-      <li><strong>Honest about its data.</strong> Pages say where numbers come from and what they can't show, for example
-        why "no record" of a species isn't proof nobody sampled it.</li>
-    </ul>
+<section class="cockpit-feature" id="cockpit"><div class="container">
+  <div class="cockpit-layout"><div><p class="eyebrow">Your ship. Your atmosphere.</p><h2>Make the cockpit feel like yours.</h2><p>Change the HUD palette. Turn down the cockpit lights. Take control of glare and exposure. Three dedicated tools, each with a different job.</p><div class="swatches"><span><i class="swatch-dot swatch-red"></i>Hostile red</span><span><i class="swatch-dot swatch-green"></i>Friendly green</span><span><i class="swatch-dot swatch-blue"></i>Shield blue</span></div><a class="text-link" href="hud-colours.html#contact-colours">See how colour protection works</a></div>
+  <figure class="screenshot"><a href="screenshots/hud-colours.png" data-lightbox data-caption="HUD colours: the app’s live illustrative cockpit preview with protected contact colours."><img src="screenshots/hud-colours.png" width="1480" height="920" loading="lazy" decoding="async" alt="HUD colour editor with an Empire blue theme and preview showing red hostiles and green friendlies"></a><figcaption>Preview your theme before applying it to the game.<span class="enlarge-hint">View full size ↗</span></figcaption></figure></div>
+  <div class="cockpit-links"><a href="hud-colours.html">Explore HUD colours <span>↗</span></a><a href="cockpit-lights.html">Explore cockpit lighting <span>↗</span></a><a href="odyssey-glare.html">Explore glare &amp; exposure <span>↗</span></a></div>
+</div></section>
+
+<section class="section container" id="all-tools">
+  <div class="section-heading"><p class="eyebrow">The full flight kit</p><h2>The details make the difference.</h2><p>Every major tool has a place. Jump straight to the part you need.</p></div>
+  <div class="feature-index">
+    <div><h3>Explore &amp; discover</h3><ul><li><a href="exploration.html#scan-values">Body scans &amp; mapping values</a></li><li><a href="exploration.html#valuable-bodies">Valuable-body tours</a></li><li><a href="exploration.html#navigation">Spansh travel planners</a></li><li><a href="exploration.html#galaxy-map">Galaxy map &amp; travel history</a></li><li><a href="exobiology.html#sampling-radar">Sampling radar &amp; spacing</a></li><li><a href="exobiology.html#species-predictions">Species predictions</a></li><li><a href="exobiology.html#bonus-hunt">First-logged bonus hunt</a></li><li><a href="exobiology.html#known-species">Known-species routes</a></li></ul></div>
+    <div><h3>Trade &amp; supply</h3><ul><li><a href="trading.html#sell-cargo">Commodity search &amp; cargo sales</a></li><li><a href="trading.html#trade-routes">Ship-aware trade routes</a></li><li><a href="trading.html#abnormal-prices">Abnormal market prices</a></li><li><a href="trading.html#price-alerts">Live commodity price alerts</a></li><li><a href="trading.html#services">Nearest services</a></li><li><a href="trading.html#mining">Mining sessions &amp; hotspots</a></li><li><a href="trading.html#colonisation">Colonisation supply runs</a></li><li><a href="commander.html#fleet">Fleet carrier tracking</a></li></ul></div>
+    <div><h3>Build &amp; command</h3><ul><li><a href="commander.html#fleet">Ships &amp; engineered loadouts</a></li><li><a href="commander.html#engineering">Blueprint wishlist &amp; G5 targets</a></li><li><a href="commander.html#engineering">Materials &amp; trader plans</a></li><li><a href="commander.html#engineering">Odyssey suits &amp; weapons</a></li><li><a href="commander.html#missions">Missions &amp; massacre stacks</a></li><li><a href="commander.html#missions">BGS &amp; Powerplay activity</a></li><li><a href="commander.html#bindings">Keybindings &amp; reference cards</a></li><li><a href="companion.html#dashboard">Dashboard &amp; session totals</a></li></ul></div>
+    <div><h3>Your flight, your way</h3><ul><li><a href="hud-colours.html">HUD themes &amp; colour protection</a></li><li><a href="cockpit-lights.html">Cockpit-light dimming</a></li><li><a href="odyssey-glare.html">Glare &amp; exposure controls</a></li><li><a href="companion.html#ask">AI co-pilot</a></li><li><a href="companion.html#history">Voice &amp; on-screen alerts</a></li><li><a href="companion.html#dashboard">Compact always-on-top HUD</a></li><li><a href="companion.html#history">Logbook &amp; statistics</a></li><li><a href="companion.html#privacy">Accounts &amp; opt-in sync</a></li></ul></div>
   </div>
 </section>
 
-<section id="faq">
-  <div class="wrap narrow">
-    <h2>Questions</h2>
-    <details><summary>Is it free?</summary><p>Yes: no ads, no account, no subscription. It's open source under the
-      GNU GPL version 3 or later, and the source code is on <a href="https://github.com/uruskan/EliteNexus">GitHub</a>.</p></details>
-    <details><summary>How do I install it?</summary><p>Download the zip from the
-      <a href="https://github.com/uruskan/EliteNexus/releases/latest">latest release</a>, unzip it anywhere and run
-      <code>EliteNexus.exe</code>. It finds your journal folder by itself. Start it before or after the game. Windows may
-      warn about an app from an unknown publisher the first time; choose "More info", then "Run anyway".</p></details>
-    <details><summary>Can I change the HUD colour without hostile contacts changing colour?</summary><p>Yes. Switch on
-      "Keep hostile red, friendly green and shield blue" on the HUD colours tab. It needs Elite Nexus's optional
-      graphics hook (3Dmigoto), installed and removed in one click, and it can't run alongside EDHM.
-      <a href="hud-colours.html">More about HUD colours</a>.</p></details>
-    <details><summary>Is it allowed?</summary><p>Elite Nexus reads the journal files Frontier writes for
-      third-party tools, and HUD colours and glare use the game's own settings file. The optional dimmer and colour
-      protection use 3Dmigoto, which Frontier tolerates without having approved it. Nothing in the game's own files is
-      changed.</p></details>
-    <details><summary>Does it replace EDMC, EDDiscovery or Observatory?</summary><p>For many commanders, yes; for
-      some, not yet. See <a href="alternatives.html">how it compares</a>, including what other tools still do
-      better.</p></details>
-    <details><summary>Consoles, Mac or Linux?</summary><p>Windows only. It reads the journal files that the PC game
-      writes.</p></details>
-    <details><summary>Where do I report a bug or ask for a feature?</summary><p>Open an issue on
-      <a href="https://github.com/uruskan/EliteNexus/issues">GitHub</a>.</p></details>
-  </div>
-</section>
-</main>
+<section class="container section-rule" id="your-data"><div class="trust-grid">
+  <div><span class="trust-symbol">01 / NATIVE BY DESIGN</span><h3>Made to keep up.</h3><p>A Rust app with a GPU-rendered interface and a local market database. Your ship, journal and session stay close at hand while you play.</p></div>
+  <div><span class="trust-symbol">02 / YOUR CHOICES</span><h3>Share on your terms.</h3><p>Your journals are read-only. Community uploads are opt-in and share live events, never a backfill of your history. Cloud AI is a separate, optional connection.</p><a class="text-link" href="companion.html#privacy">Understand your data</a></div>
+  <div><span class="trust-symbol">03 / OPEN TO EVERYONE</span><h3>A tool you can make your own.</h3><p>Free software under GPL-3.0. Read the code, report an issue or help shape what comes next. No ads or Elite Nexus subscription.</p><a class="text-link" href="https://github.com/uruskan/EliteNexus">Explore the source</a></div>
+</div></section>
 
-<footer>
-  <div class="wrap">
-    <span>Elite Nexus is an unofficial community tool, not endorsed by Frontier Developments. Elite Dangerous is a
-      trademark of Frontier Developments plc.</span>
-    <span><a href="https://github.com/uruskan/EliteNexus">GitHub</a> · <a href="https://github.com/uruskan/EliteNexus/blob/main/docs/USER_GUIDE.md">User guide</a> · <a href="https://github.com/uruskan/EliteNexus/blob/main/CHANGELOG.md">Changelog</a></span>
-  </div>
-</footer>
-</body>
-</html>
+<section class="container download-section" id="download">
+  <div><p class="eyebrow">Your next session, upgraded</p><h2>Ready for launch.</h2><p class="lead">One portable Windows app. Everything you need to start is in the release download.</p><div class="actions"><a class="button" href="https://github.com/uruskan/EliteNexus/releases/latest">Download Elite Nexus <span aria-hidden="true">↓</span></a></div><span class="small-label">Windows 10/11 · 64-bit · Elite Dangerous PC journals</span><a class="text-link" href="https://github.com/uruskan/EliteNexus/releases">Read the release notes</a></div>
+  <ol class="download-steps"><li><h3>Download &amp; unzip</h3><p>Get the Windows ZIP from the latest GitHub release. Extract it to a folder of your choice.</p></li><li><h3>Launch EliteNexus.exe</h3><p>The app finds the game’s journal folder and loads your commander. No installer is needed.</p></li><li><h3>Fly your way</h3><p>Explore the tools. Configure optional sync, AI and cockpit settings when you want to use them.</p></li></ol>
+</section>
+
+<section class="section container" id="questions"><div class="section-heading"><p class="eyebrow">Before you launch</p><h2>A few useful answers.</h2></div><div class="faq-list">
+  <details><summary>Is Elite Nexus free?</summary><p>Yes. Elite Nexus is free and open source under GPL-3.0, with no ads or app subscription. The optional AI co-pilot uses a provider you configure; cloud providers may have their own usage limits or charges. You can also connect a local model.</p></details>
+  <details><summary>Do I need AI to use the app?</summary><p>No. Trading, exploration, engineering, exobiology, navigation and cockpit tools have their own dedicated interfaces. The AI co-pilot is an additional way to ask questions and use supported tools.</p></details>
+  <details><summary>Which platforms and game versions work?</summary><p>Elite Nexus runs on 64-bit Windows 10 and 11 and reads the journal files produced by the PC game. It supports Horizons and Odyssey data; activities such as exobiology and on-foot equipment require Odyssey. There is no console, macOS or Linux build.</p></details>
+  <details><summary>What changes in my game?</summary><p>Journal tracking only reads the files the game writes. HUD colours and glare settings are applied when you choose. Cockpit-light dimming and contact-colour protection use an optional graphics hook, with installation and removal controls. Read the <a href="cockpit-lights.html#setup">cockpit setup details</a> before enabling it.</p></details>
+  <details><summary>Can I keep using my other tools?</summary><p>You choose your own setup. Elite Nexus reads the game’s journal files and offers opt-in community sync, so check which app is uploading for you. Its optional graphics hook cannot run alongside EDHM or another 3Dmigoto mod. <a href="alternatives.html">See how the workflows fit together.</a></p></details>
+</div></section>
+</main><footer class="site-footer"><div class="container footer-grid">
+<div class="footer-brand"><a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span><span>Elite Nexus</span></a><p>One app. Your whole galaxy.</p><span class="small-label">Free software · Native Windows app</span></div>
+<div><h2>Make it yours</h2><a href="hud-colours.html">HUD colours</a><a href="cockpit-lights.html">Cockpit lights</a><a href="odyssey-glare.html">Glare &amp; exposure</a></div>
+<div><h2>Find your next move</h2><a href="trading.html">Trading &amp; markets</a><a href="exploration.html">Exploration &amp; navigation</a><a href="exobiology.html">Exobiology</a><a href="commander.html">Fleet &amp; engineering</a><a href="companion.html">AI &amp; everyday tools</a></div>
+<div><h2>Get involved</h2><a href="https://github.com/uruskan/EliteNexus/releases/latest">Download &amp; release notes</a><a href="https://github.com/uruskan/EliteNexus">Source on GitHub</a><a href="https://github.com/uruskan/EliteNexus/blob/main/docs/USER_GUIDE.md">User guide</a><a href="https://github.com/uruskan/EliteNexus/issues">Report an issue</a><a href="https://github.com/uruskan/EliteNexus/blob/main/LICENSE">GPL-3.0 licence</a></div>
+</div><div class="container footer-bottom"><p>An independent community companion. Not affiliated with or endorsed by Frontier Developments.<br>Elite Dangerous is a trademark of Frontier Developments plc.</p><a href="#top">Back to top ↑</a></div></footer>
+<dialog class="lightbox" aria-labelledby="lightbox-caption"><div class="lightbox-layout"><div class="lightbox-toolbar"><p id="lightbox-caption"></p><div class="lightbox-actions"><button type="button" data-lightbox-prev aria-label="Previous screenshot">←</button><button type="button" data-lightbox-next aria-label="Next screenshot">→</button><button type="button" data-lightbox-zoom aria-pressed="false">Zoom in</button><a data-lightbox-original target="_blank" rel="noopener">Original ↗</a><button type="button" data-lightbox-close aria-label="Close screenshot">✕</button></div></div><div class="lightbox-stage"><img alt=""></div><p class="lightbox-help">Arrow keys to browse · Escape to close</p><p class="sr-only" aria-live="polite" data-lightbox-status></p></div></dialog>
+</body></html>

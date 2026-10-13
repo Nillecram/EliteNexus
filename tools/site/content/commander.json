@@ -1,0 +1,50 @@
+{
+  "slug": "commander",
+  "title": "Engineering, fleet & commander tools | Elite Nexus",
+  "description": "Plan engineering upgrades, track ship loadouts and carriers, manage mission stacks, follow BGS activity and find colonisation supplies in Elite Nexus.",
+  "kicker": "Commander tools",
+  "heading": "Give every ambition a plan.",
+  "lead": "The next upgrade, the next mission stack, the next construction delivery. Bring your ships, materials and commitments together, with the details ready when you need them.",
+  "hero_image": "engineering.png",
+  "hero_alt": "Elite Nexus engineering page with blueprint wishlist and materials shopping list",
+  "hero_caption": "Turn a blueprint wishlist into a shopping list and a material trader plan.",
+  "toc": [
+    {
+      "id": "engineering",
+      "label": "Engineering plans"
+    },
+    {
+      "id": "fleet",
+      "label": "Ships & carrier"
+    },
+    {
+      "id": "missions",
+      "label": "Missions & factions"
+    },
+    {
+      "id": "colonisation",
+      "label": "Colonisation supplies"
+    },
+    {
+      "id": "bindings",
+      "label": "Control bindings"
+    }
+  ],
+  "related": [
+    {
+      "href": "trading.html",
+      "label": "Trading & supply runs",
+      "description": "Find commodities, sell your cargo and plan trade routes."
+    },
+    {
+      "href": "companion.html",
+      "label": "Your everyday companion",
+      "description": "Ask the AI co-pilot, follow sessions and keep useful alerts close."
+    },
+    {
+      "href": "exploration.html",
+      "label": "Exploration & navigation",
+      "description": "Plan the journey and keep your discoveries in view."
+    }
+  ]
+}

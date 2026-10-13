@@ -1,0 +1,54 @@
+{
+  "slug": "trading",
+  "title": "Elite Dangerous Trading Tools, Live Markets & Cargo Selling | Elite Nexus",
+  "description": "Find buyers for your cargo, filter commodity prices, plan trade routes, spot abnormal prices and set live market alerts. Mining and colonisation tools included.",
+  "kicker": "Trading, mining & colonisation",
+  "heading": "Make every tonne count.",
+  "lead": "Find a buyer for the hold you already have. Plan the next profitable run. Catch unusual prices as commanders report them. Elite Nexus puts your cargo, ship and market data together in dedicated trading tools.",
+  "hero_image": "market.png",
+  "hero_alt": "Elite Nexus Market page showing abnormal commodity prices, galactic-average comparisons, station distances and update ages.",
+  "hero_caption": "Abnormal prices puts the offer, the galactic average, the distance and the age of the report in one view.",
+  "toc": [
+    {
+      "id": "sell-cargo",
+      "label": "Cargo & commodities"
+    },
+    {
+      "id": "trade-routes",
+      "label": "Trade routes"
+    },
+    {
+      "id": "abnormal-prices",
+      "label": "Abnormal prices"
+    },
+    {
+      "id": "price-alerts",
+      "label": "Alerts & data"
+    },
+    {
+      "id": "mining-colonisation",
+      "label": "Mining & colonisation"
+    },
+    {
+      "id": "services",
+      "label": "Nearest services"
+    }
+  ],
+  "related": [
+    {
+      "href": "exploration.html#navigation",
+      "label": "Navigation & routes",
+      "description": "Follow plotted journeys with fuel-star information and the next system on your clipboard."
+    },
+    {
+      "href": "commander.html",
+      "label": "Your ships & carrier",
+      "description": "Keep loadouts, engineering, carrier resources and commander activity together."
+    },
+    {
+      "href": "exobiology.html",
+      "label": "Exobiology",
+      "description": "Find promising planets, track samples and see the data waiting to be sold."
+    }
+  ]
+}

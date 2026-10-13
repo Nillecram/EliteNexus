@@ -1,0 +1,46 @@
+{
+  "slug": "cockpit-lights",
+  "title": "Elite Dangerous Cockpit Light Dimmer — Elite Nexus",
+  "description": "Dim Elite Dangerous cockpit lights independently of the HUD. Adjust light kept and reach, use F9/F10/F11 in flight, and manage the optional graphics hook from Elite Nexus.",
+  "kicker": "Cockpit lights",
+  "heading": "Less cabin light. More of the galaxy.",
+  "lead": "Turn down the cockpit’s own lamps and glow with a dedicated dimmer. Keep your HUD readable, your surroundings unchanged, and adjust the cabin while you fly.",
+  "hero_image": "cockpit-lights.png",
+  "hero_alt": "Elite Nexus Cockpit lights tab with the installed dimmer, Light kept and Reach settings, and F9, F10 and F11 keyboard controls.",
+  "hero_caption": "A dedicated dimmer for the cockpit’s own lights, with saved settings and in-game keyboard controls.",
+  "toc": [
+    {
+      "id": "controls",
+      "label": "Dimming controls"
+    },
+    {
+      "id": "flight-controls",
+      "label": "In-flight keys"
+    },
+    {
+      "id": "setup",
+      "label": "Hook setup"
+    },
+    {
+      "id": "details",
+      "label": "Compatibility & details"
+    }
+  ],
+  "related": [
+    {
+      "href": "hud-colours.html",
+      "label": "HUD colours",
+      "description": "Make your own theme and preserve the contact colours you fly by."
+    },
+    {
+      "href": "odyssey-glare.html",
+      "label": "Glare & exposure",
+      "description": "Find a more comfortable balance of bright lights and dark tones."
+    },
+    {
+      "href": "exploration.html",
+      "label": "Exploration & navigation",
+      "description": "Plan the journey beyond the canopy and keep valuable discoveries in view."
+    }
+  ]
+}
