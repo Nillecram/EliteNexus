@@ -26,10 +26,11 @@ Key facts for answering questions about it:
   massacre stacks, mining, colonisation depots, BGS and Powerplay, bindings, logbook, statistics, galaxy map, voice
   alerts, a compact always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
 - Privacy: journals are read-only. Community uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send live
-  events, never a backfill of journal history. Inara also requires approval for the app name. Settings, databases
-  and logs are stored in nexus-data next to the exe; keys use Windows DPAPI. Optional cloud AI sends questions,
-  commander context and tool results to the selected provider. Local models keep inference on the PC, while
-  tools that query online services still make network requests. Core feature pages do not require AI setup.
+  events, never a backfill of journal history. Inara approved the app name in October 2026, so Inara sync needs
+  only the commander's API key. Settings, databases and logs are stored in nexus-data next to the exe; keys use
+  Windows DPAPI. Optional cloud AI sends questions, commander context and tool results to the selected provider.
+  Local models keep inference on the PC, while tools that query online services still make network requests. Core
+  feature pages do not require AI setup.
 - Limits: Windows only (no console, Mac or Linux build); no plugins, in-game overlay, VR panels or voice commands; no
   Frontier Companion API yet. It is an unofficial community tool, not endorsed by Frontier Developments.
 

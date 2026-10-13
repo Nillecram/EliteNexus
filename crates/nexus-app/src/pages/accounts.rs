@@ -184,14 +184,14 @@ pub fn show(ui: &mut Ui, acc: &mut Accounts, st: &mut AccountsUi, cmdr_name: &st
                         );
                     });
                 }
-                // Inara only talks to apps it has approved; say so plainly when it refuses.
+                // Inara approved "Elite Nexus" on 2026-10-13; should it ever refuse the app again, say so plainly.
                 let refused = s.last_error.as_deref().is_some_and(|e| e.to_ascii_lowercase().contains("no access allowed"));
                 if refused {
                     g.content(|ui| {
                         ui.add(
                             egui::Label::new(
                                 RichText::new(format!(
-                                    "{} Inara hasn't approved \"Elite Nexus\" yet, so it refuses every request and sync is paused. Approval comes from Inara's author: send him the app name, what it does, a short description and a download link.",
+                                    "{} Inara answered \"no access allowed\": it isn't accepting requests from \"Elite Nexus\" right now, so sync is paused. Inara approved the app in October 2026, so this is unexpected: check Inara for news, or ask its author.",
                                     icon::WARNING
                                 ))
                                 .color(pal::WARN),
@@ -204,7 +204,7 @@ pub fn show(ui: &mut Ui, acc: &mut Accounts, st: &mut AccountsUi, cmdr_name: &st
                 status_row(g, s);
             });
             if !matches!(status.uplink.inara.last_error.as_deref(), Some(e) if e.to_ascii_lowercase().contains("no access allowed")) {
-                footnote(ui, "Inara accepts uploads only from apps it has approved by name.");
+                footnote(ui, "Inara accepts uploads only from apps it has approved by name; it approved \"Elite Nexus\" in October 2026.");
             }
             // Hidden depth.
             ui.add_space(6.0);
@@ -213,7 +213,7 @@ pub fn show(ui: &mut Ui, acc: &mut Accounts, st: &mut AccountsUi, cmdr_name: &st
                     changed |= g.switch(
                         &mut acc.inara_dev_mode,
                         "Developer mode",
-                        "Sent to Inara as isBeingDeveloped: Inara then ignores shared data such as community-goal progress. Keep it on for the first weeks after Inara approves \"Elite Nexus\". Updates are batched every 35+ seconds, so the key is never locked out.",
+                        "Sent to Inara as isBeingDeveloped: Inara then ignores shared data such as community-goal progress. Inara approved \"Elite Nexus\" in October 2026 and treats newly approved apps as in development for a while anyway, so leave it on for now. Updates are batched every 35+ seconds, so the key is never locked out.",
                     );
                 });
             }

@@ -32,7 +32,8 @@ impl fmt::Debug for EdsmCredentials {
 pub struct InaraCredentials {
     pub api_key: String,
     /// Sent as `isBeingDeveloped`: Inara then ignores global events (community goals) so test
-    /// data cannot pollute shared data. Keep it on until "Elite Nexus" is whitelisted.
+    /// data cannot pollute shared data. Inara whitelisted "Elite Nexus" on 2026-10-13; the app
+    /// keeps this on by default for the first weeks after.
     pub is_being_developed: bool,
 }
 

@@ -155,9 +155,9 @@ your journals), `cargo run -p nexus-eddn --example live -- <db> <seconds>` (watc
 ## Accounts you may want
 
 * **EDSM** API key: https://www.edsm.net/en/settings/api
-* **Inara** API key: https://inara.cz/elite/cmdr-settings-api/ (Inara only accepts whitelisted app names: until
-  "Elite Nexus" is approved, every request is rejected with "This application has no access allowed" and sync pauses.
-  Keep "Developer mode" on for the first weeks after approval; see docs/research/inara.md)
+* **Inara** API key: https://inara.cz/elite/cmdr-settings-api/ (Inara only accepts whitelisted app names; it approved
+  "Elite Nexus" on 2026-10-13, so your personal key is all sync needs. "Developer mode" stays on by default for the
+  first weeks; see docs/research/inara.md)
 * **Frontier Companion API (CAPI)** needs a client ID approved by Frontier (docs/research/capi.md) — optional; the
   journal already provides almost everything.
 

@@ -6,6 +6,9 @@ release time that section becomes the new version and the release workflow publi
 ## Unreleased
 
 ### Changed
+- **Inara sync works**: Inara approved the app name "Elite Nexus" on 13 October 2026, so your personal Inara API key
+  is all it needs (0.3.0 already sends the right name). Accounts & sync no longer reads as if approval is pending,
+  and still explains if Inara ever refuses the app.
 - Rebuilt the GitHub Pages website with a complete feature directory, dedicated exploration, commander and
   companion pages, and trading content focused on the app's trading tools. Screenshots now open in a full-size
   viewer with zoom and keyboard navigation. Added responsive navigation, a product tour and clearer setup guidance.

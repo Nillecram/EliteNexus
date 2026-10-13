@@ -96,6 +96,11 @@ Response: JSON           { "header": {...}, "events": [ ... ] }   (same order as
 
 ## 2. Application whitelisting, key types and approval
 
+**Status: approved.** Artie whitelisted the app name "Elite Nexus" on **2026-10-13**, replying to a request sent
+through Inara's private messages (app name, what it does and what it sends, the short description for the apps list,
+the GitHub repo as homepage). He confirmed that the earlier refusals were only because the name wasn't whitelisted
+yet. He didn't mention a generic application key.
+
 From the Dev guide (paraphrased):
 
 - **Whitelisting is mandatory.** Before releasing your app, tell Artie (Inara's author) the app name/identifier you will use, because **it must be white-listed first**. Artie says this is not meant to exclude anyone; it identifies problems and lists the app for users. Send him:
@@ -111,8 +116,8 @@ From the Dev guide (paraphrased):
 - **Enforcement.** Inara reserves the right to revoke access for apps or keys that have high error rates, break the rules, or misuse the API (e.g. mass scraping of commander data).
 - **Does an unapproved app work?**
   - The docs only say the name must be whitelisted first, and that newly accepted apps start in development mode server-side (`isBeingDeveloped` forced on).
-  - What happens to requests with an unknown `appName` is **not documented [UNVERIFIED]**. Expect a header-level 400 rejection.
-  - **Practical answer: plan on contacting Artie and getting "Elite Nexus" whitelisted before shipping Inara sync.** Use `isBeingDeveloped: true` and a test account during development.
+  - The docs don't say what happens to requests with an unknown `appName`. **Verified 2026-10-13:** every request is refused at header level with `eventStatusText` "This application has no access allowed", confirmed by Artie as the not-whitelisted answer. Elite Nexus pauses sync on it and Accounts & sync explains why.
+  - "Elite Nexus" was whitelisted on 2026-10-13 (see above). Keep `isBeingDeveloped: true` and a test account for development work.
 - **Personal vs generic API key:**
   - **Personal key:** each user generates it in Inara Settings → API (https://inara.cz/elite/cmdr-settings-api/; EDMC links `https://inara.cz/settings-api`). It identifies the user and is required for all `add*`/`set*`/`del*` events and for `getCommanderProfile` without `searchName`.
   - **Generic application key:** your app's own key, usable only for **read-only general events**. Per the docs these are `getCommanderProfile` (with `searchName`) and `getCommunityGoalsRecent`. How it is issued is not documented; presumably Artie provides it on approval **[UNVERIFIED]**.
@@ -414,7 +419,7 @@ Otherwise EDMC shows "Inara only accepts Live galaxy data", at most every 5 minu
 
 ## 8. [UNVERIFIED] / open questions
 
-- The response to a non-whitelisted `appName`, and how the generic app key is issued.
+- How the generic app key is issued. (The response to a non-whitelisted `appName` is now known, see §2.)
 - The exact current numeric rate limit. Documented by EDMC as "2 messages a minute", with a 1-hour lock on violation.
 - Whether null-valued optional properties are accepted or rejected.
 - The duplicate-timestamp dedupe behaviour reported by EDDiscovery.

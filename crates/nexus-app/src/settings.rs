@@ -115,7 +115,7 @@ pub struct Accounts {
     pub edsm_api_key: String,
     pub inara_enabled: bool,
     pub inara_api_key: String,
-    /// Inara requires new apps to run in "being developed" mode until whitelisted.
+    /// Sent as `isBeingDeveloped`. Inara approved "Elite Nexus" on 2026-10-13; on by default for the first weeks after.
     pub inara_dev_mode: bool,
     pub edastro_enabled: bool,
     /// EDDN sharing paused by the commander (the header's Pause button).

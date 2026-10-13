@@ -151,7 +151,9 @@ and writes `dist\EliteNexus-vx.y.z-windows-x64.zip`. It never touches `nexus-dat
 
 * EDGalaxyData (online footfall lookups) publishes no terms: ask its operator. The switch is
   `ai_tools::ONLINE_FOOTFALL_LOOKUP`.
-* Inara accepts uploads only after its author whitelists the app name "Elite Nexus".
+* Inara whitelisted the app name "Elite Nexus" on 2026-10-13 (Artie, Inara's author), so Inara sync works with a
+  user's personal key. Developer mode (`Accounts::inara_dev_mode`, sent as `isBeingDeveloped`) is still on by
+  default; when to switch that default off is the owner's call, after a few weeks of clean syncs.
 * `GalaxyOptions::all_eddn_bodies` (keep every landable EDDN body, not just biology and valuable worlds) is off.
 * Small known issue: the EDDN "updates stored" counter slightly over-counts body updates.
 * GitHub repo settings, which only the owner can change: upload `docs/social-preview.png` (Settings › Social preview),
