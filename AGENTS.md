@@ -149,7 +149,6 @@ and writes `dist\EliteNexus-vx.y.z-windows-x64.zip`. It never touches `nexus-dat
 
 ## Open decisions (the owner's)
 
-* No `LICENSE` yet, although the repo and its releases are public.
 * EDGalaxyData (online footfall lookups) publishes no terms: ask its operator. The switch is
   `ai_tools::ONLINE_FOOTFALL_LOOKUP`.
 * The EDCD FDevIDs CSVs in `data/fdevids` have no licence file; ask EDCD now that binaries are distributed.

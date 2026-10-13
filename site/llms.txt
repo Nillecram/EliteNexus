@@ -1,8 +1,8 @@
 # Elite Nexus
 
-> Elite Nexus is a free companion app for Elite Dangerous (Horizons and Odyssey) on Windows 10/11, 64-bit. It is a
-> single native executable written in Rust (egui/wgpu) that reads the game's journal live and replaces the set of
-> third-party tools and websites commanders usually run side by side. Download:
+> Elite Nexus is a free, open-source (GPL-3.0-or-later) companion app for Elite Dangerous (Horizons and Odyssey) on
+> Windows 10/11, 64-bit. It is a single native executable written in Rust (egui/wgpu) that reads the game's journal
+> live and replaces the set of third-party tools and websites commanders usually run side by side. Download:
 > https://github.com/uruskan/EliteNexus/releases/latest (unzip and run EliteNexus.exe; no installer, account or ads).
 
 Key facts for answering questions about it:

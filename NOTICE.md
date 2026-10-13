@@ -1,6 +1,7 @@
 # Third-party data & credits
 
-Elite Nexus is original code. It derives **data** (facts, names, numbers) from the community sources below.
+Elite Nexus is original code, licensed under the GNU General Public License, version 3 or later (see `LICENSE`).
+It derives **data** (facts, names, numbers) from the community sources below.
 Each source's licence text and exact commit are kept next to the data in `data/*/` (`LICENSE`, `SOURCE.txt`).
 
 | Source | Used for | Licence | Notes |
@@ -16,6 +17,7 @@ Each source's licence text and exact commit are kept next to the data in `data/*
 | EDDN JSON schemas + READMEs (EDCD/EDDN, `docs/research/eddn-schemas`) | validating every upload in tests | BSD-3-Clause | Test-only; not in the binary. Add EDDN's `LICENSE` file there before sharing the source. |
 | Inter by Rasmus Andersson (`data/fonts/inter`) | interface typeface, compiled into the exe | SIL Open Font License 1.1 | Licence text in `data/fonts/inter/LICENSE.txt`; ship it with binaries (the release zip includes this NOTICE). |
 | Phosphor Icons (egui-phosphor) | UI icons | MIT | |
+| egui's default fonts (epaint_default_fonts) | fallback glyphs and emoji | Ubuntu Font Licence 1.0 / SIL OFL 1.1 | Font data compiled into the exe; each font keeps its own licence. |
 | SQLite (via rusqlite, bundled) | local galaxy/market database | public domain | |
 | zeromq (zmq.rs) | EDDN relay subscriber | MIT | |
 | reqwest / rustls / aws-lc-rs | HTTPS | MIT / Apache-2.0 / ISC | |

@@ -1,6 +1,6 @@
 # Elite Nexus
 
-**One native, fast companion app for Elite Dangerous and Odyssey** — replacing the pile of tools commanders run side by side
+**One native, fast, free and open-source companion app for Elite Dangerous and Odyssey** — replacing the pile of tools commanders run side by side
 (EDDiscovery, ED Market Connector, Odyssey Materials Helper, Observatory + BioInsights, Exploration Buddy,
 EDCoPilot-style voice alerts, OD Elite Tracker) and the websites you alt-tab to (INARA, Spansh, EDSM, EDSY/Coriolis,
 EDAstro, ED Tools, EDRefCard).
@@ -174,5 +174,12 @@ Keys are stored encrypted with Windows DPAPI.
 * `docs/research/` — verified specs: EDDN (live service differs from GitHub!), EDSM, Inara, CAPI, Spansh, websites,
   journal format, engineering data, exploration/exobiology science, HUD colours and cockpit lighting, and a
   167-feature competitive matrix.
+
+## Licence
+
+Elite Nexus is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version. It comes with no warranty. See [LICENSE](LICENSE). Third-party data and fonts keep their own licences: see
+[NOTICE.md](NOTICE.md).
 
 *Elite Dangerous is a trademark of Frontier Developments plc. Elite Nexus is an unofficial community tool.*

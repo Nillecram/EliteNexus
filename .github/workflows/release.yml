@@ -24,7 +24,7 @@ jobs:
         run: |
           $name = "EliteNexus-${{ github.ref_name }}-windows-x64"
           New-Item -ItemType Directory -Force -Path "out\$name" | Out-Null
-          Copy-Item target\release\EliteNexus.exe, README.md, NOTICE.md, docs\USER_GUIDE.md "out\$name"
+          Copy-Item target\release\EliteNexus.exe, LICENSE, README.md, NOTICE.md, docs\USER_GUIDE.md "out\$name"
           # The bundled Inter font's licence (SIL OFL) travels with the program.
           Copy-Item data\fonts\inter\LICENSE.txt "out\$name\Inter-LICENSE.txt"
           Compress-Archive -Path "out\$name\*" -DestinationPath "out\$name.zip"

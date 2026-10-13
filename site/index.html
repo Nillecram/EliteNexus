@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Elite Nexus: a free Elite Dangerous companion app for Windows</title>
-<meta name="description" content="Elite Nexus is a free, fast Elite Dangerous and Odyssey companion app for Windows: HUD colours that keep hostile red, a cockpit-light dimmer, Odyssey glare fixes, exobiology, exploration, live EDDN trading, Spansh routes, engineering and fleet. One native exe.">
+<meta name="description" content="Elite Nexus is a free, open-source, fast Elite Dangerous and Odyssey companion app for Windows: HUD colours that keep hostile red, a cockpit-light dimmer, Odyssey glare fixes, exobiology, exploration, live EDDN trading, Spansh routes, engineering and fleet. One native exe.">
 <link rel="canonical" href="https://uruskan.github.io/EliteNexus/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Elite Nexus: a free Elite Dangerous companion app">
@@ -25,6 +25,7 @@
   "url": "https://uruskan.github.io/EliteNexus/",
   "downloadUrl": "https://github.com/uruskan/EliteNexus/releases/latest",
   "codeRepository": "https://github.com/uruskan/EliteNexus",
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "screenshot": "https://uruskan.github.io/EliteNexus/screenshots/dashboard.png"
 }
@@ -34,7 +35,7 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    { "@type": "Question", "name": "Is Elite Nexus free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Elite Nexus is free to download and use, with no ads, accounts or subscriptions. The source code is on GitHub." } },
+    { "@type": "Question", "name": "Is Elite Nexus free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Elite Nexus is free and open source under the GNU GPL version 3 or later, with no ads, accounts or subscriptions. The source code is on GitHub." } },
     { "@type": "Question", "name": "Can I change the Elite Dangerous HUD colour without hostile contacts changing colour?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, with Elite Nexus. The game's own colour setting moves every HUD colour together, so a blue theme also turns hostile contacts blue. Elite Nexus can install an optional graphics hook (3Dmigoto) that applies your theme only to the HUD's orange, so hostile red, friendly green and shield blue keep their colours. It can't run alongside EDHM." } },
     { "@type": "Question", "name": "Is Elite Nexus allowed by Frontier?", "acceptedAnswer": { "@type": "Answer", "text": "Elite Nexus reads the game's journal files, which Frontier publishes for third-party tools. HUD colours and glare use the game's own settings file. The optional cockpit-light dimmer and colour protection use 3Dmigoto, a graphics hook that Frontier tolerates without having approved it." } },
     { "@type": "Question", "name": "Does Elite Nexus upload my data?", "acceptedAnswer": { "@type": "Answer", "text": "Only if you switch an upload on. Sharing with EDDN, EDSM, Inara and EDAstro is opt-in, sends only live events (never your history) and follows each service's rules. API keys are stored encrypted with Windows DPAPI." } },
@@ -71,7 +72,7 @@
       <a class="btn primary" href="https://github.com/uruskan/EliteNexus/releases/latest">Download for Windows</a>
       <a class="btn ghost" href="https://github.com/uruskan/EliteNexus">Source on GitHub</a>
     </div>
-    <p class="meta">Free · no installer, no account, no ads · Windows 10/11, 64-bit · Horizons and Odyssey</p>
+    <p class="meta">Free and open source (GPL-3.0) · no installer, no account, no ads · Windows 10/11, 64-bit · Horizons and Odyssey</p>
     <img class="shot" src="screenshots/dashboard.png" width="1480" height="920" alt="Elite Nexus dashboard: commander ranks, active ship, location and session stats">
   </section>
 </div>
@@ -177,8 +178,8 @@
 <section id="faq">
   <div class="wrap narrow">
     <h2>Questions</h2>
-    <details><summary>Is it free?</summary><p>Yes: no ads, no account, no subscription. The source code is on
-      <a href="https://github.com/uruskan/EliteNexus">GitHub</a>.</p></details>
+    <details><summary>Is it free?</summary><p>Yes: no ads, no account, no subscription. It's open source under the
+      GNU GPL version 3 or later, and the source code is on <a href="https://github.com/uruskan/EliteNexus">GitHub</a>.</p></details>
     <details><summary>How do I install it?</summary><p>Download the zip from the
       <a href="https://github.com/uruskan/EliteNexus/releases/latest">latest release</a>, unzip it anywhere and run
       <code>EliteNexus.exe</code>. It finds your journal folder by itself. Start it before or after the game. Windows may

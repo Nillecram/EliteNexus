@@ -128,7 +128,7 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                     ui.add(egui::Label::new(RichText::new(d.clone()).color(pal::DIM)).truncate()).on_hover_text(d);
                 });
             });
-            footnote(ui, "Elite Dangerous is a trademark of Frontier Developments plc. Elite Nexus is an unofficial community tool, written in Rust.");
+            footnote(ui, "Elite Nexus is free software under the GNU GPL, version 3 or later, and comes with no warranty. Source: github.com/uruskan/EliteNexus. Elite Dangerous is a trademark of Frontier Developments plc; Elite Nexus is an unofficial community tool.");
         });
     });
 }
