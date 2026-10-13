@@ -27,6 +27,11 @@ release time that section becomes the new version and the release workflow publi
   takes out exactly what was installed, and Delete them clears frame captures and exported shaders left over from
   setting 3Dmigoto up. The game's code is never copied, so most game updates don't break it. Leaves EDHM and other
   3Dmigoto mods alone.
+- **HUD & cockpit › HUD colours: Keep hostile red, friendly green and shield blue.** The game's colour matrix moves
+  every HUD colour together, so a blue theme turned hostile contacts blue too. With Elite Nexus's graphics hook
+  (installed from Cockpit lights), a pattern on the HUD shaders that apply the matrix applies it only to the HUD's
+  orange: hostile red, friendly green, shield blue and white keep their colours. The preview, swatches and warnings
+  follow the same rule; the thresholds sit under Options, because Frontier documents none of this.
 
 ## [0.2.2] - 2026-10-12
 

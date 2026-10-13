@@ -1,8 +1,13 @@
-//! The cockpit-light dimmer: 3Dmigoto (a Direct3D 11 hook placed next to the game) with a pattern that
-//! patches the game's deferred box-light shader as the game loads it, so lights near the eyes (the
-//! cockpit's own) come out dimmer.
+//! Elite Nexus's graphics hook: 3Dmigoto (a Direct3D 11 hook placed next to the game) with patterns
+//! that patch game shaders as the game loads them.
 //!
-//! Elite Nexus ships only its pattern and the few instructions it inserts; the game's shader code is
+//! * The cockpit-light dimmer ([`Dimmer`]): the deferred box-light shader, so lights near the eyes
+//!   (the cockpit's own) come out dimmer.
+//! * HUD colour protection ([`Protect`], optional): the HUD shaders that apply the game's colour
+//!   matrix apply it only to the HUD's orange, so hostile red, friendly green and shield blue keep
+//!   their colours under a theme.
+//!
+//! Elite Nexus ships only its patterns and the few instructions it inserts; the game's shader code is
 //! never copied (3Dmigoto patches it in memory). 3Dmigoto itself (GPL-3.0) is downloaded from its
 //! official release and checked against pinned checksums. Everything Elite Nexus puts in the game
 //! folder is listed in a manifest there, and removal deletes only files that still match it.
@@ -56,6 +61,37 @@ impl Default for Dimmer {
     }
 }
 
+/// Keeps hostile red, friendly green and shield blue out of the HUD colour theme: the game's colour
+/// matrix is applied only to colours like the HUD's orange ([`crate::palette::is_hud_orange`]), in
+/// the game's `[Constants]` as 3Dmigoto's IniParams `x1`, `y1`, `z1`, `w1`. The shares compare the
+/// colour's channels with its red, so they don't depend on brightness. Frontier documents none of
+/// this; the defaults come from the colours measured in a frame capture.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Protect {
+    pub on: bool,
+    /// The most green, as a share of red, a colour can have and still count as the HUD's orange.
+    pub max_gr: f32,
+    /// The most blue, as a share of red.
+    pub max_br: f32,
+    /// The least green, as a share of red: redder colours (hostile red) keep their colour.
+    pub min_gr: f32,
+}
+
+impl Default for Protect {
+    fn default() -> Self {
+        Protect { on: false, max_gr: 0.6, max_br: 0.3, min_gr: 0.035 }
+    }
+}
+
+/// Everything Elite Nexus sets in the game's 3Dmigoto config.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HookConfig {
+    pub dimmer: Dimmer,
+    pub protect: Protect,
+}
+
 /// What Elite Nexus installed, written next to the game as [`MANIFEST`].
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -71,9 +107,9 @@ pub enum Status {
     /// No 3Dmigoto.
     None,
     /// Installed and managed by Elite Nexus.
-    Installed { dimmer: Dimmer },
+    Installed { config: HookConfig },
     /// Elite Nexus's config without a manifest: put there by hand (the first test). Can be taken over.
-    Unmanaged { dimmer: Dimmer },
+    Unmanaged { config: HookConfig },
     /// Another 3Dmigoto mod (EDHM or something else): left alone.
     Foreign { edhm: bool },
 }
@@ -136,8 +172,8 @@ pub fn status(game: &Path) -> Status {
     let config = std::fs::read_to_string(game.join(CONFIG)).ok();
     match config {
         Some(text) if text.starts_with(CONFIG_MARK) => {
-            let dimmer = read_settings(&text);
-            if game.join(MANIFEST).is_file() { Status::Installed { dimmer } } else { Status::Unmanaged { dimmer } }
+            let config = read_config(&text);
+            if game.join(MANIFEST).is_file() { Status::Installed { config } } else { Status::Unmanaged { config } }
         }
         Some(_) => Status::Foreign { edhm: game.join("EDHM-ini").is_dir() },
         None if game.join("d3d11.dll").exists() => Status::Foreign { edhm: game.join("EDHM-ini").is_dir() },
@@ -145,9 +181,9 @@ pub fn status(game: &Path) -> Status {
     }
 }
 
-/// Installs 3Dmigoto (`files` from [`extract`]) and the dimmer with `dimmer`, or takes over a
-/// hand-installed Elite Nexus config (then `files` may be empty: the DLLs there are checked instead).
-pub fn install(game: &Path, files: &[(&'static str, Vec<u8>)], dimmer: &Dimmer) -> Result<(), DimmerError> {
+/// Installs 3Dmigoto (`files` from [`extract`]) with `config`, or takes over a hand-installed Elite
+/// Nexus config (then `files` may be empty: the DLLs there are checked instead).
+pub fn install(game: &Path, files: &[(&'static str, Vec<u8>)], config: &HookConfig) -> Result<(), DimmerError> {
     match status(game) {
         Status::Foreign { edhm } => return Err(DimmerError::Foreign(edhm)),
         Status::None | Status::Installed { .. } | Status::Unmanaged { .. } => {}
@@ -176,7 +212,7 @@ pub fn install(game: &Path, files: &[(&'static str, Vec<u8>)], dimmer: &Dimmer) 
     if legacy.is_file() {
         std::fs::remove_file(&legacy).map_err(io(&legacy))?;
     }
-    let ini = render_config(dimmer);
+    let ini = render_config(config);
     write_atomic(&game.join(CONFIG), ini.as_bytes())?;
     manifest.files.push((CONFIG.to_string(), sha256_hex(ini.as_bytes())));
     let json = serde_json::to_vec_pretty(&manifest).unwrap_or_default();
@@ -185,13 +221,13 @@ pub fn install(game: &Path, files: &[(&'static str, Vec<u8>)], dimmer: &Dimmer) 
     Ok(())
 }
 
-/// Writes new dimmer settings (the game reads them when it starts).
-pub fn save_settings(game: &Path, dimmer: &Dimmer) -> Result<(), DimmerError> {
+/// Writes new settings (the game reads them when it starts).
+pub fn save_config(game: &Path, config: &HookConfig) -> Result<(), DimmerError> {
     match status(game) {
         Status::Installed { .. } => {}
         _ => return Err(DimmerError::NotOurs),
     }
-    let ini = render_config(dimmer);
+    let ini = render_config(config);
     write_atomic(&game.join(CONFIG), ini.as_bytes())?;
     // Keep the manifest's checksum of the config in step, so removal recognises it.
     let path = game.join(MANIFEST);
@@ -211,8 +247,8 @@ pub struct Removed {
     pub kept: Vec<String>,
 }
 
-/// Removes 3Dmigoto and the dimmer: the files Elite Nexus installed (only while they still match),
-/// 3Dmigoto's own by-products, and the frame captures made with it.
+/// Removes 3Dmigoto with the dimmer and the HUD colour protection: the files Elite Nexus installed
+/// (only while they still match), 3Dmigoto's own by-products, and the frame captures made with it.
 pub fn uninstall(game: &Path) -> Result<Removed, DimmerError> {
     let manifest = match status(game) {
         Status::Installed { .. } => std::fs::read(game.join(MANIFEST)).ok().and_then(|b| serde_json::from_slice::<Manifest>(&b).ok()).unwrap_or_default(),
@@ -368,28 +404,36 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), DimmerError> {
     std::fs::rename(&tmp, path).map_err(io(path))
 }
 
-/// The dimmer settings in a config's `[Constants]` (defaults for anything missing).
-pub fn read_settings(ini: &str) -> Dimmer {
-    let mut d = Dimmer::default();
+/// The settings in a config's `[Constants]` (defaults for anything missing).
+pub fn read_config(ini: &str) -> HookConfig {
+    let mut c = HookConfig::default();
     for (key, value) in section(ini, "Constants") {
         let Ok(v) = value.parse::<f32>() else { continue };
+        if !v.is_finite() {
+            continue;
+        }
         match key {
-            "x" => d.strength = v.clamp(0.0, 1.0),
-            "y" => d.reach = v.max(0.0),
-            "z" => d.on = v != 0.0,
+            "x" => c.dimmer.strength = v.clamp(0.0, 1.0),
+            "y" => c.dimmer.reach = v.max(0.0),
+            "z" => c.dimmer.on = v != 0.0,
+            "x1" => c.protect.on = v != 0.0,
+            "y1" => c.protect.max_gr = v.clamp(0.0, 1.0),
+            "z1" => c.protect.max_br = v.clamp(0.0, 1.0),
+            "w1" => c.protect.min_gr = v.clamp(0.0, 1.0),
             _ => {}
         }
     }
-    d
+    c
 }
 
-/// The section names of the pattern (one name, so nothing else in an ini can collide with it).
-const REGEX: &str = "ShaderRegexEliteNexusCockpitLights";
+/// The section names of each pattern (own names, so nothing else in an ini can collide with them).
+const LIGHT_REGEX: &str = "ShaderRegexEliteNexusCockpitLights";
+const HUD_REGEX: &str = "ShaderRegexEliteNexusHudColours";
 
 /// The box-light shader, recognised by its inputs (light position and range in camera space, packed
 /// colour, view ray, pixel position) and by how it ends (colour and luminance scaled by `cb2[0].x`).
 /// Lines are joined after trimming, as 3Dmigoto does; `\n` matches the end of each shader line.
-pub const PATTERN: [&str; 8] = [
+pub const LIGHT_PATTERN: [&str; 8] = [
     r"dcl_input_ps constant v0\.xyzw\n",
     r"dcl_input_ps constant v1\.xyzw\n",
     r"dcl_input_ps linear v2\.xyz\n",
@@ -402,7 +446,7 @@ pub const PATTERN: [&str; 8] = [
 
 /// The same shader with the dimmer before its last three lines: `IniParams[0]` = (strength, reach,
 /// on); `v0.xyz` is the light's position relative to the eyes, so its length is the distance.
-pub const REPLACE: [&str; 19] = [
+pub const LIGHT_REPLACE: [&str; 18] = [
     r"dcl_input_ps constant v0.xyzw\n",
     r"dcl_input_ps constant v1.xyzw\n",
     r"dcl_input_ps linear v2.xyz\n",
@@ -421,9 +465,49 @@ pub const REPLACE: [&str; 19] = [
     r"mul o0.xyz, ${colour}.xyzx, cb2[0].xxxx\n",
     r"dp3 ${lumout}.x, ${lumin}.xyzx, l(0.308600, 0.609400, 0.082000, 0.000000)\n",
     r"mul o1.x, ${lumres}.x, cb2[0].x\n",
-    "",
 ];
-pub const TEMPS: [&str; 2] = ["nexus_settings", "nexus_light"];
+pub const LIGHT_TEMPS: [&str; 2] = ["nexus_settings", "nexus_light"];
+
+/// Where a HUD shader applies the game's colour matrix to an element's standard colour (`cb1[85]`,
+/// `[86]`, `[87]` are the MatrixRed, MatrixGreen and MatrixBlue rows): green times row 86, plus red
+/// times row 85, plus blue times row 87, three lines in a row. Registers, masks and component order
+/// vary between shaders; the third line's destination components hold the themed red, green, blue.
+pub const HUD_PATTERN: [&str; 3] = [
+    r"(?P<l1>mul r\d+\.[xyzw]{3}, (?P<gs>r\d+)\.(?P<gc>[xyzw])[xyzw]{3}, cb1\[86\]\.[xyzw]{4}\n)",
+    r"(?P<l2>mad r\d+\.[xyzw]{3}, (?P<rs>r\d+)\.(?P<rc>[xyzw])[xyzw]{3}, cb1\[85\]\.[xyzw]{4}, r\d+\.[xyzw]{4}\n)",
+    r"(?P<l3>mad (?P<d>r\d+)\.(?P<d0>[xyzw])(?P<d1>[xyzw])(?P<d2>[xyzw]), (?P<bs>r\d+)\.(?P<bc>[xyzw])[xyzw]{3}, cb1\[87\]\.[xyzw]{4}, r\d+\.[xyzw]{4}\n)",
+];
+
+/// The same three lines with the standard colour copied first (the third line can overwrite it) and,
+/// after them, the rule of [`crate::palette::is_hud_orange`] with `IniParams[1]` = (on, max_gr,
+/// max_br, min_gr): a colour that isn't the HUD's orange gets its standard colour back.
+pub const HUD_REPLACE: [&str; 22] = [
+    r"mov ${nexus_in}.x, ${rs}.${rc}\n",
+    r"mov ${nexus_in}.y, ${gs}.${gc}\n",
+    r"mov ${nexus_in}.z, ${bs}.${bc}\n",
+    r"${l1}${l2}${l3}",
+    r"// Elite Nexus: keep hostile red, friendly green and shield blue out of the HUD colour theme.\n",
+    r"ld_indexable(texture1d)(float,float,float,float) ${nexus_set}.xyzw, l(1, 0, 0, 0), t120.xyzw\n",
+    r"max ${nexus_tmp}.w, ${nexus_in}.y, ${nexus_in}.z\n",
+    r"lt ${nexus_tmp}.x, ${nexus_tmp}.w, ${nexus_in}.x\n",
+    r"mul ${nexus_tmp}.y, ${nexus_in}.x, ${nexus_set}.y\n",
+    r"ge ${nexus_tmp}.y, ${nexus_tmp}.y, ${nexus_in}.y\n",
+    r"mul ${nexus_tmp}.z, ${nexus_in}.x, ${nexus_set}.w\n",
+    r"ge ${nexus_tmp}.z, ${nexus_in}.y, ${nexus_tmp}.z\n",
+    r"mul ${nexus_tmp}.w, ${nexus_in}.x, ${nexus_set}.z\n",
+    r"ge ${nexus_tmp}.w, ${nexus_tmp}.w, ${nexus_in}.z\n",
+    r"and ${nexus_tmp}.x, ${nexus_tmp}.x, ${nexus_tmp}.y\n",
+    r"and ${nexus_tmp}.x, ${nexus_tmp}.x, ${nexus_tmp}.z\n",
+    r"and ${nexus_tmp}.x, ${nexus_tmp}.x, ${nexus_tmp}.w\n",
+    r"eq ${nexus_tmp}.y, ${nexus_set}.x, l(0.000000)\n",
+    r"or ${nexus_tmp}.x, ${nexus_tmp}.x, ${nexus_tmp}.y\n",
+    r"movc ${d}.${d0}, ${nexus_tmp}.x, ${d}.${d0}, ${nexus_in}.x\n",
+    r"movc ${d}.${d1}, ${nexus_tmp}.x, ${d}.${d1}, ${nexus_in}.y\n",
+    r"movc ${d}.${d2}, ${nexus_tmp}.x, ${d}.${d2}, ${nexus_in}.z\n",
+];
+pub const HUD_TEMPS: [&str; 3] = ["nexus_in", "nexus_tmp", "nexus_set"];
+
+/// Both patterns read their settings from 3Dmigoto's IniParams texture.
 pub const INSERT_DECLARATIONS: &str = "dcl_resource_texture1d (float,float,float,float) t120";
 
 fn number(v: f32) -> String {
@@ -432,17 +516,21 @@ fn number(v: f32) -> String {
     if s.is_empty() || s == "-0" { "0".into() } else { s.to_string() }
 }
 
-/// The game's `d3dx.ini` with the dimmer set to `d`.
-pub fn render_config(d: &Dimmer) -> String {
+/// The game's `d3dx.ini` for `c`. The HUD pattern is in it only while the protection is on, so the
+/// HUD shaders are patched only when that's wanted.
+pub fn render_config(c: &HookConfig) -> String {
+    let (d, p) = (&c.dimmer, &c.protect);
     let mut s = String::new();
     let mut line = |l: &str| {
         s.push_str(l);
         s.push_str("\r\n");
     };
-    line("; Elite Nexus: cockpit-light dimmer. Installed and managed by Elite Nexus (HUD & cockpit > Cockpit");
-    line(&format!("; lights); change it there. 3Dmigoto {MIGOTO_VERSION} ({MIGOTO_SOURCE}, GPL-3.0) patches the game's"));
-    line("; box-light shader as the game loads it, so lights within the reach of your eyes (the cockpit's own)");
-    line("; come out dimmer. No game file is changed.");
+    line("; Elite Nexus: graphics hook for the cockpit-light dimmer and the HUD colours. Installed and managed by");
+    line(&format!("; Elite Nexus (HUD & cockpit); change it there. 3Dmigoto {MIGOTO_VERSION} ({MIGOTO_SOURCE}, GPL-3.0)"));
+    line("; patches game shaders as the game loads them: the box-light shader, so lights within the reach of your");
+    line("; eyes (the cockpit's own) come out dimmer, and, while \"Keep hostile red, friendly green and shield blue\"");
+    line("; is on, the HUD shaders that apply the game's colour matrix, so a theme colours only the HUD's orange.");
+    line("; No game file is changed.");
     line(";");
     line("; Keys, while the game window is in front:");
     for (key, what) in KEYS {
@@ -466,6 +554,12 @@ pub fn render_config(d: &Dimmer) -> String {
     line(&format!("x = {}", number(d.strength)));
     line(&format!("y = {}", number(d.reach)));
     line(&format!("z = {}", if d.on { 1 } else { 0 }));
+    line("; x1: 1 = keep hostile red, friendly green and shield blue out of the HUD colour theme. y1, z1: the most");
+    line("; green and blue (shares of red) the HUD's orange has; w1: the least green (redder colours keep theirs).");
+    line(&format!("x1 = {}", if p.on { 1 } else { 0 }));
+    line(&format!("y1 = {}", number(p.max_gr)));
+    line(&format!("z1 = {}", number(p.max_br)));
+    line(&format!("w1 = {}", number(p.min_gr)));
     line("");
     line("[KeyEliteNexusDimmerOnOff]");
     line("Key = no_modifiers VK_F9");
@@ -482,44 +576,191 @@ pub fn render_config(d: &Dimmer) -> String {
     line("type = cycle");
     line("y = 5, 8, 12");
     line("");
-    line(&format!("[{REGEX}]"));
-    line("shader_model = ps_5_0");
-    line(&format!("temps = {}", TEMPS.join(" ")));
-    line("");
-    line(&format!("[{REGEX}.Pattern]"));
-    for l in PATTERN {
-        line(l);
+    regex_sections(&mut line, LIGHT_REGEX, &LIGHT_TEMPS, &LIGHT_PATTERN, &LIGHT_REPLACE);
+    if p.on {
+        regex_sections(&mut line, HUD_REGEX, &HUD_TEMPS, &HUD_PATTERN, &HUD_REPLACE);
     }
-    line("");
-    line(&format!("[{REGEX}.Pattern.Replace]"));
-    for l in REPLACE.iter().filter(|l| !l.is_empty()) {
-        line(l);
-    }
-    line("");
-    line(&format!("[{REGEX}.InsertDeclarations]"));
-    line(INSERT_DECLARATIONS);
-    line("");
     line("[Stereo]");
     line("automatic_mode=0");
     s
 }
 
+/// One `[ShaderRegex…]` group: the main section, the pattern, its replacement and the declaration
+/// of the IniParams texture.
+fn regex_sections(line: &mut dyn FnMut(&str), name: &str, temps: &[&str], pattern: &[&str], replace: &[&str]) {
+    line(&format!("[{name}]"));
+    line("shader_model = ps_5_0");
+    line(&format!("temps = {}", temps.join(" ")));
+    line("");
+    line(&format!("[{name}.Pattern]"));
+    for l in pattern {
+        line(l);
+    }
+    line("");
+    line(&format!("[{name}.Pattern.Replace]"));
+    for l in replace {
+        line(l);
+    }
+    line("");
+    line(&format!("[{name}.InsertDeclarations]"));
+    line(INSERT_DECLARATIONS);
+    line("");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::matrix::{HudMatrix, Rgb};
+    use crate::palette::is_hud_orange;
+    use std::collections::HashMap;
 
-    /// Applies the pattern the way 3Dmigoto does (lines joined, case-insensitive, multi-line, `\n`
-    /// in the replacement is a new line, temps become free registers).
-    fn patch(shader: &str) -> Option<String> {
-        let re = regex::Regex::new(&format!("(?im){}", PATTERN.concat())).ok()?;
+    /// A pattern applied the way 3Dmigoto does it: lines joined, case-insensitive, multi-line, `\n` in
+    /// the replacement is a new line, temps become free registers (r90, r91, ... here).
+    struct Patched {
+        shader: String,
+        /// The replacement on its own.
+        inserted: String,
+        groups: HashMap<String, String>,
+    }
+
+    fn regex(pattern: &[&str]) -> regex::Regex {
+        regex::Regex::new(&format!("(?im){}", pattern.concat())).unwrap()
+    }
+
+    fn patch_with(pattern: &[&str], replace: &[&str], temps: &[&str], shader: &str) -> Option<Patched> {
+        let re = regex(pattern);
         let caps = re.captures(shader)?;
-        let mut replacement = REPLACE.concat().replace(r"\n", "\n");
-        for (i, t) in TEMPS.iter().enumerate() {
+        let mut replacement = replace.concat().replace(r"\n", "\n");
+        for (i, t) in temps.iter().enumerate() {
             replacement = replacement.replace(&format!("${{{t}}}"), &format!("r{}", 90 + i));
         }
-        let mut out = String::new();
-        caps.expand(&replacement, &mut out);
-        Some(format!("{}{}{}", &shader[..caps.get(0)?.start()], out, &shader[caps.get(0)?.end()..]))
+        let mut inserted = String::new();
+        caps.expand(&replacement, &mut inserted);
+        let whole = caps.get(0)?;
+        let groups = re.capture_names().flatten().filter_map(|n| Some((n.to_string(), caps.name(n)?.as_str().to_string()))).collect();
+        Some(Patched { shader: format!("{}{}{}", &shader[..whole.start()], inserted, &shader[whole.end()..]), inserted, groups })
+    }
+
+    fn patch_lights(shader: &str) -> Option<Patched> {
+        patch_with(&LIGHT_PATTERN, &LIGHT_REPLACE, &LIGHT_TEMPS, shader)
+    }
+
+    fn patch_hud(shader: &str) -> Option<Patched> {
+        patch_with(&HUD_PATTERN, &HUD_REPLACE, &HUD_TEMPS, shader)
+    }
+
+    /// Just enough of a pixel shader machine to run the instructions the patterns match and insert,
+    /// so the tests check what the inserted code computes. Values are kept as bits, as on the GPU:
+    /// comparisons give all-ones masks and `and`/`or` are bitwise.
+    #[derive(Default)]
+    struct Machine {
+        regs: HashMap<String, [u32; 4]>,
+        /// Constant buffers by (buffer, index).
+        cb: HashMap<(u32, u32), [f32; 4]>,
+        /// 3Dmigoto's IniParams (t120).
+        ini: Vec<[f32; 4]>,
+    }
+
+    const LANES: &str = "xyzw";
+
+    fn lane(c: char) -> usize {
+        LANES.find(c).expect("a component")
+    }
+
+    /// Operands split at the commas between them (not inside `l(...)`).
+    fn operands(s: &str) -> Vec<&str> {
+        let (mut out, mut depth, mut start) = (Vec::new(), 0, 0);
+        for (i, ch) in s.char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' => depth -= 1,
+                ',' if depth == 0 => {
+                    out.push(s[start..i].trim());
+                    start = i + 1;
+                }
+                _ => {}
+            }
+        }
+        out.push(s[start..].trim());
+        out
+    }
+
+    impl Machine {
+        fn set(&mut self, reg: &str, values: [f32; 4]) {
+            self.regs.insert(reg.to_string(), values.map(f32::to_bits));
+        }
+
+        fn set_component(&mut self, reg: &str, component: &str, value: f32) {
+            self.regs.entry(reg.to_string()).or_default()[lane(component.chars().next().unwrap())] = value.to_bits();
+        }
+
+        fn get(&self, reg: &str) -> [f32; 4] {
+            self.regs.get(reg).copied().unwrap_or_default().map(f32::from_bits)
+        }
+
+        /// A source operand, swizzled to four lanes (a short swizzle repeats its last component).
+        fn read(&self, operand: &str) -> [u32; 4] {
+            if let Some(list) = operand.strip_prefix("l(").and_then(|o| o.strip_suffix(')')) {
+                let v: Vec<u32> = list.split(',').map(|n| n.trim().parse::<f32>().unwrap().to_bits()).collect();
+                return if v.len() == 1 { [v[0]; 4] } else { [v[0], v[1], v[2], v[3]] };
+            }
+            let (base, swizzle) = operand.split_once('.').unwrap();
+            let values = match base.strip_prefix("cb").and_then(|r| r.trim_end_matches(']').split_once('[')) {
+                Some((buf, idx)) => self.cb.get(&(buf.parse().unwrap(), idx.parse().unwrap())).copied().unwrap_or_default().map(f32::to_bits),
+                None => self.regs.get(base).copied().unwrap_or_default(),
+            };
+            let s: Vec<char> = swizzle.chars().collect();
+            std::array::from_fn(|i| values[lane(s[i.min(s.len() - 1)])])
+        }
+
+        /// Runs the instructions of `code`, skipping declarations and comments.
+        fn run(&mut self, code: &str) {
+            let float = f32::from_bits;
+            let mask = |b: bool| if b { u32::MAX } else { 0 };
+            for line in code.lines().map(str::trim) {
+                if line.is_empty() || line.starts_with("//") || line.starts_with("dcl_") || line.starts_with("ps_") || line == "ret" {
+                    continue;
+                }
+                let (op, rest) = line.split_once(' ').unwrap();
+                let args = operands(rest);
+                let (dest, write) = args[0].split_once('.').unwrap();
+                let src: Vec<[u32; 4]> = if op.starts_with("ld_indexable") {
+                    let texel = float(self.read(args[1])[0]) as usize;
+                    vec![self.ini.get(texel).copied().unwrap_or_default().map(f32::to_bits)]
+                } else {
+                    args[1..].iter().map(|a| self.read(a)).collect()
+                };
+                let out: [u32; 4] = std::array::from_fn(|i| {
+                    let a = |k: usize| src[k][i];
+                    match op {
+                        "mov" => a(0),
+                        "mul" => (float(a(0)) * float(a(1))).to_bits(),
+                        "mad" => (float(a(0)) * float(a(1)) + float(a(2))).to_bits(),
+                        "max" => float(a(0)).max(float(a(1))).to_bits(),
+                        "dp3" => (0..3).map(|k| float(src[0][k]) * float(src[1][k])).sum::<f32>().to_bits(),
+                        "lt" => mask(float(a(0)) < float(a(1))),
+                        "ge" => mask(float(a(0)) >= float(a(1))),
+                        "eq" => mask(float(a(0)) == float(a(1))),
+                        "ne" => mask(float(a(0)) != float(a(1))),
+                        "and" => a(0) & a(1),
+                        "or" => a(0) | a(1),
+                        "movc" => {
+                            if a(0) != 0 {
+                                a(1)
+                            } else {
+                                a(2)
+                            }
+                        }
+                        o if o.starts_with("ld_indexable") => a(0),
+                        o => panic!("{o} isn't modelled"),
+                    }
+                });
+                let reg = self.regs.entry(dest.to_string()).or_default();
+                for c in write.chars() {
+                    reg[lane(c)] = out[lane(c)];
+                }
+            }
+        }
     }
 
     // A made-up shader with the box light's inputs and ending (not the game's code).
@@ -527,7 +768,7 @@ mod tests {
 
     #[test]
     fn the_pattern_dims_only_the_end_of_a_box_light() {
-        let out = patch(BOX).expect("pattern should match");
+        let out = patch_lights(BOX).expect("pattern should match").shader;
         // Everything before the end is untouched.
         assert!(out.starts_with(&BOX[..BOX.find("mul o0.xyz").unwrap()]));
         assert!(out.contains("ld_indexable(texture1d)(float,float,float,float) r90.xyzw, l(0, 0, 0, 0), t120.xyzw\n"));
@@ -541,24 +782,167 @@ mod tests {
     fn other_light_shapes_are_left_alone() {
         // Round lights read their data elsewhere; v0 isn't a light position there.
         let sphere = BOX.replace("dcl_input_ps constant v0.xyzw\n", "dcl_input_ps constant v0.xyz\n");
-        assert!(patch(&sphere).is_none());
+        assert!(patch_lights(&sphere).is_none());
         let other_end = BOX.replace("cb2[0].xxxx", "cb2[1].xxxx");
-        assert!(patch(&other_end).is_none());
+        assert!(patch_lights(&other_end).is_none());
     }
 
     #[test]
-    fn config_round_trips_settings_and_carries_the_pattern() {
-        let d = Dimmer { on: false, strength: 0.15, reach: 7.5 };
-        let ini = render_config(&d);
+    fn the_inserted_dimmer_code_dims_only_lights_within_reach() {
+        let patched = patch_lights(BOX).unwrap().shader;
+        let colour = [0.5, 0.25, 1.0];
+        let luminance = 0.3086 * colour[0] + 0.6094 * colour[1] + 0.082 * colour[2];
+        // Light position relative to the eyes, dimmer on, light kept.
+        for (at, on, kept) in [([1.0, 2.0, 2.0], true, 0.35), ([1.0, 2.0, 2.0], false, 1.0), ([3.0, 4.0, 5.0], true, 1.0)] {
+            let mut m = Machine { ini: vec![[0.35, 5.0, if on { 1.0 } else { 0.0 }, 0.0]], ..Default::default() };
+            m.cb.insert((2, 0), [1.0, 0.0, 0.0, 0.0]);
+            m.set("v0", [at[0], at[1], at[2], 1.0]);
+            m.set("v1", [colour[0], colour[1], colour[2], 0.0]);
+            m.run(&patched);
+            let o0 = m.get("o0");
+            assert!(o0.iter().zip(colour).all(|(got, c)| (got - c * kept).abs() < 1e-6), "{at:?} {on}: {o0:?}");
+            assert!((m.get("o1")[0] - luminance * kept).abs() < 1e-6, "{at:?} {on}");
+        }
+    }
+
+    // Made-up HUD shaders (not the game's code) around the two shapes in which the game's HUD
+    // shaders apply the colour matrix.
+    const HUD_SHAPE_1: &str = "ps_5_0\ndcl_constantbuffer CB1[91], immediateIndexed\ndcl_input_ps linear v1.xyzw\ndcl_output o0.xyzw\ndcl_temps 3\nmov r1.xyz, v1.xyzx\nmul r2.xyz, r1.yyyy, cb1[86].xyzx\nmad r1.xyw, r1.xxxx, cb1[85].xyxz, r2.xyxz\nmad r0.xyz, r1.zzzz, cb1[87].xyzx, r1.xywx\nmul o0.xyz, r0.xyzx, cb1[90].yyyy\nmov o0.w, v1.w\nret\n";
+    const HUD_SHAPE_2: &str = "ps_5_0\ndcl_constantbuffer CB1[91], immediateIndexed\ndcl_input_ps linear v1.xyzw\ndcl_output o0.xyzw\ndcl_temps 2\nmov r0.xyzw, v1.xwyz\nmul r1.xyz, r0.zzzz, cb1[86].xyzx\nmad r1.xyz, r0.xxxx, cb1[85].xyzx, r1.xyzx\nmad r0.xzw, r0.wwww, cb1[87].xxyz, r1.xxyz\nmul o0.xyz, r0.xzwx, cb1[90].yyyy\nmov o0.w, r0.y\nret\n";
+
+    #[test]
+    fn the_hud_pattern_wraps_the_three_matrix_lines_and_nothing_else() {
+        for shader in [HUD_SHAPE_1, HUD_SHAPE_2] {
+            let found: Vec<_> = regex(&HUD_PATTERN).find_iter(shader).collect();
+            assert_eq!(found.len(), 1, "{shader}");
+            let (start, end) = (found[0].start(), found[0].end());
+            let p = patch_hud(shader).unwrap();
+            // Byte for byte the same outside the three lines, which stay in the middle as they were.
+            assert!(p.shader.starts_with(&shader[..start]) && p.shader.ends_with(&shader[end..]), "{}", p.shader);
+            assert!(p.inserted.contains(&shader[start..end]));
+            assert!(!p.inserted.contains("${") && !p.inserted.contains(r"\n"), "{}", p.inserted);
+            assert!(p.inserted.contains("ld_indexable(texture1d)(float,float,float,float) r92.xyzw, l(1, 0, 0, 0), t120.xyzw\n"));
+            // Neither pattern takes the other's shaders.
+            assert!(patch_lights(shader).is_none());
+        }
+        assert!(patch_hud(BOX).is_none());
+        // Shape 2 writes its result over its own blue input (r0.w): the inputs are copied first.
+        let p = patch_hud(HUD_SHAPE_2).unwrap();
+        assert!(p.inserted.starts_with("mov r90.x, r0.x\nmov r90.y, r0.z\nmov r90.z, r0.w\nmul r1.xyz, r0.zzzz, cb1[86].xyzx\n"), "{}", p.inserted);
+        assert!(p.inserted.ends_with("movc r0.x, r91.x, r0.x, r90.x\nmovc r0.z, r91.x, r0.z, r90.y\nmovc r0.w, r91.x, r0.w, r90.z\n"), "{}", p.inserted);
+        let p = patch_hud(HUD_SHAPE_1).unwrap();
+        assert!(p.inserted.starts_with("mov r90.x, r1.x\nmov r90.y, r1.y\nmov r90.z, r1.z\nmul r2.xyz"), "{}", p.inserted);
+        assert!(p.inserted.ends_with("movc r0.x, r91.x, r0.x, r90.x\nmovc r0.y, r91.x, r0.y, r90.y\nmovc r0.z, r91.x, r0.z, r90.z\n"), "{}", p.inserted);
+        // Only two matrix rows, or another buffer: not the HUD's matrix.
+        assert!(patch_hud(&HUD_SHAPE_1.replace("cb1[87]", "cb1[88]")).is_none());
+        assert!(patch_hud(&HUD_SHAPE_1.replace("cb1[86]", "cb2[86]")).is_none());
+    }
+
+    /// What the HUD should show for the standard colour `c` (linear light): the theme `m` when the
+    /// protection is off or `c` is the HUD's orange, else `c` itself.
+    fn expected(m: &HudMatrix, c: Rgb, p: &Protect) -> Rgb {
+        if p.on && !is_hud_orange(c, p) {
+            return c;
+        }
+        std::array::from_fn(|k| c[2] * m.blue[k] + (c[0] * m.red[k] + c[1] * m.green[k]))
+    }
+
+    /// Random colours from a fixed seed, plus the measured and reference ones and the edges.
+    fn test_colours() -> Vec<Rgb> {
+        let mut out: Vec<Rgb> = vec![[1.0, 0.068, 0.025], [0.234, 0.044, 0.025], [1.0, 1.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.6, 1.0], [1.0, 0.01, 0.01], [0.0, 0.0, 0.0], [1.0, 0.0144, 0.0052], [1.0, 0.6, 0.3], [1.0, 0.035, 0.0]];
+        let mut seed = 0x2545_f491_u32;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            (seed % 10_001) as f32 / 10_000.0
+        };
+        for _ in 0..500 {
+            let r = next() * 4.0;
+            out.push([r, r * next() * 0.8, r * next() * 0.5]);
+            out.push([next(), next(), next()]);
+        }
+        out
+    }
+
+    /// Runs the matrix lines of a patched shader (made-up or the game's) for many colours and themes
+    /// and checks the output against [`expected`].
+    fn check_hud_rule(p: &Patched, what: &str) {
+        let g = |k: &str| p.groups[k].as_str();
+        let themes = [HudMatrix { red: [0.0, 0.0, 1.0], green: [0.0, 1.0, 0.0], blue: [1.0, 0.0, 0.0] }, HudMatrix::hue_rotation(200.0), HudMatrix::IDENTITY.scaled(0.4)];
+        let settings = [Protect { on: true, ..Protect::default() }, Protect::default(), Protect { on: true, max_gr: 0.3, max_br: 0.1, min_gr: 0.1 }];
+        for theme in themes {
+            for protect in settings {
+                for c in test_colours() {
+                    let mut m = Machine { ini: vec![[0.35, 5.0, 1.0, 0.0], [if protect.on { 1.0 } else { 0.0 }, protect.max_gr, protect.max_br, protect.min_gr]], ..Default::default() };
+                    for (i, row) in theme.rows().iter().enumerate() {
+                        m.cb.insert((1, 85 + i as u32), [row[0], row[1], row[2], 0.0]);
+                    }
+                    m.set_component(g("rs"), g("rc"), c[0]);
+                    m.set_component(g("gs"), g("gc"), c[1]);
+                    m.set_component(g("bs"), g("bc"), c[2]);
+                    m.run(&p.inserted);
+                    let d = m.get(g("d"));
+                    let got = [d[lane(g("d0").chars().next().unwrap())], d[lane(g("d1").chars().next().unwrap())], d[lane(g("d2").chars().next().unwrap())]];
+                    let want = expected(&theme, c, &protect);
+                    assert!(got.iter().zip(want).all(|(a, b)| (a - b).abs() <= 1e-5 * b.abs().max(1.0)), "{what}: {c:?} with {protect:?}: got {got:?}, want {want:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_inserted_hud_code_follows_the_rule() {
+        for shader in [HUD_SHAPE_1, HUD_SHAPE_2] {
+            check_hud_rule(&patch_hud(shader).unwrap(), shader);
+        }
+        // The whole made-up shader, run end to end: orange is themed, hostile red keeps its colour.
+        let swap = HudMatrix { red: [0.0, 0.0, 1.0], green: [0.0, 1.0, 0.0], blue: [1.0, 0.0, 0.0] };
+        let patched = patch_hud(HUD_SHAPE_2).unwrap().shader;
+        for (c, want) in [([1.0, 0.068, 0.025], [0.025, 0.068, 1.0]), ([1.0, 0.0144, 0.0052], [1.0, 0.0144, 0.0052])] {
+            let mut m = Machine { ini: vec![[0.0; 4], [1.0, 0.6, 0.3, 0.035]], ..Default::default() };
+            for (i, row) in swap.rows().iter().enumerate() {
+                m.cb.insert((1, 85 + i as u32), [row[0], row[1], row[2], 0.0]);
+            }
+            m.cb.insert((1, 90), [0.0, 1.0, 0.0, 0.0]);
+            m.set("v1", [c[0], c[1], c[2], 0.75]);
+            m.run(&patched);
+            let o0 = m.get("o0");
+            assert_eq!(&o0[..3], &want[..], "{c:?}");
+            assert_eq!(o0[3], 0.75);
+        }
+    }
+
+    #[test]
+    fn config_round_trips_settings_and_carries_the_patterns() {
+        let c = HookConfig { dimmer: Dimmer { on: false, strength: 0.15, reach: 7.5 }, protect: Protect { on: true, max_gr: 0.55, max_br: 0.25, min_gr: 0.04 } };
+        let ini = render_config(&c);
         assert!(ini.starts_with(CONFIG_MARK));
-        assert_eq!(read_settings(&ini), d);
+        assert!(ini.is_ascii());
+        assert!(!ini.replace("\r\n", "").contains('\n'), "CRLF only");
+        assert_eq!(read_config(&ini), c);
         assert!(ini.contains("\r\nx = 0.15\r\ny = 7.5\r\nz = 0\r\n"));
-        // F9 switches it the other way.
+        assert!(ini.contains("\r\nx1 = 1\r\ny1 = 0.55\r\nz1 = 0.25\r\nw1 = 0.04\r\n"));
+        // F9 switches the dimmer the other way.
         assert!(ini.contains("type = toggle\r\nz = 1\r\n"));
         assert!(ini.contains("[ShaderRegexEliteNexusCockpitLights.Pattern]\r\ndcl_input_ps constant v0\\.xyzw\\n\r\n"));
         assert!(ini.contains("[ShaderRegexEliteNexusCockpitLights.InsertDeclarations]\r\ndcl_resource_texture1d (float,float,float,float) t120\r\n"));
-        assert!(ini.is_ascii());
-        assert_eq!(read_settings(&render_config(&Dimmer::default())), Dimmer::default());
+        assert!(ini.contains("[ShaderRegexEliteNexusHudColours]\r\nshader_model = ps_5_0\r\ntemps = nexus_in nexus_tmp nexus_set\r\n"));
+        assert!(ini.contains("[ShaderRegexEliteNexusHudColours.Pattern.Replace]\r\nmov ${nexus_in}.x, ${rs}.${rc}\\n\r\n"));
+        assert!(ini.contains("\r\n${l1}${l2}${l3}\r\n// Elite Nexus: keep hostile red"));
+        assert!(ini.contains("[ShaderRegexEliteNexusHudColours.InsertDeclarations]\r\ndcl_resource_texture1d (float,float,float,float) t120\r\n"));
+        // Instruction lines carry no trailing comments (3Dmigoto's assembler reads them as they are).
+        for l in HUD_REPLACE.iter().chain(LIGHT_REPLACE.iter()).filter(|l| !l.starts_with("//")) {
+            assert!(!l.contains("//") && !l.contains(';'), "{l}");
+        }
+        // Protection off: its settings are kept, but no HUD shader is patched.
+        let off = HookConfig { protect: Protect { on: false, ..c.protect }, ..c };
+        let ini = render_config(&off);
+        assert!(!ini.contains("ShaderRegexEliteNexusHudColours"));
+        assert_eq!(read_config(&ini), off);
+        assert_eq!(read_config(&render_config(&HookConfig::default())), HookConfig::default());
+        // A config from before the protection existed reads as protection off, with the defaults.
+        assert_eq!(read_config("; Elite Nexus\r\n[Constants]\r\nx = 0.6\r\ny = 8\r\nz = 1\r\n"), HookConfig { dimmer: Dimmer { on: true, strength: 0.6, reach: 8.0 }, protect: Protect::default() });
     }
 
     fn temp_game(tag: &str) -> PathBuf {
@@ -581,7 +965,8 @@ mod tests {
         std::fs::write(game.join(CONFIG), "[Constants]\nx150 = 1\n").unwrap();
         std::fs::create_dir_all(game.join("EDHM-ini")).unwrap();
         assert_eq!(status(&game), Status::Foreign { edhm: true });
-        assert!(matches!(install(&game, &fake_files(), &Dimmer::default()), Err(DimmerError::Foreign(true))));
+        assert!(matches!(install(&game, &fake_files(), &HookConfig::default()), Err(DimmerError::Foreign(true))));
+        assert!(matches!(save_config(&game, &HookConfig::default()), Err(DimmerError::NotOurs)));
         assert!(matches!(uninstall(&game), Err(DimmerError::NotOurs)));
         assert!(game.join(CONFIG).is_file() && game.join("EDHM-ini").is_dir());
         let _ = std::fs::remove_dir_all(&game);
@@ -594,16 +979,24 @@ mod tests {
         // Real installs check the DLLs against the pinned hashes; the fakes don't match, so a
         // stray "official" file already there would be refused.
         std::fs::write(game.join("d3d11.dll"), b"something else").unwrap();
-        assert!(matches!(install(&game, &fake_files(), &Dimmer::default()), Err(DimmerError::Foreign(false))));
+        assert!(matches!(install(&game, &fake_files(), &HookConfig::default()), Err(DimmerError::Foreign(false))));
         std::fs::remove_file(game.join("d3d11.dll")).unwrap();
 
-        install(&game, &fake_files(), &Dimmer::default()).unwrap();
-        assert_eq!(status(&game), Status::Installed { dimmer: Dimmer::default() });
+        install(&game, &fake_files(), &HookConfig::default()).unwrap();
+        assert_eq!(status(&game), Status::Installed { config: HookConfig::default() });
         assert_eq!(std::fs::read(game.join("d3d11.dll")).unwrap(), b"fake d3d11");
         assert!(game.join(FIXES_DIR).is_dir());
-        let changed = Dimmer { on: true, strength: 0.6, reach: 9.0 };
-        save_settings(&game, &changed).unwrap();
-        assert_eq!(status(&game), Status::Installed { dimmer: changed });
+        let changed = HookConfig { dimmer: Dimmer { on: true, strength: 0.6, reach: 9.0 }, protect: Protect { on: true, ..Protect::default() } };
+        save_config(&game, &changed).unwrap();
+        assert_eq!(status(&game), Status::Installed { config: changed });
+        assert!(std::fs::read_to_string(game.join(CONFIG)).unwrap().contains("[ShaderRegexEliteNexusHudColours]"));
+        // The manifest follows the config, so removal still recognises it.
+        let manifest: Manifest = serde_json::from_slice(&std::fs::read(game.join(MANIFEST)).unwrap()).unwrap();
+        assert!(manifest.files.iter().any(|(n, h)| n == CONFIG && matches_hash(&game.join(CONFIG), h)));
+        let off = HookConfig { protect: Protect::default(), ..changed };
+        save_config(&game, &off).unwrap();
+        assert_eq!(status(&game), Status::Installed { config: off });
+        assert!(!std::fs::read_to_string(game.join(CONFIG)).unwrap().contains("[ShaderRegexEliteNexusHudColours]"));
 
         // 3Dmigoto's by-products and captures go too; a file someone changed stays.
         std::fs::create_dir_all(game.join("ShaderCache")).unwrap();
@@ -632,7 +1025,7 @@ mod tests {
         // Not Elite Nexus's install (yet): nothing is counted or deleted.
         assert_eq!(leftovers(&game), 0);
         assert!(matches!(remove_leftovers(&game), Err(DimmerError::NotOurs)));
-        install(&game, &fake_files(), &Dimmer::default()).unwrap();
+        install(&game, &fake_files(), &HookConfig::default()).unwrap();
         assert_eq!(leftovers(&game), 1700);
         // While the config exports shaders, ShaderCache is in use and stays.
         let config = std::fs::read_to_string(game.join(CONFIG)).unwrap();
@@ -656,28 +1049,47 @@ mod tests {
         std::fs::create_dir_all(game.join(FIXES_DIR)).unwrap();
         std::fs::write(game.join(FIXES_DIR).join(LEGACY_FIX), b"asm").unwrap();
         std::fs::write(game.join(CONFIG), "; Elite Nexus: cockpit-light dimmer, test version.\n[Constants]\nx = 0.35\ny = 5.0\nz = 1\n").unwrap();
-        assert_eq!(status(&game), Status::Unmanaged { dimmer: Dimmer::default() });
+        assert_eq!(status(&game), Status::Unmanaged { config: HookConfig::default() });
         // Taking over without a download needs the official DLLs in place; fakes are refused.
         std::fs::write(game.join("d3d11.dll"), b"fake").unwrap();
-        assert!(matches!(install(&game, &[], &Dimmer::default()), Err(DimmerError::UnknownFile(_))));
+        assert!(matches!(install(&game, &[], &HookConfig::default()), Err(DimmerError::UnknownFile(_))));
         // With files supplied it installs over them only if they're the official ones.
-        assert!(matches!(install(&game, &fake_files(), &Dimmer::default()), Err(DimmerError::UnknownFile(_))));
+        assert!(matches!(install(&game, &fake_files(), &HookConfig::default()), Err(DimmerError::UnknownFile(_))));
         std::fs::remove_file(game.join("d3d11.dll")).unwrap();
-        install(&game, &fake_files(), &Dimmer::default()).unwrap();
+        install(&game, &fake_files(), &HookConfig::default()).unwrap();
         assert!(!game.join(FIXES_DIR).join(LEGACY_FIX).exists());
         assert!(matches!(status(&game), Status::Installed { .. }));
         let _ = std::fs::remove_dir_all(&game);
     }
 
-    /// Checks the pattern against the shaders the game loaded (exported with 3Dmigoto's
-    /// `export_shaders`; not in git). Run with NEXUS_SHADER_DIR set:
+    /// The shaders each pattern must take among the 309 pixel shaders the game loaded on 2026-10-13
+    /// (game 4.4): the box-light shader and its variant, and the 12 HUD shaders that apply the colour
+    /// matrix.
+    const REAL_LIGHTS: [&str; 2] = ["3f366702d540af3e", "7d85f63f9ab11daf"];
+    const REAL_HUD: [&str; 12] = [
+        "08517b7d32fa1f80",
+        "1a696e8bae6eec02",
+        "1d5a317f0e831e9d",
+        "3582a66bcb0903ae",
+        "4a533b975e4998bf",
+        "70e91536d34607c7",
+        "9798f7cba8194a6c",
+        "ad5ad611d07db185",
+        "c4f04894e3f6ae79",
+        "cc0e441e849ebe4e",
+        "ef44eee0c6ab9506",
+        "f2ce89f2c5d390ce",
+    ];
+
+    /// Checks both patterns against the shaders the game loaded (exported with 3Dmigoto's
+    /// `export_shaders`; not in git), and runs the HUD rule through each real HUD shader's own
+    /// registers. Run with NEXUS_SHADER_DIR set:
     ///   cargo test -p nexus-hud real_shaders -- --ignored --nocapture
     #[test]
     #[ignore]
     fn real_shaders() {
         let dir = std::env::var("NEXUS_SHADER_DIR").expect("set NEXUS_SHADER_DIR to a ShaderCache folder");
-        let mut matched = Vec::new();
-        let mut total = 0;
+        let (mut lights, mut hud, mut total) = (Vec::new(), Vec::new(), 0);
         for e in std::fs::read_dir(&dir).unwrap().flatten() {
             let name = e.file_name().to_string_lossy().to_string();
             if !name.ends_with("-ps.txt") {
@@ -685,12 +1097,33 @@ mod tests {
             }
             total += 1;
             let text = std::fs::read_to_string(e.path()).unwrap().replace("\r\n", "\n");
-            if patch(&text).is_some() {
-                matched.push(name);
+            let hash = name.trim_end_matches("-ps.txt").to_string();
+            let (l, h) = (regex(&LIGHT_PATTERN).find_iter(&text).count(), regex(&HUD_PATTERN).find_iter(&text).count());
+            assert!(l <= 1 && h <= 1, "{name}: a pattern matches {l} / {h} times");
+            assert!(l + h < 2, "{name}: both patterns match");
+            if l == 1 {
+                lights.push(hash.clone());
+            }
+            if h == 1 {
+                let p = patch_hud(&text).unwrap();
+                println!("{hash}: {}", p.inserted.lines().take(6).skip(3).collect::<Vec<_>>().join(" | "));
+                check_hud_rule(&p, &name);
+                hud.push(hash);
             }
         }
-        println!("{} of {total} pixel shaders match: {matched:?}", matched.len());
-        assert!(matched.iter().any(|n| n.starts_with("3f366702d540af3e")), "the cockpit's box-light shader must match");
+        lights.sort();
+        hud.sort();
+        println!("{total} pixel shaders; box lights {lights:?}; HUD {hud:?}");
+        assert_eq!(lights, REAL_LIGHTS);
+        assert_eq!(hud, REAL_HUD);
+    }
+
+    /// Prints the config Elite Nexus writes with the HUD colour protection on, to read it over:
+    ///   cargo test -p nexus-hud print_config -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn print_config() {
+        print!("{}", render_config(&HookConfig { protect: Protect { on: true, ..Protect::default() }, ..HookConfig::default() }));
     }
 
     /// Checks the real download (network, ~5 MB). Run with:

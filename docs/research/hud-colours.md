@@ -181,9 +181,36 @@ shaders are kept outside git in `target-agents\cockpit-capture-2026-10-13\` (Fro
 - **The GUI colour matrix is applied in the HUD shaders at draw time**, from the frame's global constant buffer:
   `out = r·cb1[85] + g·cb1[86] + b·cb1[87]` (MatrixRed, MatrixGreen, MatrixBlue), after each element has its
   standard colour. 12 of the 614 exported shaders read all three rows (the compositor, the 3D HUD elements and
-  HUD screens not on screen in this frame); the instruction order varies, so a `[ShaderRegex]` must accept the
-  three `mul`/`mad` lines in any order. That is the hook for colour rules (recolour the orange, keep hostile
-  red and shield blue) and per-panel colours, and it depends only on how the game applies its own matrix.
+  HUD screens not on screen in this frame), always as three consecutive lines in the same order (green `mul`,
+  red `mad`, blue `mad`); registers, write masks and component order vary. That is the hook for colour rules
+  (recolour the orange, keep hostile red and shield blue) and per-panel colours, and it depends only on how the
+  game applies its own matrix. Colours arriving there (capture 2, `dump_cb`, linear light): HUD orange
+  (1, 0.068, 0.025), dark orange (0.234, 0.044, 0.025), white; the panel tint `cb2[8]` is white (panel colours
+  come from the panel textures). Hostile red wasn't in view, so its value in the game is not measured.
+
+### Keep hostile red, friendly green and shield blue (Elite Nexus, 2026-10-13)
+
+- **The rule** ("is this the HUD's orange?"): red is the largest channel, green ≤ red·`max_gr`, green ≥
+  red·`min_gr` and blue ≤ red·`max_br` (defaults 0.6, 0.035 and 0.3). Orange and its shades take the theme;
+  everything else (hostile red, friendly green, shield blue, white, black) keeps its standard colour. Shares of
+  red don't depend on brightness or the HDR scale. The measured orange has green at 7 % of red; the reference
+  hostile red #FF2010 has 1.4 % in linear light, under the 3.5 % floor (its real value in the game is unmeasured).
+- **Settings**: 3Dmigoto IniParams index 1, `[Constants]` `x1` (on), `y1` (`max_gr`), `z1` (`max_br`), `w1`
+  (`min_gr`), read in the shader with `ld_indexable(texture1d)… l(1, 0, 0, 0), t120`. The dimmer keeps index 0.
+- **Pattern** `[ShaderRegexEliteNexusHudColours]` (`nexus_hud::dimmer::HUD_PATTERN` / `HUD_REPLACE`): the three
+  lines with named groups for the red, green and blue inputs and the destination. The replacement copies the
+  inputs first (the third line can overwrite one: `mad r0.xzw, r0.wwww, …`), keeps the three lines, evaluates
+  the rule with three `temps`, and `movc`s the standard colour back into the destination components when the
+  colour isn't the orange. It is only written to `d3dx.ini` while the switch is on, so the HUD shaders are left
+  alone otherwise. `palette::is_hud_orange` is the same rule (same comparisons in the same order) for the preview.
+- **Offline checks** (Rust `regex`, case-insensitive, as 3Dmigoto's PCRE2): the pattern matches exactly the 12
+  shaders (`08517b7d32fa1f80`, `1a696e8bae6eec02`, `1d5a317f0e831e9d`, `3582a66bcb0903ae`, `4a533b975e4998bf`,
+  `70e91536d34607c7`, `9798f7cba8194a6c`, `ad5ad611d07db185`, `c4f04894e3f6ae79`, `cc0e441e849ebe4e`,
+  `ef44eee0c6ab9506`, `f2ce89f2c5d390ce`) once each, and never a shader the dimmer's pattern takes. A small
+  interpreter in the tests runs the inserted instructions through each real shader's own registers and swizzles
+  (3 themes × 3 settings × 1,010 colours) and agrees with `is_hud_orange`; the dimmer's inserted code is checked
+  the same way on a made-up box light.
+- **In game**: not tested yet.
 
 Sources: https://github.com/psychicEgg/EDHM (Odyssey README, patch notes, licence),
 https://github.com/BlueMystical/EDHM_UI (`source_v3/src/Helpers/SettingsHelper.js`, `ThemeReloadSignal.js`,

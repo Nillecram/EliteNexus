@@ -78,7 +78,8 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
   ledger by category, credit history, jumps per day, in-game statistics, and a map of everywhere you've been.
 * **Bindings** — your active presets, conflicts, missing essentials, printable reference card.
 * **HUD & cockpit** — recolour or dim the HUD with the game's own colour setting: community themes, a colour wheel,
-  brightness, a live cockpit preview that warns when friend and foe would look alike. **Glare and exposure** tames
+  brightness, a live cockpit preview that warns when friend and foe would look alike, and an option that keeps
+  hostile red, friendly green and shield blue out of the theme. **Glare and exposure** tames
   the glare of cockpit lights with the game's tone-mapping values. Safe edits of `GraphicsConfigurationOverride.xml`:
   only the values you change are written, and the original is kept. **Cockpit lights** dims the cockpit's own
   lights (and nothing else) with 3Dmigoto and a pattern for the game's light shader, installed and removed in one

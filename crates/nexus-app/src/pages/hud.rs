@@ -1,16 +1,20 @@
 //! HUD & cockpit. HUD colours: the game's own colour matrix (`GraphicsConfigurationOverride.xml`)
 //! with presets, simple controls, a live preview and the honest limits of what the matrix can
-//! change. Glare and exposure (glare.rs): the tone-mapping values in the same file.
+//! change, plus "Keep hostile red, friendly green and shield blue" through Elite Nexus's graphics
+//! hook (`nexus_hud::dimmer`). Glare and exposure (glare.rs): the tone-mapping values in the same
+//! file. Cockpit lights (cockpit.rs): the dimmer, which installs the hook.
 
 use crate::settings::HudTheme;
 use crate::theme::{display, pal, size};
-use crate::widgets::{self, card, card_with, footnote, group, section};
+use crate::widgets::{self, Group, card, card_with, footnote, group, section};
 use egui::text::LayoutJob;
 use egui::{Align2, Color32, CornerRadius, FontId, Pos2, Rect, RichText, Sense, Shape, Stroke, TextFormat, Ui, Vec2, pos2, vec2};
 use egui_phosphor::regular as icon;
+use nexus_hud::dimmer::{self, HookConfig, Protect, Status};
 use nexus_hud::install::GameInstall;
 use nexus_hud::{Adjust, HudMatrix, OverrideFile, palette, presets};
 use std::cell::Cell;
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Mode {
@@ -52,6 +56,14 @@ pub struct HudUi {
     more: bool,
     /// `--tab <preset>` (screenshots): start from this preset instead of the file.
     start_preset: Option<String>,
+    /// The game folder and Elite Nexus's graphics hook in it (the Cockpit lights tab installs it),
+    /// which "Keep hostile red, friendly green and shield blue" needs.
+    hook_folder: Option<PathBuf>,
+    hook: Option<Status>,
+    /// The protection as shown; saved to the game's config as soon as a change settles.
+    protect: Protect,
+    protect_options: bool,
+    protect_status: Option<(bool, String)>,
 }
 
 impl Default for HudUi {
@@ -72,19 +84,75 @@ impl Default for HudUi {
             theme_name: String::new(),
             more: false,
             start_preset: None,
+            hook_folder: None,
+            hook: None,
+            protect: Protect::default(),
+            protect_options: false,
+            protect_status: None,
         }
     }
 }
 
 impl HudUi {
     /// `tab` (screenshots): `glare` opens Glare and exposure, `cockpit` Cockpit lights; a preset name
-    /// such as `mocha` or `royalpurple` starts the colours from that theme.
+    /// such as `mocha` or `royalpurple` starts the colours from that theme; `options` opens the
+    /// protection's options. Combine them with commas: `empireblue,options`.
     pub fn new(tab: Option<&str>) -> Self {
-        match tab {
-            Some(t) if t.eq_ignore_ascii_case("glare") => HudUi { tab: Tab::Glare, ..Default::default() },
-            Some(t) if t.eq_ignore_ascii_case("cockpit") => HudUi { tab: Tab::Cockpit, ..Default::default() },
-            _ => HudUi { start_preset: tab.map(str::to_owned), ..Default::default() },
+        let mut st = HudUi::default();
+        for t in tab.unwrap_or_default().split(',').map(str::trim).filter(|t| !t.is_empty()) {
+            match t.to_ascii_lowercase().as_str() {
+                "glare" => st.tab = Tab::Glare,
+                "cockpit" => st.tab = Tab::Cockpit,
+                "options" => st.protect_options = true,
+                _ => st.start_preset = Some(t.to_owned()),
+            }
         }
+        st
+    }
+
+    /// Reads what's in the game folder: is the graphics hook there, and how is the protection set.
+    fn read_hook(&mut self) {
+        self.hook_folder = super::cockpit::game_folder(&self.installs);
+        self.hook = self.hook_folder.as_deref().map(dimmer::status);
+        if let Some(Status::Installed { config }) = &self.hook {
+            self.protect = config.protect;
+        }
+    }
+
+    /// The protection as the game will apply it: `None` while it's off or can't run.
+    fn protection(&self) -> Option<Protect> {
+        (matches!(self.hook, Some(Status::Installed { .. })) && self.protect.on).then_some(self.protect)
+    }
+
+    fn saved_protect(&self) -> Option<Protect> {
+        match &self.hook {
+            Some(Status::Installed { config }) => Some(config.protect),
+            _ => None,
+        }
+    }
+
+    /// Writes the protection into the game's 3Dmigoto config, keeping the dimmer's settings there.
+    fn save_protect(&mut self) {
+        let Some(folder) = self.hook_folder.clone() else { return };
+        let before = self.saved_protect();
+        let result = match dimmer::status(&folder) {
+            Status::Installed { config } => dimmer::save_config(&folder, &HookConfig { protect: self.protect, ..config }),
+            _ => Err(dimmer::DimmerError::NotOurs),
+        };
+        self.protect_status = Some(match result {
+            Ok(()) => (
+                true,
+                match (before.is_some_and(|b| b.on), self.protect.on) {
+                    (false, true) => "Saved. From its next start the game keeps hostile red, friendly green and shield blue, and your theme colours only the HUD's orange.",
+                    (true, false) => "Saved. From its next start the game themes every HUD colour again.",
+                    _ => "Saved. The game uses these shares from its next start.",
+                }
+                .into(),
+            ),
+            Err(e) => (false, e.to_string()),
+        });
+        // Show what's really in the file now (the old settings, if saving failed).
+        self.read_hook();
     }
 
     fn edit(&self) -> HudMatrix {
@@ -113,6 +181,7 @@ impl HudUi {
             }
             None => nexus_hud::install::find_installs(),
         };
+        self.read_hook();
         self.glare.reload(self.file.as_ref(), &self.installs);
         let wanted = self.start_preset.take().map(|t| t.replace([' ', '-', '_'], "").to_ascii_lowercase());
         if let Some(p) = wanted.and_then(|t| presets::ALL.iter().find(|p| p.name.replace(' ', "").eq_ignore_ascii_case(&t))) {
@@ -146,6 +215,11 @@ pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bo
         st.load();
     }
     if let Some(t) = widgets::tabs(ui, st.tab, &[(Tab::Colours, "HUD colours"), (Tab::Glare, "Glare and exposure"), (Tab::Cockpit, "Cockpit lights")]) {
+        if t != st.tab {
+            // HUD colours and Cockpit lights share the graphics hook: each shows what the other did.
+            st.read_hook();
+            st.cockpit.reload();
+        }
         st.tab = t;
     }
     ui.add_space(widgets::GAP);
@@ -165,6 +239,7 @@ pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bo
 fn colours(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bool) -> bool {
     let mut changed = false;
     let edit = st.edit();
+    let protect = st.protection();
     let view = Cell::new(st.view);
     widgets::split(
         ui,
@@ -181,10 +256,10 @@ fn colours(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: boo
                 },
                 |ui| {
                     let shown = if view.get() == View::Standard { HudMatrix::IDENTITY } else { edit };
-                    preview(ui, &shown);
+                    preview(ui, &shown, protect.as_ref());
                     ui.add_space(8.0);
-                    swatches(ui, &shown);
-                    let worries = palette::concerns(&edit);
+                    swatches(ui, &shown, protect.as_ref());
+                    let worries = palette::concerns(&edit, protect.as_ref());
                     if !worries.is_empty() {
                         ui.add_space(6.0);
                         for w in worries {
@@ -281,6 +356,8 @@ fn controls(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bo
                 let b = f.backup_path().display().to_string();
                 ui.add(egui::Label::new(RichText::new("Your file as it was before Elite Nexus first changed it is kept next to it.").size(size::FOOTNOTE).color(pal::DIM)).wrap()).on_hover_text(b);
             }
+        ui.add_space(8.0);
+        protect_controls(ui, st);
     });
     ui.add_space(widgets::GAP);
     card(ui, "Start from", |ui| {
@@ -402,7 +479,84 @@ fn simple(ui: &mut Ui, st: &mut HudUi) {
     if st.adjust != Adjust::default() && widgets::button(ui, "Reset adjustments").clicked() {
         st.adjust = Adjust::default();
     }
-    footnote(ui, "Turning the colour moves every HUD colour round the wheel together, so hostile red and shield blue change too: check them in the preview.");
+    if st.protection().is_some() {
+        footnote(ui, "Turning the colour moves the HUD's orange round the wheel; hostile red, friendly green and shield blue keep their colours while \"Keep hostile red…\" is on.");
+    } else {
+        footnote(ui, "Turning the colour moves every HUD colour round the wheel together, so hostile red and shield blue change too: check them in the preview.");
+    }
+}
+
+/// "Keep hostile red, friendly green and shield blue": needs Elite Nexus's graphics hook; saved to
+/// the game's 3Dmigoto config as soon as a change settles, and read by the game when it starts.
+fn protect_controls(ui: &mut Ui, st: &mut HudUi) {
+    const TITLE: &str = "Keep hostile red, friendly green and shield blue";
+    let open_cockpit = group(ui, |g| match &st.hook {
+        Some(Status::Installed { .. }) => {
+            g.switch(&mut st.protect.on, TITLE, "Your theme then colours only the HUD's orange.");
+            false
+        }
+        Some(Status::None) => why_not(g, TITLE, "Needs Elite Nexus's graphics hook, which the Cockpit lights tab installs. Its dimmer can be switched off there if you only want this.", true),
+        Some(Status::Unmanaged { .. }) => why_not(g, TITLE, "Needs Elite Nexus to manage the graphics hook in the game folder: Cockpit lights › Let Elite Nexus manage it.", true),
+        Some(Status::Foreign { edhm: true }) => why_not(g, TITLE, "Can't be used with EDHM: it needs Elite Nexus's graphics hook, and EDHM already holds the game's d3d11.dll.", false),
+        Some(Status::Foreign { edhm: false }) => why_not(g, TITLE, "Can't be used with the other 3Dmigoto mod in the game folder: it needs Elite Nexus's graphics hook, and the two can't share the game's d3d11.dll.", false),
+        None => why_not(g, TITLE, "Needs Elite Dangerous's folder, which wasn't found in the usual Steam, Epic or Frontier places.", false),
+    });
+    if open_cockpit {
+        st.tab = Tab::Cockpit;
+        st.cockpit.reload();
+    }
+    if !matches!(st.hook, Some(Status::Installed { .. })) {
+        return;
+    }
+    let mut busy = false;
+    widgets::disclosure(ui, &mut st.protect_options, "Options");
+    if st.protect_options {
+        let p = &mut st.protect;
+        group(ui, |g| {
+            busy |= share(g, "Most green", "In the HUD's orange, as a share of its red. Yellower colours keep theirs.", &mut p.max_gr);
+            busy |= share(g, "Most blue", "As a share of red. Bluer colours, such as pinks, keep theirs.", &mut p.max_br);
+            busy |= share(g, "Least green", "As a share of red. Redder colours, such as hostile red, keep theirs.", &mut p.min_gr);
+        });
+        footnote(ui, "Frontier documents none of this: adjust if hostile contacts still change colour or parts of the HUD stay orange.");
+        let defaults = Protect { on: st.protect.on, ..Protect::default() };
+        if st.protect != defaults && widgets::button(ui, "Back to the defaults").clicked() {
+            st.protect = defaults;
+        }
+    }
+    // Saved once a change settles, not while a value is being dragged or typed.
+    if !busy && st.saved_protect() != Some(st.protect) {
+        st.save_protect();
+    }
+    if let Some((ok, msg)) = &st.protect_status {
+        ui.add(egui::Label::new(RichText::new(msg).size(size::FOOTNOTE).color(if *ok { pal::GOOD } else { pal::BAD })).wrap());
+    }
+}
+
+/// A setting that can't be switched on yet: its title and why, full width, and (with `button`) the
+/// way to the Cockpit lights tab. Returns true when that button is clicked.
+fn why_not(g: &mut Group, title: &str, detail: &str, button: bool) -> bool {
+    g.content(|ui| {
+        ui.spacing_mut().item_spacing.y = 1.0;
+        ui.add(egui::Label::new(RichText::new(title).size(size::BODY).color(pal::TEXT)).wrap());
+        ui.add(egui::Label::new(RichText::new(detail).size(size::FOOTNOTE).color(pal::DIM)).wrap());
+        if !button {
+            return false;
+        }
+        ui.add_space(6.0);
+        widgets::button(ui, &format!("Go to Cockpit lights {}", icon::ARROW_RIGHT)).clicked()
+    })
+}
+
+/// A share of red, edited as a percentage. Returns true while it's being dragged or typed.
+fn share(g: &mut Group, title: &str, detail: &str, value: &mut f32) -> bool {
+    g.row(title, detail, |ui| {
+        let mut pct = *value * 100.0;
+        let r = ui.add(egui::DragValue::new(&mut pct).range(0.0..=100.0).speed(0.1).fixed_decimals(1).suffix(" %"));
+        if r.changed() {
+            *value = (pct * 10.0).round() / 1000.0;
+        }
+        r.dragged() || r.has_focus()
+    })
 }
 
 /// A strip showing what the HUD orange becomes at each hue; click or drag to pick.
@@ -465,7 +619,7 @@ fn limits_card(ui: &mut Ui) {
     card(ui, "What this setting changes, and what it can't", |ui| {
         let lines = [
             "One colour matrix for the whole interface: cockpit HUD, panels, scanner contacts, shields, station menus, the on-foot HUD and the portraits on mission boards (strong themes give them colour bands). It can't give one element, say the scanner, a colour of its own.",
-            "Friend and foe colours move with everything else: that is why the preview warns when hostile and friendly contacts end up alike.",
+            "Friend and foe colours move with everything else, which is why the preview warns when hostile and friendly contacts end up alike. \"Keep hostile red, friendly green and shield blue\" changes that, with Elite Nexus's graphics hook.",
             "The main menu and the store's ship previews stay in the standard colours.",
             "It doesn't touch the cockpit's own lighting: dashboard lights and cabin glow keep their colour and brightness.",
             "The game reads it only at launch; there is no way to reload it while playing.",
@@ -477,7 +631,7 @@ fn limits_card(ui: &mut Ui) {
         let more = [
             "Cockpit lights: the game has no setting for them, so the Cockpit lights tab dims them with Elite Nexus's own dimmer.",
             "Glare and exposure: how bright lights glare and how the picture is exposed, in the same file as these colours.",
-            "Colours for single HUD elements (a scanner of its own colour, say) aren't possible with the game's setting, and Elite Nexus doesn't offer them yet.",
+            "Colours for single HUD elements: the game's setting can't do them. Elite Nexus's graphics hook can keep hostile red, friendly green and shield blue out of a theme (the switch under In the game), but can't yet give one element, such as the scanner, a colour of its own.",
         ];
         for l in more {
             ui.add(egui::Label::new(RichText::new(format!("•  {l}")).color(pal::DIM)).wrap());
@@ -513,7 +667,7 @@ fn chip(ui: &mut Ui, text: &str, c: Color32, selected: bool) -> egui::Response {
 }
 
 /// "standard → yours" for each standard colour, with what it's used for.
-fn swatches(ui: &mut Ui, m: &HudMatrix) {
+fn swatches(ui: &mut Ui, m: &HudMatrix, protect: Option<&Protect>) {
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = vec2(16.0, 6.0);
         for s in palette::ALL {
@@ -524,25 +678,25 @@ fn swatches(ui: &mut Ui, m: &HudMatrix) {
             let y = rect.center().y;
             p.circle_filled(pos2(rect.left() + 7.0, y), 7.0, rgb(s.rgb));
             p.text(pos2(rect.left() + 14.0 + 9.0, y), Align2::CENTER_CENTER, icon::ARROW_RIGHT, FontId::proportional(size::CAPTION), pal::FAINT);
-            p.circle_filled(pos2(rect.left() + 14.0 + 18.0 + 7.0, y), 7.0, colour(m, s.rgb));
+            p.circle_filled(pos2(rect.left() + 14.0 + 18.0 + 7.0, y), 7.0, rgb(m.apply_srgb_protected(s.rgb, protect)));
             p.galley(pos2(rect.left() + 46.0 + 8.0, y - label.size().y / 2.0), label, pal::DIM);
             resp.on_hover_text(s.used_for);
         }
     });
 }
 
-/// A cockpit view with the HUD drawn in the matrix's colours.
-fn preview(ui: &mut Ui, m: &HudMatrix) {
+/// A cockpit view with the HUD drawn in the matrix's colours (only its orange while `protect` is on).
+fn preview(ui: &mut Ui, m: &HudMatrix, protect: Option<&Protect>) {
     let w = ui.available_width();
     let h = (w * 0.56).clamp(240.0, 440.0);
     let (rect, _) = ui.allocate_exact_size(vec2(w, h), Sense::hover());
     if ui.is_rect_visible(rect) {
-        paint_hud(&ui.painter_at(rect), rect, m);
+        paint_hud(&ui.painter_at(rect), rect, m, protect);
     }
 }
 
-fn paint_hud(p: &egui::Painter, r: Rect, m: &HudMatrix) {
-    let c = |s: palette::Swatch, a: f32| colour(m, s.rgb).gamma_multiply(a);
+fn paint_hud(p: &egui::Painter, r: Rect, m: &HudMatrix, protect: Option<&Protect>) {
+    let c = |s: palette::Swatch, a: f32| rgb(m.apply_srgb_protected(s.rgb, protect)).gamma_multiply(a);
     let o = |a: f32| c(palette::ORANGE, a);
     let x = |f: f32| r.left() + f * r.width();
     let y = |f: f32| r.top() + f * r.height();
@@ -684,4 +838,50 @@ fn arc(p: &egui::Painter, at: Pos2, r: f32, s: Stroke) {
 fn slider(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str) -> bool {
     ui.add_sized([56.0, 20.0], egui::Label::new(RichText::new(format!("{:.0}{suffix}", *value)).color(pal::DIM)));
     ui.add(egui::Slider::new(value, range).show_value(false)).changed()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nexus_hud::dimmer::Dimmer;
+
+    #[test]
+    fn the_switch_saves_the_protection_and_keeps_the_dimmer() {
+        let game = std::env::temp_dir().join(format!("nexus-app-protect-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&game);
+        std::fs::create_dir_all(&game).unwrap();
+        std::fs::write(game.join("EliteDangerous64.exe"), b"game").unwrap();
+        let mut st = HudUi { installs: vec![GameInstall { folder: game.clone(), store: "custom", shader_mod: None }], ..Default::default() };
+        // No hook yet: nothing to switch.
+        st.read_hook();
+        assert_eq!(st.hook, Some(Status::None));
+        assert!(st.protection().is_none());
+
+        let dimmer = Dimmer { on: true, strength: 0.15, reach: 8.0 };
+        let fake = vec![("d3d11.dll", b"fake".to_vec()), ("d3dcompiler_47.dll", b"fake".to_vec())];
+        dimmer::install(&game, &fake, &HookConfig { dimmer, protect: Protect::default() }).unwrap();
+        st.read_hook();
+        assert!(st.protection().is_none());
+        st.protect.on = true;
+        st.protect.min_gr = 0.05;
+        st.save_protect();
+        assert!(st.protect_status.as_ref().is_some_and(|(ok, msg)| *ok && msg.contains("keeps hostile red")), "{:?}", st.protect_status);
+        let want = Protect { on: true, min_gr: 0.05, ..Protect::default() };
+        assert_eq!(dimmer::status(&game), Status::Installed { config: HookConfig { dimmer, protect: want } });
+        assert_eq!(st.protection(), Some(want));
+
+        // Removed from the Cockpit lights tab: the protection can't run, whatever was saved.
+        dimmer::uninstall(&game).unwrap();
+        st.read_hook();
+        assert!(st.protection().is_none());
+        let _ = std::fs::remove_dir_all(&game);
+    }
+
+    #[test]
+    fn screenshot_tabs_combine() {
+        let st = HudUi::new(Some("empireblue,options"));
+        assert!(st.tab == Tab::Colours && st.protect_options && st.start_preset.as_deref() == Some("empireblue"));
+        assert!(HudUi::new(Some("cockpit")).tab == Tab::Cockpit);
+        assert!(HudUi::new(None).start_preset.is_none());
+    }
 }

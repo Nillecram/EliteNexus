@@ -1,5 +1,6 @@
 //! Cockpit lights (a tab of HUD & cockpit): installs, sets up and removes the cockpit-light dimmer,
-//! 3Dmigoto plus a pattern for the game's box-light shader (`nexus_hud::dimmer`).
+//! 3Dmigoto plus a pattern for the game's box-light shader (`nexus_hud::dimmer`). The same install
+//! is the graphics hook the HUD colours tab needs to keep hostile red, friendly green and shield blue.
 
 use crate::jobs::Slot;
 use crate::theme::{display, pal, size};
@@ -7,9 +8,14 @@ use crate::widgets::{self, card, footnote, group, section};
 use egui::{RichText, Ui};
 use egui_phosphor::regular as icon;
 use nexus_binds::{Bindings, Input};
-use nexus_hud::dimmer::{self, Dimmer, Removed, Status};
+use nexus_hud::dimmer::{self, Dimmer, HookConfig, Protect, Removed, Status};
 use nexus_hud::install::GameInstall;
 use std::path::{Path, PathBuf};
+
+/// The game folder the HUD & cockpit page works on: the live (Odyssey) client, else the first found.
+pub fn game_folder(installs: &[GameInstall]) -> Option<PathBuf> {
+    installs.iter().find(|i| i.is_live()).or(installs.first()).map(|i| i.folder.clone())
+}
 
 type Files = Vec<(&'static str, Vec<u8>)>;
 
@@ -34,12 +40,21 @@ pub struct CockpitUi {
 }
 
 impl CockpitUi {
+    /// Read the game folder again the next time the tab is shown (another tab may have changed it).
+    pub fn reload(&mut self) {
+        self.loaded = false;
+    }
+
     fn refresh(&mut self, ctx: &egui::Context, installs: &[GameInstall]) {
         self.loaded = true;
-        self.folder = installs.iter().find(|i| i.is_live()).or(installs.first()).map(|i| i.folder.clone());
+        // Settings changed here but not saved yet survive a reload.
+        let unsaved = matches!(&self.status, Some(Status::Installed { config }) if config.dimmer != self.edit);
+        self.folder = game_folder(installs);
         self.status = self.folder.as_deref().map(dimmer::status);
-        if let Some(Status::Installed { dimmer } | Status::Unmanaged { dimmer }) = &self.status {
-            self.edit = *dimmer;
+        if let Some(Status::Installed { config } | Status::Unmanaged { config }) = &self.status
+            && !unsaved
+        {
+            self.edit = config.dimmer;
         }
         self.leftovers = Slot::default();
         self.clashes.clear();
@@ -108,7 +123,7 @@ pub fn show(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: 
     if st.download.tick() {
         match (st.download.last.take(), st.folder.clone()) {
             (Some(Ok(files)), Some(folder)) => {
-                st.message = Some(match dimmer::install(&folder, &files, &st.edit) {
+                st.message = Some(match dimmer::install(&folder, &files, &HookConfig { dimmer: st.edit, protect: Protect::default() }) {
                     Ok(()) => (true, "Installed. Start Elite Dangerous: the cockpit lights come out dimmer from the first frame.".into()),
                     Err(e) => (false, e.to_string()),
                 });
@@ -208,7 +223,11 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
             .wrap(),
         );
         if widgets::primary_button(ui, &format!("{} Let Elite Nexus manage it", icon::CHECK)).clicked() {
-            st.message = Some(match dimmer::install(folder, &[], &st.edit) {
+            let protect = match &st.status {
+                Some(Status::Unmanaged { config }) => config.protect,
+                _ => Protect::default(),
+            };
+            st.message = Some(match dimmer::install(folder, &[], &HookConfig { dimmer: st.edit, protect }) {
                 Ok(()) => (true, "Done: Elite Nexus manages the dimmer now. The game picks up the change the next time it starts.".into()),
                 Err(e) => (false, e.to_string()),
             });
@@ -222,7 +241,9 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
         ui.label(RichText::new("Installed").font(display(size::BODY)).color(pal::TEXT));
     });
     ui.add_space(4.0);
-    let saved = matches!(&st.status, Some(Status::Installed { dimmer }) if *dimmer == st.edit);
+    let saved = matches!(&st.status, Some(Status::Installed { config }) if config.dimmer == st.edit);
+    // HUD colours' "Keep hostile red..." runs on the same install.
+    let protecting = matches!(&st.status, Some(Status::Installed { config }) if config.protect.on);
     group(ui, |g| {
         g.switch(&mut st.edit.on, "Dim the cockpit lights", "Off keeps 3Dmigoto installed but changes nothing.");
         g.row("Light kept", "0 % switches the cockpit lights off.", |ui| {
@@ -240,7 +261,12 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
         if !saved && widgets::primary_button(ui, &format!("{} Save", icon::CHECK)).clicked() {
-            st.message = Some(match dimmer::save_settings(folder, &st.edit) {
+            // Read what's there now, so the HUD colours' settings in the same file are kept.
+            let result = match dimmer::status(folder) {
+                Status::Installed { config } => dimmer::save_config(folder, &HookConfig { dimmer: st.edit, ..config }),
+                _ => Err(dimmer::DimmerError::NotOurs),
+            };
+            st.message = Some(match result {
                 Ok(()) => (true, "Saved. The game uses it the next time it starts; F9, F10 and F11 change it while you play.".into()),
                 Err(e) => (false, e.to_string()),
             });
@@ -251,9 +277,15 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
                 st.confirm_remove = true;
             }
         } else {
-            ui.label(RichText::new("Remove 3Dmigoto and the dimmer from the game folder?").color(pal::WARN));
+            let question = if protecting {
+                "Remove 3Dmigoto from the game folder? The dimmer goes, and HUD colours stops keeping hostile red, friendly green and shield blue."
+            } else {
+                "Remove 3Dmigoto and the dimmer from the game folder?"
+            };
+            ui.add(egui::Label::new(RichText::new(question).color(pal::WARN)).wrap());
             if widgets::button(ui, "Remove").clicked() {
                 st.message = Some(match dimmer::uninstall(folder) {
+                    Ok(done) if done.kept.is_empty() && protecting => (true, "Removed. From the next game start the cockpit lights are back to normal and your HUD theme colours every HUD colour again.".into()),
                     Ok(done) if done.kept.is_empty() => (true, "Removed. The cockpit lights are back to normal the next time the game starts.".into()),
                     Ok(done) => (false, format!("Removed, except {}: changed since Elite Nexus installed it, so it was left in place.", done.kept.join(", "))),
                     Err(e) if playing => (false, format!("{e}. Quit the game first: it keeps these files open.")),
@@ -309,6 +341,7 @@ fn explain(ui: &mut Ui) {
             "Only the cockpit's own lights change. Stations, carriers, planets, the HUD and everything else stay exactly as the game draws them.",
             "Elite Nexus never copies the game's code: a pattern finds the light shader by what its code looks like as the game loads it. A game update that only rebuilds shaders keeps it working; if Frontier rewrites how lights are drawn, the dimmer simply stops (the game is unaffected) until Elite Nexus is updated.",
             "Settings saved here apply the next time the game starts; the keys change them while you play.",
+            "The same install is the graphics hook HUD colours needs to keep hostile red, friendly green and shield blue out of a theme. If you only want that, switch the dimmer off here.",
             "It can't run alongside EDHM or another 3Dmigoto mod: they all need the game's d3d11.dll.",
             "Frontier tolerates mods like this but has never approved them.",
         ];

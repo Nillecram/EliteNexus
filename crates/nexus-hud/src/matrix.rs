@@ -64,6 +64,16 @@ impl HudMatrix {
         self.apply(c.map(to_linear)).map(to_srgb)
     }
 
+    /// [`apply_srgb`](Self::apply_srgb) as the game draws it with Elite Nexus's HUD colour
+    /// protection: while `protect` is on, only the HUD's orange takes the theme
+    /// ([`crate::palette::is_hud_orange`]) and any other colour keeps its standard look.
+    pub fn apply_srgb_protected(&self, c: Rgb, protect: Option<&crate::dimmer::Protect>) -> Rgb {
+        match protect {
+            Some(p) if p.on && !crate::palette::is_hud_orange(c.map(to_linear), p) => c,
+            _ => self.apply_srgb(c),
+        }
+    }
+
     pub fn is_identity(&self) -> bool {
         self.approx_eq(&Self::IDENTITY)
     }
