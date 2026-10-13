@@ -1,13 +1,43 @@
 # Elite Nexus
 
-**One native, fast companion for Elite Dangerous** — replacing the pile of tools commanders run side by side
+**One native, fast companion app for Elite Dangerous and Odyssey** — replacing the pile of tools commanders run side by side
 (EDDiscovery, ED Market Connector, Odyssey Materials Helper, Observatory + BioInsights, Exploration Buddy,
 EDCoPilot-style voice alerts, OD Elite Tracker) and the websites you alt-tab to (INARA, Spansh, EDSM, EDSY/Coriolis,
 EDAstro, ED Tools, EDRefCard).
 
 Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendered UI (egui/wgpu).
 
-![Elite Nexus dashboard: commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
+**[Download the latest release](https://github.com/uruskan/EliteNexus/releases/latest)**, unzip it anywhere and run
+`EliteNexus.exe` (Windows, 64-bit). There is no installer: everything it keeps lives in a `nexus-data` folder next to
+the program.
+
+![Elite Nexus, an Elite Dangerous companion app: dashboard with commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
+
+## Make the cockpit yours: HUD colours, cockpit lights, glare
+
+![Elite Dangerous HUD colour editor: an Empire blue theme in the live cockpit preview, with hostile contacts still red and friendly ones still green](docs/screenshots/hud-colours.png)
+
+* **HUD colours**: a HUD colour editor built on the game's own setting, with community themes (credited to their
+  authors), a colour wheel, saturation and brightness, and a live cockpit preview that warns when friend and foe would
+  look alike. Applying writes only the three colour lines of `GraphicsConfigurationOverride.xml` and keeps your
+  original file.
+* **Keep hostile red, friendly green and shield blue.** The game's setting moves every HUD colour together, so a blue
+  theme turns hostile contacts blue too. Switch this on and your theme colours only the HUD's orange.
+* **Cockpit lights.** The game has no setting for them: Elite Nexus dims the cockpit's own lamps and glow and nothing
+  else, with in-game keys for on/off (F9), how much light stays (F10) and reach (F11).
+* **Glare and exposure.** Odyssey's auto-exposure darkens everything outside when the dashboard is bright; tame the
+  glare and lift the darks with the game's own tone-mapping values, starting from community presets.
+
+HUD colours and glare use the game's own settings file. Keeping friend-and-foe colours and dimming the cockpit lights
+need an optional graphics hook: [3Dmigoto](https://github.com/bo3b/3Dmigoto) (open source), downloaded from its
+official release, checked against pinned checksums, and installed or removed in one click from the Cockpit lights
+tab. No game file is changed and Elite Nexus never ships the game's code: its patterns adjust the light and HUD
+shaders as the game loads them. The hook can't run alongside EDHM, and Frontier tolerates mods like this without having
+approved them.
+
+| | |
+|---|---|
+| ![Elite Dangerous cockpit lights dimmer: installed, with light kept, reach and the in-game keys](docs/screenshots/cockpit-lights.png) **Cockpit lights** — dim the cockpit's own lights | ![Elite Dangerous Odyssey glare and auto-exposure fix: Morbad's Odyssey tweak applied, with less glare and the standard ACES curve](docs/screenshots/glare.png) **Glare and exposure** — less glare, brighter darks |
 
 ## Screenshots
 
@@ -20,6 +50,14 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 | ![Galaxy map: everywhere you've been, with your ship and carrier](docs/screenshots/galaxy-map.png) **Galaxy map** — your travels, ship and carrier | ![Statistics: credits over time, income by category, jumps per day](docs/screenshots/statistics.png) **Statistics** — credits, income, jumps |
 | ![Logbook: every journal event, searchable](docs/screenshots/logbook.png) **Logbook** — every journal event, searchable | ![Bindings: active presets, conflicts and every bound action](docs/screenshots/bindings.png) **Bindings** — presets, conflicts, reference card |
 | ![Accounts & sync: EDDN, EDSM, Inara and EDAstro, all opt-in](docs/screenshots/accounts.png) **Accounts & sync** — EDDN, EDSM, Inara, EDAstro | |
+
+## Your game, your data
+
+* Your journals are only ever read. Uploads to EDDN, EDSM, Inara and EDAstro are opt-in, send only live events (never
+  your history) and respect each service's rate limits.
+* Game settings change only when you click, and only the values you change; your original settings file is kept.
+  Whatever Elite Nexus puts in the game folder is listed there in a manifest and comes out again in one click.
+* API keys are stored encrypted with Windows DPAPI.
 
 ## Why it's faster
 
@@ -77,13 +115,8 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 * **Logbook / Statistics / Galaxy map** — activity, every journal event with full-text search, travel, docking, a credits
   ledger by category, credit history, jumps per day, in-game statistics, and a map of everywhere you've been.
 * **Bindings** — your active presets, conflicts, missing essentials, printable reference card.
-* **HUD & cockpit** — recolour or dim the HUD with the game's own colour setting: community themes, a colour wheel,
-  brightness, a live cockpit preview that warns when friend and foe would look alike, and an option that keeps
-  hostile red, friendly green and shield blue out of the theme. **Glare and exposure** tames
-  the glare of cockpit lights with the game's tone-mapping values. Safe edits of `GraphicsConfigurationOverride.xml`:
-  only the values you change are written, and the original is kept. **Cockpit lights** dims the cockpit's own
-  lights (and nothing else) with 3Dmigoto and a pattern for the game's light shader, installed and removed in one
-  click.
+* **HUD & cockpit** — HUD colours that can keep hostile red, friendly green and shield blue, a cockpit-light dimmer,
+  and glare and exposure: see [Make the cockpit yours](#make-the-cockpit-yours-hud-colours-cockpit-lights-glare).
 * **Accounts & sync** — strictly compliant EDDN contribution, EDSM journal sync, Inara profile sync, EDAstro. All opt-in;
   only live events (never history); persistent retry queues that respect each service's rate limits.
 * **Alerts & voice** — toasts plus Windows speech for high-value bodies, likely high-value biology, sample spacing,
@@ -137,6 +170,7 @@ Keys are stored encrypted with Windows DPAPI.
 * `docs/USER_GUIDE.md` — every page explained (also the in-app assistant's knowledge).
 * `docs/ARCHITECTURE.md` — crates, threads, conventions.
 * `docs/research/` — verified specs: EDDN (live service differs from GitHub!), EDSM, Inara, CAPI, Spansh, websites,
-  journal format, engineering data, exploration/exobiology science, and a 167-feature competitive matrix.
+  journal format, engineering data, exploration/exobiology science, HUD colours and cockpit lighting, and a
+  167-feature competitive matrix.
 
 *Elite Dangerous is a trademark of Frontier Developments plc. Elite Nexus is an unofficial community tool.*

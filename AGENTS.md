@@ -80,7 +80,9 @@ open the PNG to look at it. Check a narrow (1000 px) and a wide size when a layo
 * HUD & cockpit with a game folder of your own making: set `ELITE_NEXUS_GAME_DIR` to a folder holding a dummy
   `EliteDangerous64.exe`; add a `d3dx.ini` starting `; Elite Nexus` with a `[Constants]` section (`x1 = 1` switches
   the HUD colour protection on) and an `EliteNexus-3Dmigoto.json` of `{"migoto_version":"1.4.9","files":[]}` for
-  the installed state.
+  the installed state. For README shots, also point `LOCALAPPDATA` at a demo folder holding
+  `Frontier Developments\Elite Dangerous\Options\Graphics\GraphicsConfigurationOverride.xml` (a theme, glare values):
+  the tabs then show an applied state, and no real paths or capture leftovers. Delete the demo folders afterwards.
 * `-Demo` adds a sample Ask conversation and an alert banner.
 
 egui 0.36 layout lessons learned here:
@@ -152,10 +154,17 @@ and writes `dist\EliteNexus-vx.y.z-windows-x64.zip`. It never touches `nexus-dat
 * Inara accepts uploads only after its author whitelists the app name "Elite Nexus".
 * `GalaxyOptions::all_eddn_bodies` (keep every landable EDDN body, not just biology and valuable worlds) is off.
 * Small known issue: the EDDN "updates stored" counter slightly over-counts body updates.
+* GitHub repo settings, which only the owner can change: upload `docs/social-preview.png` (Settings › Social preview),
+  and set a description and topics. Suggested description: "Elite Dangerous companion app for Windows: HUD colours
+  that keep hostile red, a cockpit-light dimmer, Odyssey glare fixes, exobiology, trade from live EDDN data, Spansh
+  routes, fleet and engineering. One fast native exe." Topics: `elite-dangerous`, `elite-dangerous-odyssey`,
+  `companion-app`, `hud`, `exobiology`, `eddn`, `spansh`, `trading`, `rust`, `egui`, `windows`.
 
 ## Ideas queue
 
 * A panel showing exactly what the Ask assistant can see and do, built from its tool list (the owner's idea).
 * Retake the README screenshots of Exobiology and Navigation: they predate 0.2.2's tabs. They were made from a
-  replay of a real exobiology landing (`cargo run --release -p nexus-journal --example replay`).
+  replay of a real exobiology landing (`cargo run --release -p nexus-journal --example replay`). The replay writes
+  only the journal: the sampling radar takes each sample's position from `Status.json` (latitude and longitude at the
+  `ScanOrganic`), and the route comes from `NavRoute.json`, so a retake has to write those next to the journal too.
 * Surface compass, on-foot farming guide, installer.
