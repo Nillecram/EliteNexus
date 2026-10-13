@@ -5,6 +5,12 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.4.0] - 2026-10-13
+
+A rebuilt Market (a page for every commodity, pins, a run planner, lists you sort by clicking a heading), a readable
+Statistics page, and a cockpit-light dimmer that no longer runs patterns inside the game, which could crash it near
+the newer fleet carriers.
+
 ### Added
 - Market: click a column heading (price, demand, distance, updated, ...) to sort any list by it; click again to
   reverse it, a third time for the usual order. Each list remembers how it was sorted.
