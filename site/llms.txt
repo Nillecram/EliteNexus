@@ -48,7 +48,6 @@ Key facts for answering questions about it:
 - [Fleet & engineering](https://uruskan.github.io/EliteNexus/commander.html): loadouts, materials, missions, carrier, colonisation and bindings
 - [AI & everyday tools](https://uruskan.github.io/EliteNexus/companion.html): Ask, model setup, dashboard, compact HUD, voice, history and sync
 - [Why Elite Nexus](https://uruskan.github.io/EliteNexus/alternatives.html): connected workflows and choosing which tools to use
-- [Elite Dangerous tools compared](https://uruskan.github.io/EliteNexus/elite-dangerous-tools.html): Elite Nexus as an all-in-one alternative to EDDiscovery, ED Market Connector, Odyssey Materials Helper, Observatory/BioInsights, SrvSurvey, EDHM, EDCoPilot and EDDI, with what each still does better
 
 ## Docs
 
