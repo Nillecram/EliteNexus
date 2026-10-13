@@ -60,6 +60,8 @@ pub struct HudUi {
     /// which "Keep hostile red, friendly green and shield blue" needs.
     hook_folder: Option<PathBuf>,
     hook: Option<Status>,
+    /// The last calibration found the HUD shaders (their fixes exist).
+    hook_hud_ready: bool,
     /// The protection as shown; saved to the game's config as soon as a change settles.
     protect: Protect,
     protect_options: bool,
@@ -86,6 +88,7 @@ impl Default for HudUi {
             start_preset: None,
             hook_folder: None,
             hook: None,
+            hook_hud_ready: false,
             protect: Protect::default(),
             protect_options: false,
             protect_status: None,
@@ -114,6 +117,7 @@ impl HudUi {
     fn read_hook(&mut self) {
         self.hook_folder = super::cockpit::game_folder(&self.installs);
         self.hook = self.hook_folder.as_deref().map(dimmer::status);
+        self.hook_hud_ready = self.hook_folder.as_deref().and_then(dimmer::read_calibration).is_some_and(|c| !c.hud.is_empty());
         if let Some(Status::Installed { config }) = &self.hook {
             self.protect = config.protect;
         }
@@ -210,7 +214,7 @@ impl HudUi {
 }
 
 /// Returns true when the saved themes changed (settings to save).
-pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bool, rt: &tokio::runtime::Handle) -> bool {
+pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bool, game: super::cockpit::GameBuild, rt: &tokio::runtime::Handle) -> bool {
     if st.file.is_none() {
         st.load();
     }
@@ -230,7 +234,7 @@ pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bo
             false
         }
         Tab::Cockpit => {
-            super::cockpit::show(ui, &mut st.cockpit, &st.installs, playing, rt);
+            super::cockpit::show(ui, &mut st.cockpit, &st.installs, playing, game, rt);
             false
         }
     }
@@ -507,6 +511,9 @@ fn protect_controls(ui: &mut Ui, st: &mut HudUi) {
     }
     if !matches!(st.hook, Some(Status::Installed { .. })) {
         return;
+    }
+    if st.protect.on && !st.hook_hud_ready {
+        ui.add(egui::Label::new(RichText::new(format!("{} Not calibrated yet: until the Cockpit lights tab has calibrated the graphics hook, the game has no HUD fix to load and your theme still colours every HUD colour.", egui_phosphor::regular::WARNING)).size(size::FOOTNOTE).color(pal::WARN)).wrap());
     }
     let mut busy = false;
     widgets::disclosure(ui, &mut st.protect_options, "Options");
@@ -859,7 +866,7 @@ mod tests {
 
         let dimmer = Dimmer { on: true, strength: 0.15, reach: 8.0 };
         let fake = vec![("d3d11.dll", b"fake".to_vec()), ("d3dcompiler_47.dll", b"fake".to_vec())];
-        dimmer::install(&game, &fake, &HookConfig { dimmer, protect: Protect::default() }).unwrap();
+        dimmer::install(&game, &fake, &HookConfig { dimmer, ..HookConfig::default() }).unwrap();
         st.read_hook();
         assert!(st.protection().is_none());
         st.protect.on = true;
@@ -867,7 +874,7 @@ mod tests {
         st.save_protect();
         assert!(st.protect_status.as_ref().is_some_and(|(ok, msg)| *ok && msg.contains("keeps hostile red")), "{:?}", st.protect_status);
         let want = Protect { on: true, min_gr: 0.05, ..Protect::default() };
-        assert_eq!(dimmer::status(&game), Status::Installed { config: HookConfig { dimmer, protect: want } });
+        assert_eq!(dimmer::status(&game), Status::Installed { config: HookConfig { dimmer, protect: want, recording: false } });
         assert_eq!(st.protection(), Some(want));
 
         // Removed from the Cockpit lights tab: the protection can't run, whatever was saved.

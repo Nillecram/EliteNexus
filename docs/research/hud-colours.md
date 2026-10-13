@@ -210,7 +210,30 @@ shaders are kept outside git in `target-agents\cockpit-capture-2026-10-13\` (Fro
   interpreter in the tests runs the inserted instructions through each real shader's own registers and swizzles
   (3 themes × 3 settings × 1,010 colours) and agrees with `is_hud_orange`; the dimmer's inserted code is checked
   the same way on a made-up box light.
-- **In game**: not tested yet.
+- **In game**: not tested yet. Since the crash below, the pattern runs in Elite Nexus during a calibration, not in the game.
+
+### The in-game patterns crashed the game; calibrated fixes instead (2026-10-13)
+
+- **Crash**: with the 0.3.0 config (both `[ShaderRegex]` patterns in `d3dx.ini`) the game crashed four times in a row at
+  `EnteringLocation` near LP 493-64 2 a, each time right after the netLog loaded a newer (squadron) fleet carrier
+  (`carrier01squadronhublevel`, `carrier01squadron_bridge`, ...). Squadron carriers had loaded fine on 10-11 October,
+  before 3Dmigoto was in the game folder; with `d3d11.dll` renamed the game loaded in at the same spot. ShaderRegex
+  disassembles every pixel shader the game creates to try its patterns, so something in that path (3Dmigoto's
+  disassembler or assembler, PCRE2, or our replacement) fails on one of that carrier's shaders. Which one isn't known.
+- **Calibrated fixes** (`nexus_hud::dimmer::start_recording`, `finish_calibration`): the config holds no patterns. For
+  one game session it sets `export_shaders=1` (the game runs without our fixes, so the originals are exported, about
+  21 MB); Elite Nexus then runs the same patterns on the exported assembly in Rust and writes
+  `ShaderFixes<hash>-ps.txt` for each match (the export, `t120` declared before the inputs, `dcl_temps` grown by the
+  replacement's temps, the replacement in place of the match), keeping copies in `EliteNexus-shaders` (the HUD
+  fixes go into ShaderFixes only while the protection is on) and the game build in `EliteNexus-calibration.json`.
+  In the game 3Dmigoto only looks up fingerprints: unknown shaders, such as a new carrier's, are never taken apart.
+  A game update that changes a fixed shader leaves the dimmer off (the fingerprint no longer matches) until the next
+  calibration; the page compares the build with the journal's and asks for one.
+- **Checked offline** against the 309 exported pixel shaders: the calibration finds `3f366702d540af3e` and
+  `7d85f63f9ab11daf` and the 12 HUD shaders, and the fix it writes for `3f366702d540af3e` is the hand-made fix tested in
+  the game that morning, line for line (`real_shaders` with `NEXUS_SHADER_DIR` and `NEXUS_HAND_FIX`).
+- **To check in the game**: calibrate, then the dimmer; then fly near a newer fleet carrier. If it still crashes there,
+  3Dmigoto itself (not the patterns) can't take that carrier's shaders.
 
 Sources: https://github.com/psychicEgg/EDHM (Odyssey README, patch notes, licence),
 https://github.com/BlueMystical/EDHM_UI (`source_v3/src/Helpers/SettingsHelper.js`, `ThemeReloadSignal.js`,

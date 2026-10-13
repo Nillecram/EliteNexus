@@ -10,9 +10,9 @@
 //! * [`presets`]: community themes, credited.
 //! * [`install`]: the game's install folders and whether a shader mod (EDHM) is in one.
 //! * [`tone`]: glare and exposure, the tone-mapping values in the same file.
-//! * [`dimmer`]: Elite Nexus's graphics hook, 3Dmigoto with patterns for the cockpit-light dimmer
-//!   (the game's box-light shader) and the HUD colour protection (the HUD shaders that apply the
-//!   colour matrix).
+//! * [`dimmer`]: Elite Nexus's graphics hook, 3Dmigoto with fixes for the cockpit-light dimmer (the
+//!   game's box-light shader) and the HUD colour protection (the HUD shaders that apply the colour
+//!   matrix), made from the commander's own game in a calibration and loaded by fingerprint.
 
 pub mod dimmer;
 pub mod error;

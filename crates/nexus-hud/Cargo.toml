@@ -9,6 +9,7 @@ license.workspace = true
 
 [dependencies]
 roxmltree.workspace = true
+regex = "1"
 serde.workspace = true
 serde_json.workspace = true
 sevenz-rust2 = { version = "0.24", default-features = false }
@@ -16,5 +17,3 @@ sha2 = "0.11"
 thiserror.workspace = true
 tracing.workspace = true
 
-[dev-dependencies]
-regex = "1"

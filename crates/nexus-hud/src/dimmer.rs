@@ -1,5 +1,6 @@
-//! Elite Nexus's graphics hook: 3Dmigoto (a Direct3D 11 hook placed next to the game) with patterns
-//! that patch game shaders as the game loads them.
+//! Elite Nexus's graphics hook: 3Dmigoto (a Direct3D 11 hook placed next to the game) loading fixes
+//! for a few of the game's shaders, each named by the fingerprint (3Dmigoto's hash) of the one shader
+//! it replaces.
 //!
 //! * The cockpit-light dimmer ([`Dimmer`]): the deferred box-light shader, so lights near the eyes
 //!   (the cockpit's own) come out dimmer.
@@ -7,10 +8,19 @@
 //!   matrix apply it only to the HUD's orange, so hostile red, friendly green and shield blue keep
 //!   their colours under a theme.
 //!
-//! Elite Nexus ships only its patterns and the few instructions it inserts; the game's shader code is
-//! never copied (3Dmigoto patches it in memory). 3Dmigoto itself (GPL-3.0) is downloaded from its
-//! official release and checked against pinned checksums. Everything Elite Nexus puts in the game
-//! folder is listed in a manifest there, and removal deletes only files that still match it.
+//! The fixes come from a calibration ([`start_recording`], [`finish_calibration`]): for one game
+//! session 3Dmigoto exports the shaders the game loads, then Elite Nexus finds the ones it needs with
+//! its patterns ([`LIGHT_PATTERN`], [`HUD_PATTERN`]) and writes them back with a few lines added.
+//! The patterns used to run inside the game (3Dmigoto's ShaderRegex), on every shader as it loaded;
+//! that crashed the game when it loaded the shaders of the newer fleet carriers (2026-10-13). Now
+//! the game only compares fingerprints, so a shader it hasn't seen before is left alone, and a game
+//! update that changes a fixed shader leaves the dimmer off until the next calibration.
+//!
+//! Elite Nexus ships only its patterns and the few instructions it inserts; the fixes are made on
+//! the commander's PC from their own game and never leave it. 3Dmigoto itself (GPL-3.0) is
+//! downloaded from its official release and checked against pinned checksums. Everything Elite
+//! Nexus puts in the game folder is listed in a manifest there or has its own name, and removal
+//! deletes only what is Elite Nexus's.
 //!
 //! How it was found and tested: docs/research/hud-colours.md.
 
@@ -40,6 +50,17 @@ const LEGACY_FIX: &str = "3f366702d540af3e-ps.txt";
 const BYPRODUCT_FILES: [&str; 3] = ["d3dx_user.ini", "d3d11_log.txt", "d3d11_profile_log.txt"];
 const BYPRODUCT_DIRS: [&str; 2] = ["ShaderCache", "ShaderFromGame"];
 const FIXES_DIR: &str = "ShaderFixes";
+/// Where 3Dmigoto exports the game's shaders while a calibration records them (`cache_directory`).
+const EXPORT_DIR: &str = "ShaderCache";
+/// Elite Nexus's copies of the fixes the last calibration made (3Dmigoto doesn't read this folder):
+/// the HUD's are copied into ShaderFixes only while the protection is on.
+pub const STORE_DIR: &str = "EliteNexus-shaders";
+/// What the last calibration found ([`Calibration`]).
+pub const CALIBRATION: &str = "EliteNexus-calibration.json";
+/// The first line of every fix Elite Nexus writes.
+const FIX_MARK: &str = "// Elite Nexus";
+/// How the in-game patterns of Elite Nexus 0.3.0 start in a config ([`uses_patterns`]).
+const PATTERN_SECTION: &str = "[ShaderRegexEliteNexus";
 
 /// Keys bound in the game while the dimmer is installed (only while the game window is in front).
 pub const KEYS: [(&str, &str); 3] = [("F9", "dimmer on / off"), ("F10", "strength: 0 %, 15 %, 35 %, 60 %, 100 %"), ("F11", "reach: 5 m, 8 m, 12 m")];
@@ -90,6 +111,25 @@ impl Default for Protect {
 pub struct HookConfig {
     pub dimmer: Dimmer,
     pub protect: Protect,
+    /// A calibration is recording: the game exports its shaders and runs without the fixes.
+    pub recording: bool,
+}
+
+/// What a calibration found, saved next to the game as [`CALIBRATION`].
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Calibration {
+    /// The game it was made for (the journal's `gameversion` and `build`): another build may have
+    /// changed the shaders.
+    pub game_version: String,
+    pub game_build: String,
+    /// When (unix seconds).
+    pub at: i64,
+    /// Pixel shaders the recording held.
+    pub shaders: u32,
+    /// Fingerprints of the box-light shaders and of the HUD shaders that apply the colour matrix.
+    pub lights: Vec<String>,
+    pub hud: Vec<String>,
 }
 
 /// What Elite Nexus installed, written next to the game as [`MANIFEST`].
@@ -130,6 +170,10 @@ pub enum DimmerError {
     UnknownFile(String),
     #[error("Elite Nexus didn't install 3Dmigoto in this folder")]
     NotOurs,
+    #[error("no shaders were recorded: start the game, get into your cockpit, then quit to the desktop")]
+    NothingRecorded,
+    #[error("the cockpit's light shader wasn't among the {0} shaders recorded: start the game again and get into your cockpit (not just the main menu), then quit")]
+    LightNotFound(u32),
     #[error("{path}: {source}")]
     Io {
         path: PathBuf,
@@ -221,7 +265,9 @@ pub fn install(game: &Path, files: &[(&'static str, Vec<u8>)], config: &HookConf
     Ok(())
 }
 
-/// Writes new settings (the game reads them when it starts).
+/// Writes new settings (the game reads them when it starts) and puts the calibrated fixes in
+/// place for them: the HUD's only while the protection is on, none while a calibration records.
+/// A config from Elite Nexus 0.3.0 loses its in-game patterns here.
 pub fn save_config(game: &Path, config: &HookConfig) -> Result<(), DimmerError> {
     match status(game) {
         Status::Installed { .. } => {}
@@ -236,7 +282,163 @@ pub fn save_config(game: &Path, config: &HookConfig) -> Result<(), DimmerError> 
         Some(entry) => entry.1 = sha256_hex(ini.as_bytes()),
         None => manifest.files.push((CONFIG.to_string(), sha256_hex(ini.as_bytes()))),
     }
-    write_atomic(&path, &serde_json::to_vec_pretty(&manifest).unwrap_or_default())
+    write_atomic(&path, &serde_json::to_vec_pretty(&manifest).unwrap_or_default())?;
+    place_fixes(game, !config.recording, config.protect.on && !config.recording)
+}
+
+/// The last calibration, if any.
+pub fn read_calibration(game: &Path) -> Option<Calibration> {
+    serde_json::from_slice(&std::fs::read(game.join(CALIBRATION)).ok()?).ok()
+}
+
+/// Copies the calibrated fixes into ShaderFixes, or takes them out: the lights' with `lights`, the
+/// HUD's with `hud`. Only files Elite Nexus wrote (they start with [`FIX_MARK`]) are removed.
+fn place_fixes(game: &Path, lights: bool, hud: bool) -> Result<(), DimmerError> {
+    let Some(cal) = read_calibration(game) else { return Ok(()) };
+    let fixes = game.join(FIXES_DIR);
+    std::fs::create_dir_all(&fixes).map_err(io(&fixes))?;
+    for (hashes, wanted) in [(&cal.lights, lights), (&cal.hud, hud)] {
+        for hash in hashes {
+            let name = fix_name(hash);
+            let target = fixes.join(&name);
+            if wanted {
+                let source = game.join(STORE_DIR).join(&name);
+                let bytes = std::fs::read(&source).map_err(io(&source))?;
+                write_atomic(&target, &bytes)?;
+            } else if is_our_fix(&target) {
+                std::fs::remove_file(&target).map_err(io(&target))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// 3Dmigoto's name for an assembly fix of pixel shader `hash`.
+fn fix_name(hash: &str) -> String {
+    format!("{hash}-ps.txt")
+}
+
+fn is_our_fix(path: &Path) -> bool {
+    std::fs::read_to_string(path).is_ok_and(|t| t.starts_with(FIX_MARK))
+}
+
+/// Whether the config still has the in-game patterns of Elite Nexus 0.3.0, which crashed the game
+/// near the newer fleet carriers. [`start_recording`] (or any [`save_config`]) replaces them.
+pub fn uses_patterns(game: &Path) -> bool {
+    std::fs::read_to_string(game.join(CONFIG)).is_ok_and(|t| t.starts_with(CONFIG_MARK) && t.contains(PATTERN_SECTION))
+}
+
+/// Whether Elite Nexus's install is there but 3Dmigoto's `d3d11.dll` isn't (renamed or deleted):
+/// the game then runs without the hook.
+pub fn hook_missing(game: &Path) -> bool {
+    matches!(status(game), Status::Installed { .. }) && !game.join("d3d11.dll").exists()
+}
+
+/// The official `d3d11.dll` under another name (`d3d11.dll.off`, ...), if one is there.
+fn renamed_dll(game: &Path) -> Option<PathBuf> {
+    let expected = MIGOTO_FILES[0].1;
+    std::fs::read_dir(game).ok()?.flatten().map(|e| e.path()).find(|p| {
+        p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.len() > "d3d11.dll".len() && n.to_ascii_lowercase().starts_with("d3d11.dll.")) && matches_hash(p, expected)
+    })
+}
+
+/// Puts a renamed official `d3d11.dll` back. Returns false when there is none (install again then).
+pub fn restore_dll(game: &Path) -> Result<bool, DimmerError> {
+    if !hook_missing(game) {
+        return Ok(false);
+    }
+    let Some(from) = renamed_dll(game) else { return Ok(false) };
+    let to = game.join("d3d11.dll");
+    std::fs::rename(&from, &to).map_err(io(&to))?;
+    Ok(true)
+}
+
+/// Starts a calibration. From its next start the game runs without Elite Nexus's fixes and
+/// 3Dmigoto exports every shader it loads (21 MB or so); [`finish_calibration`] then finds the ones
+/// to fix. An earlier export is deleted first, so only this game build's shaders are looked at.
+pub fn start_recording(game: &Path) -> Result<(), DimmerError> {
+    let Status::Installed { config } = status(game) else { return Err(DimmerError::NotOurs) };
+    remove_export(game)?;
+    save_config(game, &HookConfig { recording: true, ..config })
+}
+
+/// Stops a calibration without using it: the previous fixes (if any) go back in place.
+pub fn cancel_recording(game: &Path) -> Result<(), DimmerError> {
+    let Status::Installed { config } = status(game) else { return Err(DimmerError::NotOurs) };
+    save_config(game, &HookConfig { recording: false, ..config })?;
+    remove_export(game)
+}
+
+/// Pixel shaders the game has exported for the calibration so far.
+pub fn recorded_shaders(game: &Path) -> u32 {
+    std::fs::read_dir(game.join(EXPORT_DIR)).into_iter().flatten().flatten().filter(|e| e.file_name().to_string_lossy().ends_with("-ps.txt")).count() as u32
+}
+
+fn remove_export(game: &Path) -> Result<(), DimmerError> {
+    let dir = game.join(EXPORT_DIR);
+    if dir.is_dir() {
+        std::fs::remove_dir_all(&dir).map_err(io(&dir))?;
+    }
+    Ok(())
+}
+
+/// Finishes a calibration once the game has run (and quit): finds the box-light shaders and the HUD
+/// shaders among those it exported, writes their fixes, records what was found for this game build,
+/// switches the recording off and deletes the export. Without a light shader in the export the
+/// recording stays on ([`DimmerError::LightNotFound`]) and the previous fixes stay as they were.
+pub fn finish_calibration(game: &Path, game_version: &str, game_build: &str) -> Result<Calibration, DimmerError> {
+    let Status::Installed { config } = status(game) else { return Err(DimmerError::NotOurs) };
+    let export = game.join(EXPORT_DIR);
+    let mut shaders = 0u32;
+    let mut lights: Vec<(String, String)> = Vec::new();
+    let mut hud: Vec<(String, String)> = Vec::new();
+    for e in std::fs::read_dir(&export).into_iter().flatten().flatten() {
+        let name = e.file_name().to_string_lossy().to_string();
+        let Some(hash) = name.strip_suffix("-ps.txt").filter(|h| h.len() == 16 && h.chars().all(|c| c.is_ascii_hexdigit())) else { continue };
+        let Ok(bytes) = std::fs::read(e.path()) else { continue };
+        shaders += 1;
+        let asm = String::from_utf8_lossy(&bytes);
+        if let Some(fixed) = patch(&asm, light_regex(), &LIGHT_REPLACE, &LIGHT_TEMPS) {
+            lights.push((hash.to_ascii_lowercase(), fixed));
+        } else if let Some(fixed) = patch(&asm, hud_regex(), &HUD_REPLACE, &HUD_TEMPS) {
+            hud.push((hash.to_ascii_lowercase(), fixed));
+        }
+    }
+    if shaders == 0 {
+        return Err(DimmerError::NothingRecorded);
+    }
+    if lights.is_empty() {
+        return Err(DimmerError::LightNotFound(shaders));
+    }
+    lights.sort();
+    hud.sort();
+    // The old fixes go: they were made for shaders this game build may no longer load.
+    place_fixes(game, false, false)?;
+    let store = game.join(STORE_DIR);
+    if store.is_dir() {
+        std::fs::remove_dir_all(&store).map_err(io(&store))?;
+    }
+    std::fs::create_dir_all(&store).map_err(io(&store))?;
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+    for (hash, fixed) in lights.iter().chain(&hud) {
+        let what = if lights.iter().any(|(h, _)| h == hash) { "cockpit-light dimmer" } else { "HUD colour protection" };
+        let text = format!("{FIX_MARK} {what}: the game's shader {hash}, recorded on this PC for game {game_version} ({}), with Elite Nexus's lines added.\n{fixed}", game_build.trim());
+        write_atomic(&store.join(fix_name(hash)), text.as_bytes())?;
+    }
+    let cal = Calibration {
+        game_version: game_version.to_string(),
+        game_build: game_build.trim().to_string(),
+        at,
+        shaders,
+        lights: lights.into_iter().map(|(h, _)| h).collect(),
+        hud: hud.into_iter().map(|(h, _)| h).collect(),
+    };
+    write_atomic(&game.join(CALIBRATION), &serde_json::to_vec_pretty(&cal).unwrap_or_default())?;
+    save_config(game, &HookConfig { recording: false, ..config })?;
+    // The game may still hold an export file open (finishing while it runs); a leftover export is
+    // offered for deletion later.
+    let _ = remove_export(game);
+    Ok(cal)
 }
 
 /// What [`uninstall`] did.
@@ -296,6 +498,28 @@ pub fn uninstall(game: &Path) -> Result<Removed, DimmerError> {
     if legacy.is_file() {
         std::fs::remove_file(&legacy).map_err(io(&legacy))?;
         done.removed.push(format!("{FIXES_DIR}\\{LEGACY_FIX}"));
+    }
+    // The calibrated fixes: in ShaderFixes (recognised by their first line) and Elite Nexus's copies.
+    for e in std::fs::read_dir(&fixes).into_iter().flatten().flatten() {
+        if is_our_fix(&e.path()) {
+            std::fs::remove_file(e.path()).map_err(io(&e.path()))?;
+            done.removed.push(format!("{FIXES_DIR}\\{}", e.file_name().to_string_lossy()));
+        }
+    }
+    let store = game.join(STORE_DIR);
+    if store.is_dir() {
+        std::fs::remove_dir_all(&store).map_err(io(&store))?;
+        done.removed.push(format!("{STORE_DIR}\\"));
+    }
+    let calibration = game.join(CALIBRATION);
+    if calibration.is_file() {
+        std::fs::remove_file(&calibration).map_err(io(&calibration))?;
+        done.removed.push(CALIBRATION.to_string());
+    }
+    // An official d3d11.dll renamed to switch the hook off by hand.
+    if let Some(renamed) = renamed_dll(game) {
+        std::fs::remove_file(&renamed).map_err(io(&renamed))?;
+        done.removed.push(renamed.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default());
     }
     // Only an empty ShaderFixes goes: anything else in it isn't ours.
     if std::fs::read_dir(&fixes).is_ok_and(|mut d| d.next().is_none()) {
@@ -423,16 +647,13 @@ pub fn read_config(ini: &str) -> HookConfig {
             _ => {}
         }
     }
+    c.recording = section(ini, "Rendering").any(|(k, v)| k.eq_ignore_ascii_case("export_shaders") && v != "0");
     c
 }
 
-/// The section names of each pattern (own names, so nothing else in an ini can collide with them).
-const LIGHT_REGEX: &str = "ShaderRegexEliteNexusCockpitLights";
-const HUD_REGEX: &str = "ShaderRegexEliteNexusHudColours";
-
 /// The box-light shader, recognised by its inputs (light position and range in camera space, packed
 /// colour, view ray, pixel position) and by how it ends (colour and luminance scaled by `cb2[0].x`).
-/// Lines are joined after trimming, as 3Dmigoto does; `\n` matches the end of each shader line.
+/// Lines are joined, as 3Dmigoto's ShaderRegex did; `\n` matches the end of each shader line.
 pub const LIGHT_PATTERN: [&str; 8] = [
     r"dcl_input_ps constant v0\.xyzw\n",
     r"dcl_input_ps constant v1\.xyzw\n",
@@ -510,14 +731,75 @@ pub const HUD_TEMPS: [&str; 3] = ["nexus_in", "nexus_tmp", "nexus_set"];
 /// Both patterns read their settings from 3Dmigoto's IniParams texture.
 pub const INSERT_DECLARATIONS: &str = "dcl_resource_texture1d (float,float,float,float) t120";
 
+/// A pattern as 3Dmigoto's ShaderRegex compiled it: lines joined, case-insensitive, `^`/`$` per line.
+fn compile(pattern: &[&str]) -> regex::Regex {
+    // The patterns are constants, checked by the tests.
+    regex::Regex::new(&format!("(?im){}", pattern.concat())).expect("pattern compiles")
+}
+
+pub fn light_regex() -> &'static regex::Regex {
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| compile(&LIGHT_PATTERN))
+}
+
+pub fn hud_regex() -> &'static regex::Regex {
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| compile(&HUD_PATTERN))
+}
+
+/// Applies a pattern to a shader's assembly the way 3Dmigoto's ShaderRegex did: the match becomes
+/// the replacement, each of `temps` a new temporary register (`dcl_temps` grows by their number),
+/// and the IniParams texture is declared before the inputs. `None` when the pattern doesn't match
+/// exactly once, or the shader has no `dcl_temps` or no inputs to declare it before: such a shader is
+/// left alone rather than guessed at.
+pub fn patch(asm: &str, re: &regex::Regex, replace: &[&str], temps: &[&str]) -> Option<String> {
+    let text = asm.replace("\r\n", "\n");
+    let mut found = re.captures_iter(&text);
+    let caps = found.next()?;
+    if found.next().is_some() {
+        return None;
+    }
+    let lines: Vec<&str> = text.lines().collect();
+    let temps_line = lines.iter().position(|l| l.trim_start().starts_with("dcl_temps "))?;
+    let count: usize = lines[temps_line].trim().strip_prefix("dcl_temps ")?.trim().parse().ok()?;
+    let mut replacement = replace.concat().replace(r"\n", "\n");
+    for (i, t) in temps.iter().enumerate() {
+        replacement = replacement.replace(&format!("${{{t}}}"), &format!("r{}", count + i));
+    }
+    let mut inserted = String::new();
+    caps.expand(&replacement, &mut inserted);
+    let whole = caps.get(0)?;
+    let patched = format!("{}{}{}", &text[..whole.start()], inserted, &text[whole.end()..]);
+    // Declarations: the texture before the first input, output or temps line; dcl_temps grown.
+    let declared = patched.lines().any(|l| l.trim_start().starts_with("dcl_resource") && l.contains(" t120"));
+    let mut out = String::with_capacity(patched.len() + 64);
+    let mut placed = declared;
+    for line in patched.lines() {
+        let l = line.trim_start();
+        if !placed && ["dcl_input", "dcl_output", "dcl_temps", "dcl_indexableTemp"].iter().any(|p| l.starts_with(p)) {
+            out.push_str(INSERT_DECLARATIONS);
+            out.push('\n');
+            placed = true;
+        }
+        if l.starts_with("dcl_temps ") {
+            out.push_str(&format!("dcl_temps {}\n", count + temps.len()));
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    placed.then_some(out)
+}
+
 fn number(v: f32) -> String {
     let s = format!("{v:.3}");
     let s = s.trim_end_matches('0').trim_end_matches('.');
     if s.is_empty() || s == "-0" { "0".into() } else { s.to_string() }
 }
 
-/// The game's `d3dx.ini` for `c`. The HUD pattern is in it only while the protection is on, so the
-/// HUD shaders are patched only when that's wanted.
+/// The game's `d3dx.ini` for `c`. It holds no patterns: the fixes are files in ShaderFixes, each
+/// named by the fingerprint of the one shader it replaces. While a calibration records, 3Dmigoto
+/// exports the shaders the game loads.
 pub fn render_config(c: &HookConfig) -> String {
     let (d, p) = (&c.dimmer, &c.protect);
     let mut s = String::new();
@@ -527,10 +809,14 @@ pub fn render_config(c: &HookConfig) -> String {
     };
     line("; Elite Nexus: graphics hook for the cockpit-light dimmer and the HUD colours. Installed and managed by");
     line(&format!("; Elite Nexus (HUD & cockpit); change it there. 3Dmigoto {MIGOTO_VERSION} ({MIGOTO_SOURCE}, GPL-3.0)"));
-    line("; patches game shaders as the game loads them: the box-light shader, so lights within the reach of your");
-    line("; eyes (the cockpit's own) come out dimmer, and, while \"Keep hostile red, friendly green and shield blue\"");
-    line("; is on, the HUD shaders that apply the game's colour matrix, so a theme colours only the HUD's orange.");
-    line("; No game file is changed.");
+    line("; replaces a few game shaders, each by its fingerprint, with copies Elite Nexus made from your game in a");
+    line("; calibration: the box-light shader, so lights within the reach of your eyes (the cockpit's own) come out");
+    line("; dimmer, and, while \"Keep hostile red, friendly green and shield blue\" is on, the HUD shaders that apply");
+    line("; the game's colour matrix, so a theme colours only the HUD's orange. No game file is changed.");
+    if c.recording {
+        line(";");
+        line("; Calibrating: the game exports the shaders it loads to ShaderCache and runs without the fixes.");
+    }
     line(";");
     line("; Keys, while the game window is in front:");
     for (key, what) in KEYS {
@@ -538,12 +824,14 @@ pub fn render_config(c: &HookConfig) -> String {
     }
     line(";");
     line("; To remove it: Elite Nexus > HUD & cockpit > Cockpit lights > Remove. By hand: quit the game, then delete");
-    line(&format!("; d3d11.dll, d3dcompiler_47.dll, {CONFIG}, {MANIFEST} and the ShaderFixes and ShaderCache folders."));
+    line(&format!("; d3d11.dll, d3dcompiler_47.dll, {CONFIG}, {MANIFEST}, {CALIBRATION} and the ShaderFixes, {STORE_DIR}"));
+    line("; and ShaderCache folders.");
     line("");
     for l in ["[Logging]", "calls=0", "input=0", "debug=0", "", "[System]", "load_library_redirect=2", "check_foreground_window=1", "allow_check_interface=1", "allow_platform_update=1", ""] {
         line(l);
     }
-    for l in ["[Rendering]", "override_directory=ShaderFixes", "cache_directory=ShaderCache", "storage_directory=ShaderFromGame", "cache_shaders=0", "export_shaders=0", "ini_params = 120", ""] {
+    let export = if c.recording { "export_shaders=1" } else { "export_shaders=0" };
+    for l in ["[Rendering]", "override_directory=ShaderFixes", "cache_directory=ShaderCache", "storage_directory=ShaderFromGame", "cache_shaders=0", export, "ini_params = 120", ""] {
         line(l);
     }
     line("[Hunting]");
@@ -576,35 +864,9 @@ pub fn render_config(c: &HookConfig) -> String {
     line("type = cycle");
     line("y = 5, 8, 12");
     line("");
-    regex_sections(&mut line, LIGHT_REGEX, &LIGHT_TEMPS, &LIGHT_PATTERN, &LIGHT_REPLACE);
-    if p.on {
-        regex_sections(&mut line, HUD_REGEX, &HUD_TEMPS, &HUD_PATTERN, &HUD_REPLACE);
-    }
     line("[Stereo]");
     line("automatic_mode=0");
     s
-}
-
-/// One `[ShaderRegex…]` group: the main section, the pattern, its replacement and the declaration
-/// of the IniParams texture.
-fn regex_sections(line: &mut dyn FnMut(&str), name: &str, temps: &[&str], pattern: &[&str], replace: &[&str]) {
-    line(&format!("[{name}]"));
-    line("shader_model = ps_5_0");
-    line(&format!("temps = {}", temps.join(" ")));
-    line("");
-    line(&format!("[{name}.Pattern]"));
-    for l in pattern {
-        line(l);
-    }
-    line("");
-    line(&format!("[{name}.Pattern.Replace]"));
-    for l in replace {
-        line(l);
-    }
-    line("");
-    line(&format!("[{name}.InsertDeclarations]"));
-    line(INSERT_DECLARATIONS);
-    line("");
 }
 
 #[cfg(test)]
@@ -914,8 +1176,8 @@ mod tests {
     }
 
     #[test]
-    fn config_round_trips_settings_and_carries_the_patterns() {
-        let c = HookConfig { dimmer: Dimmer { on: false, strength: 0.15, reach: 7.5 }, protect: Protect { on: true, max_gr: 0.55, max_br: 0.25, min_gr: 0.04 } };
+    fn config_round_trips_settings_and_holds_no_patterns() {
+        let c = HookConfig { dimmer: Dimmer { on: false, strength: 0.15, reach: 7.5 }, protect: Protect { on: true, max_gr: 0.55, max_br: 0.25, min_gr: 0.04 }, recording: false };
         let ini = render_config(&c);
         assert!(ini.starts_with(CONFIG_MARK));
         assert!(ini.is_ascii());
@@ -925,24 +1187,134 @@ mod tests {
         assert!(ini.contains("\r\nx1 = 1\r\ny1 = 0.55\r\nz1 = 0.25\r\nw1 = 0.04\r\n"));
         // F9 switches the dimmer the other way.
         assert!(ini.contains("type = toggle\r\nz = 1\r\n"));
-        assert!(ini.contains("[ShaderRegexEliteNexusCockpitLights.Pattern]\r\ndcl_input_ps constant v0\\.xyzw\\n\r\n"));
-        assert!(ini.contains("[ShaderRegexEliteNexusCockpitLights.InsertDeclarations]\r\ndcl_resource_texture1d (float,float,float,float) t120\r\n"));
-        assert!(ini.contains("[ShaderRegexEliteNexusHudColours]\r\nshader_model = ps_5_0\r\ntemps = nexus_in nexus_tmp nexus_set\r\n"));
-        assert!(ini.contains("[ShaderRegexEliteNexusHudColours.Pattern.Replace]\r\nmov ${nexus_in}.x, ${rs}.${rc}\\n\r\n"));
-        assert!(ini.contains("\r\n${l1}${l2}${l3}\r\n// Elite Nexus: keep hostile red"));
-        assert!(ini.contains("[ShaderRegexEliteNexusHudColours.InsertDeclarations]\r\ndcl_resource_texture1d (float,float,float,float) t120\r\n"));
+        // Nothing runs a pattern in the game any more: the fixes are files named by fingerprint.
+        assert!(!ini.contains("ShaderRegex") && !ini.contains(PATTERN_SECTION));
+        assert!(ini.contains("\r\nexport_shaders=0\r\n"));
         // Instruction lines carry no trailing comments (3Dmigoto's assembler reads them as they are).
         for l in HUD_REPLACE.iter().chain(LIGHT_REPLACE.iter()).filter(|l| !l.starts_with("//")) {
             assert!(!l.contains("//") && !l.contains(';'), "{l}");
         }
-        // Protection off: its settings are kept, but no HUD shader is patched.
-        let off = HookConfig { protect: Protect { on: false, ..c.protect }, ..c };
-        let ini = render_config(&off);
-        assert!(!ini.contains("ShaderRegexEliteNexusHudColours"));
-        assert_eq!(read_config(&ini), off);
+        // Recording exports the shaders the game loads.
+        let rec = HookConfig { recording: true, ..c };
+        let ini = render_config(&rec);
+        assert!(ini.contains("\r\nexport_shaders=1\r\n"));
+        assert_eq!(read_config(&ini), rec);
         assert_eq!(read_config(&render_config(&HookConfig::default())), HookConfig::default());
         // A config from before the protection existed reads as protection off, with the defaults.
-        assert_eq!(read_config("; Elite Nexus\r\n[Constants]\r\nx = 0.6\r\ny = 8\r\nz = 1\r\n"), HookConfig { dimmer: Dimmer { on: true, strength: 0.6, reach: 8.0 }, protect: Protect::default() });
+        assert_eq!(read_config("; Elite Nexus\r\n[Constants]\r\nx = 0.6\r\ny = 8\r\nz = 1\r\n"), HookConfig { dimmer: Dimmer { on: true, strength: 0.6, reach: 8.0 }, ..HookConfig::default() });
+    }
+
+    #[test]
+    fn patching_grows_the_temps_and_declares_the_settings_texture() {
+        let out = patch(BOX, light_regex(), &LIGHT_REPLACE, &LIGHT_TEMPS).expect("the box light matches");
+        // The made-up box light has 3 temps: the dimmer's two are r3 and r4.
+        assert!(out.contains("\ndcl_temps 5\n") && !out.contains("dcl_temps 3"), "{out}");
+        assert!(out.contains("dcl_constantbuffer CB2[47], immediateIndexed\ndcl_resource_texture1d (float,float,float,float) t120\ndcl_input_ps constant v0.xyzw\n"), "{out}");
+        assert!(out.contains("ld_indexable(texture1d)(float,float,float,float) r3.xyzw, l(0, 0, 0, 0), t120.xyzw\ndp3 r4.x, v0.xyzx, v0.xyzx\n"), "{out}");
+        assert!(!out.contains("${") && !out.contains(r"\n"), "{out}");
+        assert_eq!(out.matches("t120.xyzw").count(), 1);
+        // The patched shader computes what the in-game pattern did.
+        let mut m = Machine { ini: vec![[0.35, 5.0, 1.0, 0.0]], ..Default::default() };
+        m.cb.insert((2, 0), [1.0, 0.0, 0.0, 0.0]);
+        m.set("v0", [1.0, 2.0, 2.0, 1.0]);
+        m.set("v1", [0.5, 0.25, 1.0, 0.0]);
+        m.run(&out);
+        assert!((m.get("o0")[0] - 0.5 * 0.35).abs() < 1e-6);
+        // The HUD shapes get the protection, with their own free registers.
+        let hud = patch(HUD_SHAPE_2, hud_regex(), &HUD_REPLACE, &HUD_TEMPS).unwrap();
+        assert!(hud.contains("\ndcl_temps 5\n") && hud.contains("mov r2.x, r0.x\n"), "{hud}");
+        // Shaders the patterns don't fit, or that can't take the fix safely, are left alone.
+        assert!(patch(HUD_SHAPE_1, light_regex(), &LIGHT_REPLACE, &LIGHT_TEMPS).is_none());
+        assert!(patch(&BOX.replace("dcl_temps 3\n", ""), light_regex(), &LIGHT_REPLACE, &LIGHT_TEMPS).is_none());
+        let twice = format!("{BOX}{BOX}");
+        assert!(patch(&twice, light_regex(), &LIGHT_REPLACE, &LIGHT_TEMPS).is_none(), "two matches: not the shader we know");
+        // Windows line endings in an export are fine.
+        assert!(patch(&BOX.replace('\n', "\r\n"), light_regex(), &LIGHT_REPLACE, &LIGHT_TEMPS).is_some());
+    }
+
+    /// Writes made-up shaders where 3Dmigoto exports them.
+    fn export(game: &Path, shaders: &[(&str, &str)]) {
+        let dir = game.join(EXPORT_DIR);
+        std::fs::create_dir_all(&dir).unwrap();
+        for (hash, asm) in shaders {
+            std::fs::write(dir.join(format!("{hash}-ps.txt")), asm).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_calibration_records_finds_and_places_the_fixes() {
+        let game = temp_game("calibrate");
+        install(&game, &fake_files(), &HookConfig::default()).unwrap();
+        assert!(read_calibration(&game).is_none());
+        // Nothing recorded yet.
+        start_recording(&game).unwrap();
+        assert!(matches!(status(&game), Status::Installed { config } if config.recording));
+        assert!(matches!(finish_calibration(&game, "4.4.1.1", "r1 "), Err(DimmerError::NothingRecorded)));
+        // Only the main menu: no light shader. The recording stays on.
+        export(&game, &[("00000000000000aa", "ps_5_0\ndcl_temps 1\nmov o0.xyzw, l(0,0,0,0)\nret\n"), ("00000000000000ab", HUD_SHAPE_1)]);
+        assert!(matches!(finish_calibration(&game, "4.4.1.1", "r1 "), Err(DimmerError::LightNotFound(2))));
+        assert!(matches!(status(&game), Status::Installed { config } if config.recording));
+        // In the cockpit: the box light is loaded too.
+        export(&game, &[("3f366702d540af3e", BOX), ("00000000000000ac", HUD_SHAPE_2)]);
+        assert_eq!(recorded_shaders(&game), 4);
+        let cal = finish_calibration(&game, "4.4.1.1", "r1 ").unwrap();
+        assert_eq!((cal.shaders, cal.lights.clone(), cal.hud.clone()), (4, vec!["3f366702d540af3e".to_string()], vec!["00000000000000ab".to_string(), "00000000000000ac".to_string()]));
+        assert_eq!((cal.game_version.as_str(), cal.game_build.as_str()), ("4.4.1.1", "r1"));
+        assert_eq!(read_calibration(&game), Some(cal));
+        // Recording off, export gone, the light fix in place; the HUD's only in the store (protection off).
+        assert!(matches!(status(&game), Status::Installed { config } if !config.recording));
+        assert!(!game.join(EXPORT_DIR).exists());
+        let light_fix = game.join(FIXES_DIR).join("3f366702d540af3e-ps.txt");
+        let text = std::fs::read_to_string(&light_fix).unwrap();
+        assert!(text.starts_with("// Elite Nexus cockpit-light dimmer: the game's shader 3f366702d540af3e"), "{text}");
+        assert!(text.contains("t120.xyzw") && text.contains("dcl_temps 5"));
+        assert!(!game.join(FIXES_DIR).join("00000000000000ab-ps.txt").exists());
+        assert!(game.join(STORE_DIR).join("00000000000000ab-ps.txt").is_file());
+        // The protection switched on: the HUD fixes join; off again: they leave, the light fix stays.
+        let Status::Installed { config } = status(&game) else { panic!() };
+        save_config(&game, &HookConfig { protect: Protect { on: true, ..config.protect }, ..config }).unwrap();
+        assert!(game.join(FIXES_DIR).join("00000000000000ab-ps.txt").is_file() && game.join(FIXES_DIR).join("00000000000000ac-ps.txt").is_file());
+        save_config(&game, &config).unwrap();
+        assert!(!game.join(FIXES_DIR).join("00000000000000ab-ps.txt").exists() && light_fix.is_file());
+        // A new recording runs the game without the fixes (so it exports the originals).
+        std::fs::write(game.join(FIXES_DIR).join("1111111111111111-ps.txt"), "someone else's fix").unwrap();
+        start_recording(&game).unwrap();
+        assert!(!light_fix.exists() && game.join(FIXES_DIR).join("1111111111111111-ps.txt").is_file());
+        cancel_recording(&game).unwrap();
+        assert!(light_fix.is_file(), "cancelled: the previous fixes are back");
+        // Removal takes Elite Nexus's fixes, store and calibration, and leaves a foreign file.
+        let done = uninstall(&game).unwrap();
+        for gone in [STORE_DIR, CALIBRATION, "d3dx.ini"] {
+            assert!(!game.join(gone).exists(), "{gone}: {done:?}");
+        }
+        assert!(!light_fix.exists() && game.join(FIXES_DIR).join("1111111111111111-ps.txt").is_file());
+        let _ = std::fs::remove_dir_all(&game);
+    }
+
+    #[test]
+    fn an_old_pattern_install_is_recognised_and_updated() {
+        let game = temp_game("patterns");
+        install(&game, &fake_files(), &HookConfig::default()).unwrap();
+        // What Elite Nexus 0.3.0 wrote: the patterns inside the config.
+        let old = format!("{}[ShaderRegexEliteNexusCockpitLights]\r\nshader_model = ps_5_0\r\n", render_config(&HookConfig::default()));
+        std::fs::write(game.join(CONFIG), old).unwrap();
+        assert!(uses_patterns(&game));
+        start_recording(&game).unwrap();
+        assert!(!uses_patterns(&game), "starting a calibration writes a config without them");
+        let _ = std::fs::remove_dir_all(&game);
+    }
+
+    #[test]
+    fn a_renamed_hook_is_noticed_and_put_back() {
+        let game = temp_game("renamed");
+        // The real DLL's checksum is pinned: stand in for it with a file that matches.
+        install(&game, &fake_files(), &HookConfig::default()).unwrap();
+        std::fs::rename(game.join("d3d11.dll"), game.join("d3d11.dll.off")).unwrap();
+        assert!(hook_missing(&game));
+        // The fake doesn't match the official checksum, so it isn't taken for the official one.
+        assert!(!restore_dll(&game).unwrap());
+        assert!(renamed_dll(&game).is_none());
+        let _ = std::fs::remove_dir_all(&game);
     }
 
     fn temp_game(tag: &str) -> PathBuf {
@@ -986,17 +1358,16 @@ mod tests {
         assert_eq!(status(&game), Status::Installed { config: HookConfig::default() });
         assert_eq!(std::fs::read(game.join("d3d11.dll")).unwrap(), b"fake d3d11");
         assert!(game.join(FIXES_DIR).is_dir());
-        let changed = HookConfig { dimmer: Dimmer { on: true, strength: 0.6, reach: 9.0 }, protect: Protect { on: true, ..Protect::default() } };
+        let changed = HookConfig { dimmer: Dimmer { on: true, strength: 0.6, reach: 9.0 }, protect: Protect { on: true, ..Protect::default() }, recording: false };
         save_config(&game, &changed).unwrap();
         assert_eq!(status(&game), Status::Installed { config: changed });
-        assert!(std::fs::read_to_string(game.join(CONFIG)).unwrap().contains("[ShaderRegexEliteNexusHudColours]"));
+        assert!(!std::fs::read_to_string(game.join(CONFIG)).unwrap().contains("ShaderRegex"));
         // The manifest follows the config, so removal still recognises it.
         let manifest: Manifest = serde_json::from_slice(&std::fs::read(game.join(MANIFEST)).unwrap()).unwrap();
         assert!(manifest.files.iter().any(|(n, h)| n == CONFIG && matches_hash(&game.join(CONFIG), h)));
         let off = HookConfig { protect: Protect::default(), ..changed };
         save_config(&game, &off).unwrap();
         assert_eq!(status(&game), Status::Installed { config: off });
-        assert!(!std::fs::read_to_string(game.join(CONFIG)).unwrap().contains("[ShaderRegexEliteNexusHudColours]"));
 
         // 3Dmigoto's by-products and captures go too; a file someone changed stays.
         std::fs::create_dir_all(game.join("ShaderCache")).unwrap();
@@ -1116,6 +1487,24 @@ mod tests {
         println!("{total} pixel shaders; box lights {lights:?}; HUD {hud:?}");
         assert_eq!(lights, REAL_LIGHTS);
         assert_eq!(hud, REAL_HUD);
+        // What a calibration writes for the box light is the hand-made fix tested in the game that
+        // morning, line for line (comments aside). NEXUS_HAND_FIX: that file.
+        if let Ok(hand) = std::env::var("NEXUS_HAND_FIX") {
+            let export = std::fs::read_to_string(std::path::Path::new(&dir).join("3f366702d540af3e-ps.txt")).unwrap();
+            let ours = patch(&export, light_regex(), &LIGHT_REPLACE, &LIGHT_TEMPS).unwrap();
+            let code = |t: &str| t.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with("//")).map(str::to_string).collect::<Vec<_>>();
+            assert_eq!(code(&ours), code(&std::fs::read_to_string(hand).unwrap()));
+            println!("the calibrated box-light fix matches the hand-made one");
+        }
+        // Every real HUD shader takes the fix with its own free registers.
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let name = e.file_name().to_string_lossy().to_string();
+            if REAL_HUD.iter().any(|h| name == format!("{h}-ps.txt")) {
+                let text = std::fs::read_to_string(e.path()).unwrap();
+                let fixed = patch(&text, hud_regex(), &HUD_REPLACE, &HUD_TEMPS).unwrap_or_else(|| panic!("{name}"));
+                assert_eq!(fixed.matches("dcl_resource_texture1d (float,float,float,float) t120").count(), 1, "{name}");
+            }
+        }
     }
 
     /// Prints the config Elite Nexus writes with the HUD colour protection on, to read it over:

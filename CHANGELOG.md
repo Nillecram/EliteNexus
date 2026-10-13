@@ -32,6 +32,13 @@ release time that section becomes the new version and the release workflow publi
   viewer with zoom and keyboard navigation. Added responsive navigation, a product tour and clearer setup guidance.
 
 ### Fixed
+- **HUD & cockpit › Cockpit lights could crash the game** when it loaded the newer fleet carriers: the dimmer (and
+  the HUD colour protection) ran a pattern inside the game on every shader it loaded. Now a one-time **calibration**
+  (start the game, get into your cockpit, quit) finds the shaders it needs among the ones your game loaded, and in
+  the game 3Dmigoto only swaps exactly those, by fingerprint; anything else, such as a new carrier, is left alone.
+  The tab shows which game build it was calibrated for and asks for a new calibration after a game update (until
+  then the dimmer is simply off). Installs from 0.3.0 get **Update and calibrate**, which also puts back a
+  d3d11.dll renamed to switch the hook off.
 - Accounts & sync: an upload error a service has recovered from since (it accepted uploads again) now shows dimmed,
   with its age, instead of staying red until the next error.
 - Market: stations listing a good they produce (the game gives it a token demand of 1, "no demand") no longer show

@@ -1,6 +1,7 @@
-//! Cockpit lights (a tab of HUD & cockpit): installs, sets up and removes the cockpit-light dimmer,
-//! 3Dmigoto plus a pattern for the game's box-light shader (`nexus_hud::dimmer`). The same install
-//! is the graphics hook the HUD colours tab needs to keep hostile red, friendly green and shield blue.
+//! Cockpit lights (a tab of HUD & cockpit): installs, calibrates, sets up and removes the
+//! cockpit-light dimmer, 3Dmigoto plus a fix for the game's box-light shader (`nexus_hud::dimmer`).
+//! The same install is the graphics hook the HUD colours tab needs to keep hostile red, friendly green
+//! and shield blue.
 
 use crate::jobs::Slot;
 use crate::theme::{display, pal, size};
@@ -8,7 +9,7 @@ use crate::widgets::{self, card, footnote, group, section};
 use egui::{RichText, Ui};
 use egui_phosphor::regular as icon;
 use nexus_binds::{Bindings, Input};
-use nexus_hud::dimmer::{self, Dimmer, HookConfig, Protect, Removed, Status};
+use nexus_hud::dimmer::{self, Calibration, Dimmer, HookConfig, Removed, Status};
 use nexus_hud::install::GameInstall;
 use std::path::{Path, PathBuf};
 
@@ -37,6 +38,16 @@ pub struct CockpitUi {
     /// The dimmer's keys that the game's own controls use too, with the actions bound to them.
     clashes: Vec<(&'static str, String)>,
     message: Option<(bool, String)>,
+    /// The last calibration, and pixel shaders recorded so far while one runs.
+    calibration: Option<Calibration>,
+    recorded: u32,
+    /// The config still has Elite Nexus 0.3.0's in-game patterns (they crashed the game near the newer
+    /// fleet carriers).
+    old_patterns: bool,
+    /// 3Dmigoto's d3d11.dll isn't there (renamed or deleted): the hook is off.
+    hook_missing: bool,
+    /// The game was running last frame (a calibration finishes when it closes).
+    was_playing: bool,
 }
 
 impl CockpitUi {
@@ -58,10 +69,22 @@ impl CockpitUi {
         }
         self.leftovers = Slot::default();
         self.clashes.clear();
+        self.calibration = None;
+        self.recorded = 0;
+        self.old_patterns = false;
+        self.hook_missing = false;
         if let (Some(folder), Some(Status::Installed { .. })) = (self.folder.clone(), &self.status) {
             self.clashes = key_clashes(&folder);
+            self.calibration = dimmer::read_calibration(&folder);
+            self.recorded = dimmer::recorded_shaders(&folder);
+            self.old_patterns = dimmer::uses_patterns(&folder);
+            self.hook_missing = dimmer::hook_missing(&folder);
             self.leftovers.run(ctx, move || dimmer::leftovers(&folder));
         }
+    }
+
+    fn recording(&self) -> bool {
+        matches!(&self.status, Some(Status::Installed { config }) if config.recording)
     }
 }
 
@@ -116,15 +139,20 @@ async fn fetch() -> Result<Files, String> {
     tokio::task::spawn_blocking(move || dimmer::extract(&bytes).map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
 }
 
-pub fn show(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: bool, rt: &tokio::runtime::Handle) {
+/// The game the commander last played, from the journal: (version, build).
+pub type GameBuild<'a> = (&'a str, &'a str);
+
+pub fn show(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: bool, game: GameBuild, rt: &tokio::runtime::Handle) {
     if !st.loaded {
         st.refresh(ui.ctx(), installs);
     }
     if st.download.tick() {
         match (st.download.last.take(), st.folder.clone()) {
             (Some(Ok(files)), Some(folder)) => {
-                st.message = Some(match dimmer::install(&folder, &files, &HookConfig { dimmer: st.edit, protect: Protect::default() }) {
-                    Ok(()) => (true, "Installed. Start Elite Dangerous: the cockpit lights come out dimmer from the first frame.".into()),
+                let config = HookConfig { dimmer: st.edit, ..HookConfig::default() };
+                // A fresh install starts with a calibration: the fixes are made from this game.
+                st.message = Some(match dimmer::install(&folder, &files, &config).and_then(|()| dimmer::start_recording(&folder)) {
+                    Ok(()) => (true, "Installed. One step left: calibrate (below), so Elite Nexus can find your game's light shader.".into()),
                     Err(e) => (false, e.to_string()),
                 });
                 st.confirm_install = false;
@@ -134,6 +162,14 @@ pub fn show(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: 
             _ => {}
         }
     }
+    // The game closed while a calibration recorded: finish it.
+    if st.was_playing && !playing && st.recording() {
+        st.refresh(ui.ctx(), installs);
+        if st.recorded > 0 {
+            finish(st, ui.ctx(), installs, game);
+        }
+    }
+    st.was_playing = playing;
     st.leftovers.tick();
     if st.cleanup.tick() {
         let bytes = st.leftovers.last.unwrap_or(0);
@@ -144,18 +180,35 @@ pub fn show(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: 
         };
         st.refresh(ui.ctx(), installs);
     }
-    widgets::split(ui, 0.5, 400.0, |ui| controls(ui, st, installs, playing, rt), explain);
+    widgets::split(ui, 0.5, 400.0, |ui| controls(ui, st, installs, playing, game, rt), explain);
 }
 
-fn controls(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: bool, rt: &tokio::runtime::Handle) {
+/// Finishes a calibration from what the game exported.
+fn finish(st: &mut CockpitUi, ctx: &egui::Context, installs: &[GameInstall], (version, build): GameBuild) {
+    let Some(folder) = st.folder.clone() else { return };
+    st.message = Some(match dimmer::finish_calibration(&folder, version, build) {
+        Ok(cal) => {
+            let hud = match cal.hud.len() {
+                0 => String::new(),
+                1 => " and 1 HUD shader".to_string(),
+                n => format!(" and {n} HUD shaders"),
+            };
+            (true, format!("Calibrated: found the cockpit's light shader{hud} among the {} your game loaded. The dimmer works from the next game start.", cal.shaders))
+        }
+        Err(e) => (false, format!("Not calibrated yet: {e}.")),
+    });
+    st.refresh(ctx, installs);
+}
+
+fn controls(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: bool, game: GameBuild, rt: &tokio::runtime::Handle) {
     card(ui, "Cockpit-light dimmer", |ui| {
         let Some(folder) = st.folder.clone() else {
             ui.add(egui::Label::new(RichText::new("Elite Dangerous wasn't found in the usual Steam, Epic or Frontier folders, so the dimmer can't be installed from here.").color(pal::DIM)).wrap());
             return;
         };
         match st.status.clone() {
-            Some(Status::Installed { .. }) => installed(ui, st, &folder, installs, playing, false),
-            Some(Status::Unmanaged { .. }) => installed(ui, st, &folder, installs, playing, true),
+            Some(Status::Installed { .. }) => installed(ui, st, &folder, installs, playing, game, false),
+            Some(Status::Unmanaged { .. }) => installed(ui, st, &folder, installs, playing, game, true),
             Some(Status::Foreign { edhm }) => {
                 let what = if edhm { "EDHM is installed in the game folder." } else { "Another 3Dmigoto mod is installed in the game folder." };
                 ui.label(RichText::new(what).font(display(size::BODY)).color(pal::TEXT));
@@ -185,15 +238,16 @@ fn not_installed(ui: &mut Ui, st: &mut CockpitUi, playing: bool, rt: &tokio::run
     }
     section(ui, "Before you install");
     let points = [
-        format!("Elite Nexus downloads 3Dmigoto {} (4.7 MB) from its official GitHub release and checks it against a pinned checksum. 3Dmigoto is an open-source (GPL-3.0) graphics modding tool; Elite Nexus uses it to load its own pattern, nothing else.", dimmer::MIGOTO_VERSION),
+        format!("Elite Nexus downloads 3Dmigoto {} (4.7 MB) from its official GitHub release and checks it against a pinned checksum. 3Dmigoto is an open-source (GPL-3.0) graphics modding tool; Elite Nexus uses it to load its own fixes, nothing else.", dimmer::MIGOTO_VERSION),
         format!("It puts d3d11.dll, d3dcompiler_47.dll, {}, {} and a ShaderFixes folder next to EliteDangerous64.exe, in the folder below. Remove takes them out again.", dimmer::CONFIG, dimmer::MANIFEST),
-        "No game file is changed: 3Dmigoto adjusts the light shader in memory while the game runs. Frontier tolerates 3Dmigoto mods (commanders have used them for years) but has never approved them.".to_string(),
+        "Then you calibrate once: start the game, get into your cockpit, quit. Elite Nexus finds the light shader among the ones your game loaded and keeps a fix for exactly that one.".to_string(),
+        "No game file is changed: 3Dmigoto swaps the light shader in memory while the game runs. Frontier tolerates 3Dmigoto mods (commanders have used them for years) but has never approved them.".to_string(),
     ];
     for p in points {
         ui.add(egui::Label::new(RichText::new(format!("•  {p}")).color(pal::TEXT)).wrap());
     }
     if playing {
-        ui.label(RichText::new("The game is running: the dimmer takes effect the next time it starts.").size(size::FOOTNOTE).color(pal::WARN));
+        ui.label(RichText::new("The game is running: calibrating starts with its next start, so quit it after installing.").size(size::FOOTNOTE).color(pal::WARN));
     }
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
@@ -212,12 +266,123 @@ fn not_installed(ui: &mut Ui, st: &mut CockpitUi, playing: bool, rt: &tokio::run
     });
 }
 
-fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameInstall], playing: bool, unmanaged: bool) {
+/// The install of Elite Nexus 0.3.0 (in-game patterns), or a hook switched off by renaming its DLL:
+/// what's wrong and the one click that fixes it. Returns true when something was shown.
+fn repairs(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameInstall]) -> bool {
+    if !st.old_patterns && !st.hook_missing {
+        return false;
+    }
+    if st.old_patterns {
+        ui.add(
+            egui::Label::new(
+                RichText::new(format!(
+                    "{} This install still uses the patterns of Elite Nexus 0.3.0, which the game runs on every shader it loads. They crash the game when it loads the newer fleet carriers. The update replaces them with fixes for exactly the shaders the dimmer needs, found in one calibration.",
+                    icon::WARNING
+                ))
+                .color(pal::BAD),
+            )
+            .wrap(),
+        );
+    }
+    if st.hook_missing {
+        ui.add(egui::Label::new(RichText::new("3Dmigoto's d3d11.dll isn't in the game folder (renamed or deleted), so the game runs without the hook: no dimmer.").color(pal::WARN)).wrap());
+    }
+    let label = match (st.old_patterns, st.hook_missing) {
+        (true, true) => "Update, put the hook back and calibrate",
+        (true, false) => "Update and calibrate",
+        _ => "Put the hook back",
+    };
+    if widgets::primary_button(ui, &format!("{} {label}", icon::WRENCH)).clicked() {
+        // The config first: the hook never comes back with the old patterns in place.
+        let result = (if st.old_patterns { dimmer::start_recording(folder) } else { Ok(()) }).and_then(|()| if st.hook_missing { dimmer::restore_dll(folder) } else { Ok(true) });
+        st.message = Some(match result {
+            Ok(true) if st.old_patterns => (true, "Updated. Now calibrate: start the game, get into your cockpit somewhere quiet, then quit to the desktop.".into()),
+            Ok(true) => (true, "The hook is back: it runs from the next game start.".into()),
+            Ok(false) => (false, "There's no official d3d11.dll to put back (it was deleted or isn't 3Dmigoto's). Remove, then install the dimmer again.".into()),
+            Err(e) => (false, e.to_string()),
+        });
+        st.refresh(ui.ctx(), installs);
+    }
+    ui.add_space(6.0);
+    true
+}
+
+/// The last calibration was made for another game build.
+fn outdated(st: &CockpitUi, (_, build): GameBuild) -> bool {
+    st.calibration.as_ref().is_some_and(|c| !build.trim().is_empty() && !c.game_build.is_empty() && c.game_build != build.trim())
+}
+
+/// The calibration: what was found and for which game build, the steps while one records, and the
+/// button that starts one.
+fn calibration(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameInstall], playing: bool, game: GameBuild) {
+    section(ui, "Calibration");
+    if st.recording() {
+        let steps = [
+            "Start the game (if it's running, quit it first: it reads the setting when it starts).",
+            "Get into your cockpit somewhere quiet: docked, or in open space. Stay away from the newer fleet carriers while calibrating.",
+            "Quit to the desktop. Elite Nexus finishes the calibration when the game closes (or click Finish).",
+        ];
+        for (i, s) in steps.iter().enumerate() {
+            ui.add(egui::Label::new(RichText::new(format!("{}.  {s}", i + 1)).color(pal::TEXT)).wrap());
+        }
+        ui.label(RichText::new(format!("The dimmer is off while calibrating. Shaders recorded so far: {}.", st.recorded)).size(size::FOOTNOTE).color(pal::DIM));
+        ui.horizontal_wrapped(|ui| {
+            let finish_button = ui.add_enabled_ui(st.recorded > 0, |ui| widgets::primary_button(ui, &format!("{} Finish calibration", icon::CHECK))).inner;
+            let tip = if playing { "Works while the game runs too, once you have been in your cockpit; the fix takes effect from the next game start." } else { "Uses the shaders the game recorded." };
+            if finish_button.on_hover_text(tip).on_disabled_hover_text("Start the game and get into your cockpit first.").clicked() {
+                finish(st, ui.ctx(), installs, game);
+            }
+            if widgets::button(ui, "Cancel").on_hover_text("Stop calibrating; the previous fixes (if any) come back").clicked() {
+                st.message = Some(match dimmer::cancel_recording(folder) {
+                    Ok(()) => (true, "Calibration cancelled.".into()),
+                    Err(e) => (false, e.to_string()),
+                });
+                st.refresh(ui.ctx(), installs);
+            }
+        });
+        return;
+    }
+    let (version, build) = game;
+    let outdated = outdated(st, game);
+    match &st.calibration {
+        Some(c) => {
+            let when = nexus_journal::Timestamp(c.at).to_local_string("%d %b %Y");
+            let hud = match c.hud.len() {
+                0 => String::new(),
+                1 => ", 1 HUD shader".to_string(),
+                n => format!(", {n} HUD shaders"),
+            };
+            ui.label(RichText::new(format!("Calibrated on {when} for game {} ({}): light shader found{}{hud}.", c.game_version, c.game_build, if c.lights.len() > 1 { format!(" ({} versions)", c.lights.len()) } else { String::new() })).color(pal::DIM));
+            if outdated {
+                ui.add(
+                    egui::Label::new(RichText::new(format!("{} The game has been updated since ({version}, {}). If the update changed the light shader, the dimmer is off until you calibrate again; the game itself is fine either way.", icon::WARNING, build.trim())).color(pal::WARN))
+                        .wrap(),
+                );
+            }
+        }
+        None => {
+            ui.add(egui::Label::new(RichText::new("Not calibrated yet: the dimmer (and the HUD colour protection) stay off until Elite Nexus has found your game's shaders.").color(pal::WARN)).wrap());
+        }
+    }
+    let label = if st.calibration.is_some() { "Calibrate again" } else { "Calibrate" };
+    let clicked = if outdated || st.calibration.is_none() { widgets::primary_button(ui, &format!("{} {label}", icon::CROSSHAIR)) } else { widgets::button(ui, &format!("{} {label}", icon::CROSSHAIR)) }
+        .on_hover_text("For one game session the game records the shaders it loads; Elite Nexus then finds the ones it needs")
+        .clicked();
+    if clicked {
+        st.message = Some(match dimmer::start_recording(folder) {
+            Ok(()) => (true, "Calibrating: follow the steps above.".into()),
+            Err(e) => (false, e.to_string()),
+        });
+        st.refresh(ui.ctx(), installs);
+    }
+}
+
+fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameInstall], playing: bool, game: GameBuild, unmanaged: bool) {
     if unmanaged {
         ui.label(RichText::new("The test version you put in by hand is installed.").font(display(size::BODY)).color(pal::TEXT));
         ui.add(
             egui::Label::new(
-                RichText::new("Let Elite Nexus manage it: it switches to the pattern (which keeps working through most game updates and replaces the copy of the game's shader the test used), keeps your settings and can remove it again. Nothing is downloaded.")
+                RichText::new("Let Elite Nexus manage it: it replaces the test's copy of the game's shader with a calibrated fix, keeps your settings and can remove it again. Nothing is downloaded.")
                     .color(pal::DIM),
             )
             .wrap(),
@@ -225,10 +390,10 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
         if widgets::primary_button(ui, &format!("{} Let Elite Nexus manage it", icon::CHECK)).clicked() {
             let protect = match &st.status {
                 Some(Status::Unmanaged { config }) => config.protect,
-                _ => Protect::default(),
+                _ => Default::default(),
             };
-            st.message = Some(match dimmer::install(folder, &[], &HookConfig { dimmer: st.edit, protect }) {
-                Ok(()) => (true, "Done: Elite Nexus manages the dimmer now. The game picks up the change the next time it starts.".into()),
+            st.message = Some(match dimmer::install(folder, &[], &HookConfig { dimmer: st.edit, protect, recording: false }).and_then(|()| dimmer::start_recording(folder)) {
+                Ok(()) => (true, "Done: Elite Nexus manages the dimmer now. One step left: calibrate (below).".into()),
                 Err(e) => (false, e.to_string()),
             });
             st.refresh(ui.ctx(), installs);
@@ -241,6 +406,15 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
         ui.label(RichText::new("Installed").font(display(size::BODY)).color(pal::TEXT));
     });
     ui.add_space(4.0);
+    if repairs(ui, st, folder, installs) {
+        return;
+    }
+    // A calibration to do (or under way) comes first; a done one goes below the settings.
+    let urgent = st.recording() || st.calibration.is_none() || outdated(st, game);
+    if urgent {
+        calibration(ui, st, folder, installs, playing, game);
+        ui.add_space(6.0);
+    }
     let saved = matches!(&st.status, Some(Status::Installed { config }) if config.dimmer == st.edit);
     // HUD colours' "Keep hostile red..." runs on the same install.
     let protecting = matches!(&st.status, Some(Status::Installed { config }) if config.protect.on);
@@ -302,8 +476,11 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
     if !saved {
         ui.label(RichText::new("Not saved yet.").size(size::FOOTNOTE).color(pal::WARN));
     }
+    if !urgent {
+        calibration(ui, st, folder, installs, playing, game);
+    }
     let leftover = st.leftovers.last.unwrap_or(0);
-    if leftover > 0 && !st.cleanup.busy() {
+    if leftover > 0 && !st.cleanup.busy() && !st.recording() {
         ui.add_space(6.0);
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new(format!("Capture files from the setup are still in the game folder ({}).", megabytes(leftover))).color(pal::DIM));
@@ -339,7 +516,9 @@ fn explain(ui: &mut Ui) {
         let lines = [
             "The game has no setting for its cockpit lights. 3Dmigoto, a Direct3D 11 hook that sits next to the game, lets Elite Nexus change one step of how the game lights the cockpit: lights within the reach of your eyes keep only part of their light.",
             "Only the cockpit's own lights change. Stations, carriers, planets, the HUD and everything else stay exactly as the game draws them.",
-            "Elite Nexus never copies the game's code: a pattern finds the light shader by what its code looks like as the game loads it. A game update that only rebuilds shaders keeps it working; if Frontier rewrites how lights are drawn, the dimmer simply stops (the game is unaffected) until Elite Nexus is updated.",
+            "Calibration: for one session the game records the shaders it loads; Elite Nexus finds the light shader among them by what its code looks like and keeps a fix for exactly that shader, by its fingerprint. In the game, 3Dmigoto only swaps that one shader: every other shader, including ones the game adds later (new ships, new carriers), is left alone.",
+            "After a game update that changes the light shader, the fingerprint no longer matches: the dimmer simply stays off until you calibrate again, and Elite Nexus tells you when the game has been updated. The game is never affected.",
+            "The fixes are made on your PC from your game and never leave it.",
             "Settings saved here apply the next time the game starts; the keys change them while you play.",
             "The same install is the graphics hook HUD colours needs to keep hostile red, friendly green and shield blue out of a theme. If you only want that, switch the dimmer off here.",
             "It can't run alongside EDHM or another 3Dmigoto mod: they all need the game's d3d11.dll.",
@@ -353,7 +532,7 @@ fn explain(ui: &mut Ui) {
     });
 }
 
-/// A settings-row slider with its value on the left.
+// A settings-row slider with its value on the left.
 fn slider(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, decimals: usize, suffix: &str) -> bool {
     ui.add_sized([56.0, 20.0], egui::Label::new(RichText::new(format!("{:.*}{suffix}", decimals, *value)).color(pal::DIM)));
     ui.add(egui::Slider::new(value, range).show_value(false)).changed()

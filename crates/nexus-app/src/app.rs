@@ -491,7 +491,7 @@ impl NexusApp {
                 settings_changed |= pages::navigation::show(ui, gs, &mut self.nav, &mut self.settings.auto_copy_next_system, &self.spansh, self.rt.handle())
             }
             Page::Bindings => pages::bindings::show(ui, &mut self.binds, &self.data_dir),
-            Page::Hud => settings_changed |= pages::hud::show(ui, &mut self.hud, &mut self.settings.hud_themes, !gs.game_closed, self.rt.handle()),
+            Page::Hud => settings_changed |= pages::hud::show(ui, &mut self.hud, &mut self.settings.hud_themes, !gs.game_closed, (&gs.cmdr.game_version, &gs.cmdr.game_build), self.rt.handle()),
             Page::Accounts => {
                 let name = gs.cmdr.name.clone();
                 let status = pages::accounts::StatusView { eddn_feed: self.market.feed_summary().map(|(_, line)| line), uplink: self.sync.status() };
