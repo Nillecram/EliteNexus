@@ -1,102 +1,186 @@
+//! Statistics: credits, income and spending, and jumps over a period the commander picks, plus the
+//! game's own Statistics event. Every chart fits the period shown, and amounts read as "19.1 B".
+
 use crate::theme::{display, pal, size};
 use crate::widgets::{card, short_credits};
 use egui::{Grid, RichText, Ui};
 use egui_plot::{Bar, BarChart, Line, Plot, PlotPoints};
 use nexus_journal::Timestamp;
 use nexus_model::GameState;
+use nexus_model::history::LedgerCategory;
+
+const DAY: f64 = 86_400.0;
+
+/// The periods the page can show: (days, label); 0 = all time.
+const RANGES: [(u32, &str); 4] = [(7, "7 days"), (30, "30 days"), (90, "90 days"), (0, "All time")];
+
+/// Where the period starts (unix seconds): `days` back from `now`, or the first record.
+fn range_start(days: u32, now: i64, first: Option<i64>) -> i64 {
+    if days == 0 { first.unwrap_or(now) } else { now - i64::from(days) * 86_400 }
+}
+
+/// The balance as a step line over [`start`, `now`]: it starts at the balance held when the period
+/// began (the last sample before it) and runs to today at `current`.
+pub(crate) fn credit_steps(samples: &[(Timestamp, i64)], start: i64, now: i64, current: i64) -> Vec<[f64; 2]> {
+    let mut pts: Vec<[f64; 2]> = Vec::new();
+    let before = samples.iter().rev().find(|(t, _)| t.0 < start).map(|(_, v)| *v);
+    let mut last = before;
+    if let Some(v) = before {
+        pts.push([start as f64 / DAY, v as f64]);
+    }
+    for (t, v) in samples.iter().filter(|(t, _)| t.0 >= start && t.0 <= now) {
+        if let Some(prev) = last {
+            pts.push([t.0 as f64 / DAY, prev as f64]);
+        }
+        pts.push([t.0 as f64 / DAY, *v as f64]);
+        last = Some(*v);
+    }
+    if let Some(prev) = last {
+        pts.push([now as f64 / DAY, prev as f64]);
+        if prev != current {
+            pts.push([now as f64 / DAY, current as f64]);
+        }
+    }
+    pts
+}
 
 pub fn show(ui: &mut Ui, gs: &GameState) {
-    crate::widgets::cards(ui, 2, 360.0, |c| {
-        c.add(|ui| {
-            card(ui, "Credits over time", |ui| {
-            let pts: Vec<[f64; 2]> = gs.history.credit_samples.iter().map(|(t, v)| [t.0 as f64 / 86_400.0, *v as f64 / 1e6]).collect();
-            if pts.len() < 2 {
-                ui.label(RichText::new("Not enough data yet.").color(pal::DIM));
-            } else {
-                Plot::new("credits")
-                    .show_background(false)
-                    .show_grid([false, true])
-                    .height(240.0)
-                    .allow_scroll(false)
-                    .x_axis_formatter(|m, _| Timestamp((m.value * 86_400.0) as i64).to_local_string("%d %b"))
-                    .y_axis_label("M Cr")
-                    .label_formatter(|h| { let (x, y) = crate::widgets::hover_xy(h); Some(format!("{}\n{:.1} M Cr", Timestamp((x * 86_400.0) as i64).to_local_string("%d %b %H:%M"), y)) })
-                    .show(ui, |p| {
-                        p.line(Line::new("credits", PlotPoints::from(pts)).color(pal::GOLD).width(2.0));
-                    });
-            }
-        });
-        });
-        c.add(|ui| {
-            card(ui, "Income & spending by category", |ui| {
-            let totals = gs.history.totals_since(Timestamp::ZERO);
-            let bars: Vec<Bar> = totals
-                .iter()
-                .enumerate()
-                .flat_map(|(i, (cat, inc, exp))| {
-                    [
-                        Bar::new(i as f64 - 0.2, *inc as f64 / 1e6).width(0.38).fill(pal::GOOD).name(format!("{} income", cat.label())),
-                        Bar::new(i as f64 + 0.2, *exp as f64 / 1e6).width(0.38).fill(pal::BAD).name(format!("{} spent", cat.label())),
-                    ]
-                })
-                .collect();
-            let labels: Vec<String> = totals.iter().map(|(c, _, _)| c.label().to_string()).collect();
-            Plot::new("ledger")
-                    .show_background(false)
-                    .show_grid([false, true])
-                .height(240.0)
-                .allow_scroll(false)
-                .y_axis_label("M Cr")
-                .x_axis_formatter(move |m, _| {
-                    let i = m.value.round();
-                    if (m.value - i).abs() < 0.01 && i >= 0.0 { labels.get(i as usize).cloned().unwrap_or_default() } else { String::new() }
-                })
-                .show(ui, |p| p.bar_chart(BarChart::new("ledger", bars)));
-        });
-        });
+    let h = &gs.history;
+    let now = Timestamp::now().0;
+    // The period, remembered between runs.
+    let id = ui.make_persistent_id("stats-range");
+    let mut days: u32 = ui.data_mut(|d| *d.get_persisted_mut_or(id, 30u32));
+    if crate::widgets::segmented(ui, &mut days, &RANGES) {
+        ui.data_mut(|d| d.insert_persisted(id, days));
+    }
+    let first = [h.credit_samples.first().map(|(t, _)| t.0), h.ledger.first().map(|e| e.ts.0), h.jumps.first().map(|j| j.ts.0)].into_iter().flatten().min();
+    let start = range_start(days, now, first);
+    let since = Timestamp(start);
+    let totals: Vec<(LedgerCategory, i64, i64)> = {
+        // Money moved between the commander and their own carrier is neither earned nor spent.
+        let mut t: Vec<_> = h.totals_since(since).into_iter().filter(|(c, i, e)| *c != LedgerCategory::Transfer && (*i != 0 || *e != 0)).collect();
+        t.sort_by_key(|(_, i, e)| std::cmp::Reverse(i + e.abs()));
+        t
+    };
+    let moved: i64 = h.totals_since(since).iter().filter(|(c, _, _)| *c == LedgerCategory::Transfer).map(|(_, i, e)| i + e).sum();
+    let earned: i64 = totals.iter().map(|(_, i, _)| i).sum();
+    let spent: i64 = totals.iter().map(|(_, _, e)| e).sum();
+    let jumps: Vec<_> = h.jumps.iter().filter(|j| j.ts.0 >= start).collect();
+    let ly: f64 = jumps.iter().map(|j| j.dist).sum();
+    let deaths = h.deaths.iter().filter(|d| d.ts.0 >= start).count();
+    let steps = credit_steps(&h.credit_samples, start, now, gs.cmdr.credits);
+    let change = match (steps.first(), steps.last()) {
+        (Some(a), Some(b)) => Some(b[1] as i64 - a[1] as i64),
+        _ => None,
+    };
+
+    ui.add_space(10.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(32.0, 8.0);
+        crate::widgets::stat(ui, "Credits now", short_credits(gs.cmdr.credits), pal::GOLD);
+        if let Some(c) = change {
+            let sign = if c > 0 { "+" } else { "" };
+            crate::widgets::stat(ui, "Change in this period", format!("{sign}{}", short_credits(c)), if c >= 0 { pal::GOOD } else { pal::BAD });
+        }
+        crate::widgets::stat(ui, "Earned", format!("+{}", short_credits(earned)), pal::GOOD);
+        crate::widgets::stat(ui, "Spent", short_credits(spent), pal::BAD);
+        crate::widgets::stat(ui, "Jumps", format!("{} · {:.0} ly", jumps.len(), ly), pal::CYAN);
+        crate::widgets::stat(ui, "Deaths", deaths.to_string(), if deaths > 0 { pal::BAD } else { pal::TEXT });
     });
     ui.add_space(10.0);
     crate::widgets::cards(ui, 2, 360.0, |c| {
         c.add(|ui| {
-            card(ui, "Jumps per day", |ui| {
-            let mut per_day: std::collections::BTreeMap<i64, (u32, f64)> = Default::default();
-            for j in &gs.history.jumps {
-                let e = per_day.entry(j.ts.0 / 86_400).or_default();
-                e.0 += 1;
-                e.1 += j.dist;
-            }
-            let bars: Vec<Bar> = per_day.iter().map(|(d, (n, ly))| Bar::new(*d as f64, *n as f64).width(0.8).fill(pal::CYAN).name(format!("{n} jumps, {ly:.0} ly"))).collect();
-            Plot::new("jumpsday")
-                    .show_background(false)
-                    .show_grid([false, true])
-                .height(200.0)
-                .allow_scroll(false)
-                .x_axis_formatter(|m, _| Timestamp((m.value * 86_400.0) as i64).to_local_string("%d %b"))
-                .show(ui, |p| p.bar_chart(BarChart::new("jumps", bars)));
-        });
+            // A log scale shows the hundreds of millions next to the billions; remembered between runs.
+            let log_id = ui.make_persistent_id("stats-credits-log");
+            // Both the title row (the switch) and the chart read it: a Cell lets the switch change it first.
+            let log = std::cell::Cell::new(ui.data_mut(|d| *d.get_persisted_mut_or(log_id, false)));
+            crate::widgets::card_with(
+                ui,
+                "Credits",
+                |ui| {
+                    let mut on = log.get();
+                    if crate::widgets::toggle(ui, &mut on, "Log scale").on_hover_text("Each step up the axis is ten times more: small and large balances both show").changed() {
+                        log.set(on);
+                        ui.data_mut(|d| d.insert_persisted(log_id, on));
+                    }
+                },
+                |ui| {
+                    if steps.len() < 2 {
+                        ui.label(RichText::new("Not enough data in this period.").color(pal::DIM));
+                        return;
+                    }
+                    let log = log.get();
+                    // On the log scale the line holds log10 of the balance (below 1 Cr counts as 1 Cr).
+                    let y = |v: f64| if log { v.max(1.0).log10() } else { v };
+                    let shown: Vec<[f64; 2]> = steps.iter().map(|p| [p[0], y(p[1])]).collect();
+                    let (lo, hi) = shown.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| (lo.min(p[1]), hi.max(p[1])));
+                    let pad = if log { 0.1 } else { (hi - lo).max(1.0) * 0.05 };
+                    let credits = move |v: f64| if log { 10f64.powf(v) } else { v };
+                    Plot::new(("credits", days, log))
+                        .show_background(false)
+                        .show_grid([false, true])
+                        .height(240.0)
+                        .allow_scroll(false)
+                        .allow_drag(false)
+                        .allow_zoom(false)
+                        .include_x(start as f64 / DAY)
+                        .include_x(now as f64 / DAY)
+                        // A little room above and below, so a flat line isn't drawn on the edge.
+                        .include_y(lo - pad)
+                        .include_y(hi + pad)
+                        .x_axis_formatter(|m, _| Timestamp((m.value * DAY) as i64).to_local_string("%d %b"))
+                        .y_axis_formatter(move |m, _| {
+                            // On the log scale only whole powers of ten are labelled (1 M, 10 M, 100 M, ...).
+                            if log && (m.value - m.value.round()).abs() > 1e-6 {
+                                String::new()
+                            } else {
+                                nexus_data::names::compact_credits(credits(m.value).round() as i64)
+                            }
+                        })
+                        .label_formatter(move |h| {
+                            let (x, v) = crate::widgets::hover_xy(h);
+                            Some(format!("{}\n{} Cr", Timestamp((x * DAY) as i64).to_local_string("%d %b %H:%M"), nexus_data::names::group_digits(credits(v).round() as i64)))
+                        })
+                        .show(ui, |p| {
+                            p.line(Line::new("Credits", PlotPoints::from(shown)).color(pal::GOLD).width(2.0));
+                        });
+                },
+            );
         });
         c.add(|ui| {
-            card(ui, "Totals", |ui| {
-            let h = &gs.history;
-            Grid::new("totals").max_col_width(ui.available_width()).num_columns(2).spacing([12.0, 4.0]).striped(true).show(ui, |ui| {
-                for (cat, inc, exp) in h.totals_since(Timestamp::ZERO) {
-                    ui.label(RichText::new(cat.label()).color(pal::DIM));
-                    ui.horizontal(|ui| {
-                        if inc != 0 {
-                            ui.label(RichText::new(format!("+{}", short_credits(inc))).font(display(14.0)).color(pal::GOOD));
-                        }
-                        if exp != 0 {
-                            ui.label(RichText::new(short_credits(exp)).font(display(14.0)).color(pal::BAD));
-                        }
-                    });
-                    ui.end_row();
-                }
-                ui.label(RichText::new("Deaths").color(pal::DIM));
-                ui.label(h.deaths.len().to_string());
-                ui.end_row();
-            });
+            card(ui, "Income and spending", |ui| ledger_rows(ui, &totals, earned, spent, moved));
         });
-        });
+    });
+    ui.add_space(10.0);
+    card(ui, "Jumps per day", |ui| {
+        let mut per_day: std::collections::BTreeMap<i64, (u32, f64)> = Default::default();
+        for j in &jumps {
+            let e = per_day.entry(j.ts.0.div_euclid(86_400)).or_default();
+            e.0 += 1;
+            e.1 += j.dist;
+        }
+        if per_day.is_empty() {
+            ui.label(RichText::new("No jumps in this period.").color(pal::DIM));
+            return;
+        }
+        let bars: Vec<Bar> = per_day.iter().map(|(d, (n, ly))| Bar::new(*d as f64 + 0.5, f64::from(*n)).width(0.8).fill(pal::CYAN).name(format!("{n} jumps, {ly:.0} ly"))).collect();
+        Plot::new(("jumpsday", days))
+            .show_background(false)
+            .show_grid([false, true])
+            .height(200.0)
+            .allow_scroll(false)
+            .allow_drag(false)
+            .allow_zoom(false)
+            .include_x(start.div_euclid(86_400) as f64)
+            .include_x(now.div_euclid(86_400) as f64 + 1.0)
+            .include_y(0.0)
+            .x_axis_formatter(|m, _| Timestamp((m.value * DAY) as i64).to_local_string("%d %b"))
+            .y_axis_formatter(|m, _| if m.value.fract() == 0.0 && m.value >= 0.0 { format!("{}", m.value as i64) } else { String::new() })
+            .label_formatter(|h| {
+                let (x, _) = crate::widgets::hover_xy(h);
+                Some(Timestamp((x.floor() * DAY) as i64).to_local_string("%d %b"))
+            })
+            .show(ui, |p| p.bar_chart(BarChart::new("Jumps", bars)));
     });
     if let Some(stats) = &gs.cmdr.statistics {
         ui.add_space(10.0);
@@ -134,5 +218,92 @@ pub fn show(ui: &mut Ui, gs: &GameState) {
                 }
             });
         });
+    }
+}
+
+/// A fixed-width cell of a row, its content on the left or (numbers) on the right.
+fn cell(ui: &mut Ui, width: f32, right: bool, add: impl FnOnce(&mut Ui)) {
+    let layout = if right { egui::Layout::right_to_left(egui::Align::Center) } else { egui::Layout::left_to_right(egui::Align::Center) };
+    ui.allocate_ui_with_layout(egui::vec2(width, 30.0), layout, |ui| {
+        ui.set_min_size(egui::vec2(width, 30.0));
+        add(ui);
+    });
+}
+
+/// One row per category, biggest first: its income and its spending as bars against the largest
+/// amount of the period, each with its value written out (a 30 B category doesn't flatten a 5 M one
+/// into nothing: its number is still there).
+fn ledger_rows(ui: &mut Ui, totals: &[(LedgerCategory, i64, i64)], earned: i64, spent: i64, moved: i64) {
+    if totals.is_empty() {
+        ui.label(RichText::new("Nothing earned or spent in this period.").color(pal::DIM));
+        return;
+    }
+    let max = totals.iter().map(|(_, i, e)| (*i).max(e.abs())).max().unwrap_or(1).max(1) as f32;
+    const LABEL: f32 = 112.0;
+    const VALUE: f32 = 86.0;
+    for (cat, inc, exp) in totals {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 8.0;
+            cell(ui, LABEL, false, |ui| {
+                ui.add(egui::Label::new(RichText::new(cat.label()).color(pal::TEXT)).truncate());
+            });
+            let bar_w = (ui.available_width() - 2.0 * VALUE - 16.0).max(40.0);
+            let (rect, resp) = ui.allocate_exact_size(egui::vec2(bar_w, 30.0), egui::Sense::hover());
+            let p = ui.painter();
+            p.rect_filled(rect.shrink2(egui::vec2(0.0, 6.0)), egui::CornerRadius::same(3), egui::Color32::from_white_alpha(8));
+            // Income above the middle, spending below; anything above zero stays visible.
+            for (amount, colour, top) in [(*inc, pal::GOOD, rect.top() + 6.0), (exp.abs(), pal::BAD, rect.center().y + 1.0)] {
+                if amount > 0 {
+                    let w = (bar_w * amount as f32 / max).max(2.0);
+                    p.rect_filled(egui::Rect::from_min_size(egui::pos2(rect.left(), top), egui::vec2(w, 8.0)), egui::CornerRadius::same(2), colour);
+                }
+            }
+            resp.on_hover_text(format!("{}: earned {} Cr, spent {} Cr", cat.label(), nexus_data::names::group_digits(*inc), nexus_data::names::group_digits(exp.abs())));
+            let value = |ui: &mut Ui, v: i64, colour, sign: &str| {
+                let text = if v == 0 { String::new() } else { format!("{sign}{}", short_credits(v.abs())) };
+                cell(ui, VALUE, true, |ui| {
+                    ui.label(RichText::new(text).font(display(size::CALLOUT)).color(colour));
+                });
+            };
+            value(ui, *inc, pal::GOOD, "+");
+            value(ui, *exp, pal::BAD, "-");
+        });
+    }
+    ui.add_space(4.0);
+    let net = earned + spent;
+    ui.horizontal(|ui| {
+        cell(ui, LABEL, false, |ui| {
+            ui.label(RichText::new("Net").font(display(size::CALLOUT)).color(pal::TEXT));
+        });
+        let sign = if net > 0 { "+" } else { "" };
+        ui.label(RichText::new(format!("{sign}{}", short_credits(net))).font(display(size::CALLOUT)).color(if net >= 0 { pal::GOOD } else { pal::BAD }));
+    });
+    if moved != 0 {
+        let what = if moved < 0 { format!("{} moved to your fleet carrier", short_credits(-moved)) } else { format!("{} taken from your fleet carrier", short_credits(moved)) };
+        ui.label(RichText::new(format!("{what} (not counted: it stays yours)")).size(size::FOOTNOTE).color(pal::DIM));
+    }
+    crate::widgets::footnote(ui, "From the journal: sales, rewards, purchases and fees, while Elite Nexus has read them.");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_credit_line_steps_through_the_period() {
+        let d = 86_400;
+        let samples = [(Timestamp(10 * d), 100), (Timestamp(20 * d), 300), (Timestamp(25 * d), 200)];
+        // From day 15: starts at the balance held then (100), steps at days 20 and 25, runs to today.
+        let pts = credit_steps(&samples, 15 * d, 30 * d, 250);
+        let days: Vec<(f64, f64)> = pts.iter().map(|p| (p[0], p[1])).collect();
+        assert_eq!(days, vec![(15.0, 100.0), (20.0, 100.0), (20.0, 300.0), (25.0, 300.0), (25.0, 200.0), (30.0, 200.0), (30.0, 250.0)]);
+        // All time: from the first sample.
+        let pts = credit_steps(&samples, 10 * d, 30 * d, 200);
+        assert_eq!(pts.first(), Some(&[10.0, 100.0]));
+        assert_eq!(pts.last(), Some(&[30.0, 200.0]));
+        // Nothing before or in the period: nothing to draw.
+        assert!(credit_steps(&[], 0, 30 * d, 5).is_empty());
+        assert_eq!(range_start(7, 100 * d, Some(3)), 93 * d);
+        assert_eq!(range_start(0, 100 * d, Some(3)), 3);
     }
 }

@@ -21,6 +21,10 @@ release time that section becomes the new version and the release workflow publi
   opens its page; clicking a station opens its whole market on the Station tab (formerly This station).
 
 ### Changed
+- **Statistics** reads at a glance: pick 7 days, 30 days, 90 days or all time and every chart fits that period;
+  amounts show as B and M instead of "20000 M Cr"; income and spending are one row per category with their amounts
+  (a 30 B trade total no longer flattens the rest), moving credits to your own carrier isn't counted as spending, and
+  the credits chart has a log scale for climbs from millions to billions.
 - Market remembers your last commodity, recent ones, filters, pins and tab between runs. Find commodity re-runs as
   you change a filter, and its defaults are wider: 100 ly, any quantity.
 - Price alerts: the commodity field suggests names as you type.
