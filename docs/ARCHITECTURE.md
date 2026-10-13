@@ -95,7 +95,7 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
 * Journal timestamps: `nexus_journal::Timestamp` (unix seconds). Commodity symbols: lower-case (`commodity_symbol("$gold_name;") == "gold"`).
 * All serde structs for external data use `#[serde(default)]`; unknown fields ignored; never panic on input data.
 * No `unwrap()` on I/O or network data. `tracing` for logs. Clippy-clean.
-* Research specs live in `docs/research/*.md` (EDDN, EDSM, Inara, CAPI, Spansh, websites, journal, engineering, exploration, tool feature matrix).
+* Research specs live in `docs/research/*.md` (EDDN, EDSM, Inara, CAPI, Spansh, websites, journal, engineering, exploration, HUD colours and cockpit lights, tool feature matrix).
 
 ## Licensing notes
 
