@@ -156,9 +156,10 @@ and writes `dist\EliteNexus-vx.y.z-windows-x64.zip`. It never touches `nexus-dat
 * `GalaxyOptions::all_eddn_bodies` (keep every landable EDDN body, not just biology and valuable worlds) is off.
 * Small known issue: the EDDN "updates stored" counter slightly over-counts body updates.
 * GitHub repo settings, which only the owner can change: upload `docs/social-preview.png` (Settings › Social preview),
-  and set a description and topics. Suggested description: "Elite Dangerous companion app for Windows: HUD colours
-  that keep hostile red, a cockpit-light dimmer, Odyssey glare fixes, exobiology, trade from live EDDN data, Spansh
-  routes, fleet and engineering. One fast native exe." Topics: `elite-dangerous`, `elite-dangerous-odyssey`,
+  and set a description and topics. Suggested description: "All-in-one Elite Dangerous companion app: one fast native
+  Windows exe that replaces EDDiscovery, EDMC, Observatory, Odyssey Materials Helper and your Inara/Spansh tabs.
+  Exobiology, exploration, live EDDN trading, Spansh routes, engineering, fleet, carrier, an AI co-pilot, and HUD
+  colours that keep hostile red." Topics: `elite-dangerous`, `elite-dangerous-odyssey`,
   `companion-app`, `hud`, `exobiology`, `eddn`, `spansh`, `trading`, `rust`, `egui`, `windows`.
 
 ## Ideas queue
