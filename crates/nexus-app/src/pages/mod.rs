@@ -13,6 +13,7 @@ pub mod exobio;
 pub mod exploration;
 pub mod fleet;
 pub mod galaxy_map;
+pub mod hud;
 pub mod logbook;
 pub mod market;
 pub mod mining;
@@ -44,6 +45,7 @@ pub enum Page {
     Logbook,
     Statistics,
     Bindings,
+    Hud,
     Accounts,
     Settings,
 }
@@ -55,7 +57,7 @@ impl Page {
         ("Economy", &[Page::Market, Page::Mining, Page::Colonisation, Page::Carrier]),
         ("Commander", &[Page::Engineering, Page::Fleet, Page::Missions, Page::Bgs]),
         ("Records", &[Page::Logbook, Page::Statistics]),
-        ("System", &[Page::Bindings, Page::Accounts, Page::Settings]),
+        ("System", &[Page::Bindings, Page::Hud, Page::Accounts, Page::Settings]),
     ];
 
     pub fn label(self) -> &'static str {
@@ -77,6 +79,7 @@ impl Page {
             Page::Logbook => "Logbook",
             Page::Statistics => "Statistics",
             Page::Bindings => "Bindings",
+            Page::Hud => "HUD colours",
             Page::Accounts => "Accounts & sync",
             Page::Settings => "Settings",
         }
@@ -101,6 +104,7 @@ impl Page {
             Page::Logbook => icon::BOOK_OPEN,
             Page::Statistics => icon::CHART_BAR,
             Page::Bindings => icon::GAME_CONTROLLER,
+            Page::Hud => icon::PALETTE,
             Page::Accounts => icon::PLUGS_CONNECTED,
             Page::Settings => icon::GEAR_SIX,
         }

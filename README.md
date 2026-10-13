@@ -77,6 +77,9 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 * **Logbook / Statistics / Galaxy map** — activity, every journal event with full-text search, travel, docking, a credits
   ledger by category, credit history, jumps per day, in-game statistics, and a map of everywhere you've been.
 * **Bindings** — your active presets, conflicts, missing essentials, printable reference card.
+* **HUD colours** — recolour or dim the HUD with the game's own colour setting: community themes, a colour wheel,
+  brightness, a live cockpit preview that warns when friend and foe would look alike, and safe edits of
+  `GraphicsConfigurationOverride.xml` (only the colour lines change; the original is kept).
 * **Accounts & sync** — strictly compliant EDDN contribution, EDSM journal sync, Inara profile sync, EDAstro. All opt-in;
   only live events (never history); persistent retry queues that respect each service's rate limits.
 * **Alerts & voice** — toasts plus Windows speech for high-value bodies, likely high-value biology, sample spacing,

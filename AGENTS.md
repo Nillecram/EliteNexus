@@ -68,7 +68,8 @@ open the PNG to look at it. Check a narrow (1000 px) and a wide size when a layo
 
 * `-Page`: a sidebar page (`Dashboard`, `Exploration`, `Exobiology`, `Navigation`, `Market`, `Settings`, ...).
 * `-Tab`: `abnormal`, `database`, ... (Market), `galaxy` (whole-galaxy map), `find`, `history`, `unsold`
-  (Exploration), `untouched`, `known` (Exobiology > Find planets). `find`, `untouched` and `known` start their
+  (Exploration), `untouched`, `known` (Exobiology > Find planets), a preset name such as `mocha` (Hud: the HUD
+  colours page starts from that theme; nothing is written). `find`, `untouched` and `known` start their
   search on the first frame: add `-Delay 15` to `-Delay 25` for Spansh to answer.
 * `-Demo` adds a sample Ask conversation and an alert banner.
 

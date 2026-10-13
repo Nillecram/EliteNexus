@@ -5,6 +5,16 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Added
+- **HUD colours** (System): recolour or dim the HUD with the game's own colour setting. Start from the standard
+  orange or a community theme (credited to its author), turn the colour wheel, lower saturation or brightness, or set
+  the nine matrix numbers; a live cockpit preview shows the result, the swatches show what hostile red, friendly
+  green and shield blue become, and the page warns when friend and foe would look alike or the HUD gets too dark.
+  Applying edits only the colour lines of `GraphicsConfigurationOverride.xml`, keeps everything else in it, never
+  touches a malformed file, and copies your original aside first. Share themes as the `<MatrixRed>` lines forums use,
+  and save your own. The page explains what the setting can't do (cockpit lights, single elements) and warns when
+  EDHM is installed, since EDHM needs it left at the standard colours.
+
 ## [0.2.2] - 2026-10-12
 
 ### Added

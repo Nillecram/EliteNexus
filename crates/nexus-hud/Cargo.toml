@@ -1,0 +1,14 @@
+[package]
+name = "nexus-hud"
+description = "Elite Dangerous HUD colours: the GraphicsConfigurationOverride.xml colour matrix, presets and previews"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+roxmltree.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

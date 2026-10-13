@@ -73,6 +73,7 @@ pub struct NexusApp {
     log: pages::logbook::LogbookUi,
     map: pages::galaxy_map::MapUi,
     binds: pages::bindings::BindsUi,
+    hud: pages::hud::HudUi,
     bgs: pages::bgs::BgsUi,
     nav: pages::navigation::NavUi,
     /// Shared async runtime for network services (Spansh, EDDN, uploads).
@@ -146,6 +147,7 @@ impl NexusApp {
             log: Default::default(),
             map,
             binds: Default::default(),
+            hud: pages::hud::HudUi::new(ov.tab.as_deref()),
             bgs: Default::default(),
             nav: Default::default(),
             rt,
@@ -489,6 +491,7 @@ impl NexusApp {
                 settings_changed |= pages::navigation::show(ui, gs, &mut self.nav, &mut self.settings.auto_copy_next_system, &self.spansh, self.rt.handle())
             }
             Page::Bindings => pages::bindings::show(ui, &mut self.binds, &self.data_dir),
+            Page::Hud => settings_changed |= pages::hud::show(ui, &mut self.hud, &mut self.settings.hud_themes, !gs.game_closed),
             Page::Accounts => {
                 let name = gs.cmdr.name.clone();
                 let status = pages::accounts::StatusView { eddn_feed: self.market.feed_summary().map(|(_, line)| line), uplink: self.sync.status() };

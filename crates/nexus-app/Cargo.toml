@@ -15,6 +15,7 @@ nexus-journal.workspace = true
 nexus-data.workspace = true
 nexus-model.workspace = true
 nexus-binds.workspace = true
+nexus-hud.workspace = true
 nexus-spansh.workspace = true
 nexus-uplink.workspace = true
 nexus-galaxy.workspace = true

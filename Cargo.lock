@@ -2428,6 +2428,7 @@ dependencies = [
  "nexus-data",
  "nexus-eddn",
  "nexus-galaxy",
+ "nexus-hud",
  "nexus-journal",
  "nexus-model",
  "nexus-spansh",
@@ -2499,6 +2500,17 @@ dependencies = [
  "thiserror 2.0.21",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "nexus-hud"
+version = "0.2.2"
+dependencies = [
+ "roxmltree 0.21.1",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tracing",
 ]
 
 [[package]]

@@ -29,6 +29,16 @@ pub struct Settings {
     pub price_watches: Vec<PriceWatch>,
     /// The "Ask" assistant's model service.
     pub ai: AiSettings,
+    /// HUD colour themes the commander saved (HUD colours page).
+    pub hud_themes: Vec<HudTheme>,
+}
+
+/// A named HUD colour matrix.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HudTheme {
+    pub name: String,
+    pub matrix: nexus_hud::HudMatrix,
 }
 
 /// Which model answers "Ask" questions. The key is DPAPI-sealed (see secrets.rs).
@@ -129,6 +139,7 @@ impl Default for Settings {
             wishlist: Vec::new(),
             price_watches: Vec::new(),
             ai: AiSettings::default(),
+            hud_themes: Vec::new(),
         }
     }
 }
