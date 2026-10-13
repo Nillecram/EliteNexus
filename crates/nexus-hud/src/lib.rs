@@ -8,6 +8,7 @@
 //!   what a matrix makes hard to see (friend and foe merging, a HUD too dark to read).
 //! * [`presets`]: community themes, credited.
 //! * [`install`]: the game's install folders and whether a shader mod (EDHM) is in one.
+//! * [`tone`]: glare and exposure, the tone-mapping values in the same file.
 
 pub mod error;
 pub mod install;
@@ -15,6 +16,7 @@ pub mod matrix;
 pub mod override_file;
 pub mod palette;
 pub mod presets;
+pub mod tone;
 
 pub use error::HudError;
 pub use matrix::{Adjust, HudMatrix, Rgb};

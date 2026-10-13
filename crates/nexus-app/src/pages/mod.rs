@@ -13,6 +13,7 @@ pub mod exobio;
 pub mod exploration;
 pub mod fleet;
 pub mod galaxy_map;
+pub mod glare;
 pub mod hud;
 pub mod logbook;
 pub mod market;
@@ -79,7 +80,7 @@ impl Page {
             Page::Logbook => "Logbook",
             Page::Statistics => "Statistics",
             Page::Bindings => "Bindings",
-            Page::Hud => "HUD colours",
+            Page::Hud => "HUD & cockpit",
             Page::Accounts => "Accounts & sync",
             Page::Settings => "Settings",
         }

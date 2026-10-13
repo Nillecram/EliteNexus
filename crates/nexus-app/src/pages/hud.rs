@@ -1,5 +1,6 @@
-//! HUD colours: the game's own colour matrix (`GraphicsConfigurationOverride.xml`) with presets,
-//! simple controls, a live preview and the honest limits of what the matrix can change.
+//! HUD & cockpit. HUD colours: the game's own colour matrix (`GraphicsConfigurationOverride.xml`)
+//! with presets, simple controls, a live preview and the honest limits of what the matrix can
+//! change. Glare and exposure (glare.rs): the tone-mapping values in the same file.
 
 use crate::settings::HudTheme;
 use crate::theme::{display, pal, size};
@@ -23,7 +24,15 @@ enum View {
     Standard,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum Tab {
+    Colours,
+    Glare,
+}
+
 pub struct HudUi {
+    tab: Tab,
+    glare: super::glare::GlareUi,
     /// The override file as last read or written.
     file: Option<Result<OverrideFile, String>>,
     /// The colours the game will use from the file: `Ok(None)` = standard.
@@ -46,6 +55,8 @@ pub struct HudUi {
 impl Default for HudUi {
     fn default() -> Self {
         HudUi {
+            tab: Tab::Colours,
+            glare: Default::default(),
             file: None,
             current: Ok(None),
             installs: Vec::new(),
@@ -63,9 +74,13 @@ impl Default for HudUi {
 }
 
 impl HudUi {
-    /// `tab` names a preset to start from (screenshots), e.g. `mocha` or `royalpurple`.
+    /// `tab` (screenshots): `glare` opens Glare and exposure; a preset name such as `mocha` or
+    /// `royalpurple` starts the colours from that theme.
     pub fn new(tab: Option<&str>) -> Self {
-        HudUi { start_preset: tab.map(str::to_owned), ..Default::default() }
+        match tab {
+            Some(t) if t.eq_ignore_ascii_case("glare") => HudUi { tab: Tab::Glare, ..Default::default() },
+            _ => HudUi { start_preset: tab.map(str::to_owned), ..Default::default() },
+        }
     }
 
     fn edit(&self) -> HudMatrix {
@@ -87,6 +102,7 @@ impl HudUi {
         self.start_from(self.current.clone().ok().flatten().unwrap_or(HudMatrix::IDENTITY));
         self.file = Some(file);
         self.installs = nexus_hud::install::find_installs();
+        self.glare.reload(self.file.as_ref(), &self.installs);
         let wanted = self.start_preset.take().map(|t| t.replace([' ', '-', '_'], "").to_ascii_lowercase());
         if let Some(p) = wanted.and_then(|t| presets::ALL.iter().find(|p| p.name.replace(' ', "").eq_ignore_ascii_case(&t))) {
             self.start_from(p.matrix);
@@ -118,6 +134,20 @@ pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bo
     if st.file.is_none() {
         st.load();
     }
+    if let Some(t) = widgets::tabs(ui, st.tab, &[(Tab::Colours, "HUD colours"), (Tab::Glare, "Glare and exposure")]) {
+        st.tab = t;
+    }
+    ui.add_space(widgets::GAP);
+    match st.tab {
+        Tab::Colours => colours(ui, st, themes, playing),
+        Tab::Glare => {
+            super::glare::show(ui, &mut st.glare, &mut st.file, playing);
+            false
+        }
+    }
+}
+
+fn colours(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bool) -> bool {
     let mut changed = false;
     let edit = st.edit();
     let view = Cell::new(st.view);

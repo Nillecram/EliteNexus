@@ -24,6 +24,9 @@ pub enum HudError {
     /// A `<MatrixRed>`-style row that is not three comma-separated numbers.
     #[error("<{row}> should hold three numbers, found {text:?}")]
     BadRow { row: &'static str, text: String },
+    /// A single value such as `<GlareCompensation>` that is not a number.
+    #[error("<{name}> should be a number, found {text:?}")]
+    BadValue { name: &'static str, text: String },
     #[error("LOCALAPPDATA is not set, so the game's options folder can't be found")]
     NoOptionsDir,
 }

@@ -6,7 +6,7 @@ release time that section becomes the new version and the release workflow publi
 ## Unreleased
 
 ### Added
-- **HUD colours** (System): recolour or dim the HUD with the game's own colour setting. Start from the standard
+- **HUD & cockpit** (System), tab **HUD colours**: recolour or dim the HUD with the game's own colour setting. Start from the standard
   orange or a community theme (credited to its author), turn the colour wheel, lower saturation or brightness, or set
   the nine matrix numbers; a live cockpit preview shows the result, the swatches show what hostile red, friendly
   green and shield blue become, and the page warns when friend and foe would look alike or the HUD gets too dark.
@@ -14,6 +14,11 @@ release time that section becomes the new version and the release workflow publi
   touches a malformed file, and copies your original aside first. Share themes as the `<MatrixRed>` lines forums use,
   and save your own. The page explains what the setting can't do (cockpit lights, single elements) and warns when
   EDHM is installed, since EDHM needs it left at the standard colours.
+- **HUD & cockpit › Glare and exposure**: Odyssey's auto-exposure darkens everything outside when the cockpit lights
+  fill the view, and it can't be switched off. This tab sets what players change instead, in the same override
+  file: glare from lights (`GlareCompensation`), the standard ACES tone curve (the page shows how much brighter darks
+  and mid-tones get) and the auto-exposure targets, with presets for the game's values, less glare, and CMDR
+  Morbad's 2021 Odyssey settings. The game's own values are read from its install.
 
 ## [0.2.2] - 2026-10-12
 
