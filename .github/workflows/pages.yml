@@ -1,0 +1,42 @@
+# Publishes the website in site/ to GitHub Pages (https://uruskan.github.io/EliteNexus/), adding the screenshots,
+# the social preview, the Inter font and the user guide from the rest of the repo. Needs Pages switched on once:
+# repo Settings > Pages > Source: GitHub Actions.
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "docs/screenshots/**", "docs/social-preview.png", "docs/USER_GUIDE.md", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assemble
+        run: |
+          mkdir -p _site/screenshots _site/fonts
+          cp -r site/. _site/
+          cp docs/screenshots/*.png _site/screenshots/
+          cp docs/social-preview.png _site/
+          cp data/fonts/inter/Inter-Regular.ttf data/fonts/inter/Inter-SemiBold.ttf data/fonts/inter/Inter-Bold.ttf data/fonts/inter/LICENSE.txt _site/fonts/
+          cp docs/USER_GUIDE.md _site/user-guide.md
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

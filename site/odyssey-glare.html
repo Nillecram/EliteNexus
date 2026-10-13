@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elite Dangerous Odyssey glare and dark exposure fix | Elite Nexus</title>
+<meta name="description" content="Odyssey's auto-exposure darkens everything outside when the cockpit is bright. Elite Nexus sets the game's own glare and tone-mapping values (GlareCompensation, ACES curve, Percentiles) with community presets.">
+<link rel="canonical" href="https://uruskan.github.io/EliteNexus/odyssey-glare.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Elite Dangerous Odyssey glare and exposure fix">
+<meta property="og:description" content="Less glare and brighter darks with the game's own tone-mapping values, starting from community presets.">
+<meta property="og:url" content="https://uruskan.github.io/EliteNexus/odyssey-glare.html">
+<meta property="og:image" content="https://uruskan.github.io/EliteNexus/screenshots/glare.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='4' fill='%23ff9f0a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./">Elite Nexus</a>
+    <nav class="links">
+      <a href="hud-colours.html">HUD colours</a>
+      <a href="cockpit-lights.html">Cockpit lights</a>
+      <a href="odyssey-glare.html" aria-current="page">Glare</a>
+      <a href="exobiology.html">Exobiology</a>
+      <a href="trading.html">Trading</a>
+      <a href="alternatives.html">Compared</a>
+      <a href="https://github.com/uruskan/EliteNexus">GitHub</a>
+    </nav>
+    <a class="btn primary small" href="https://github.com/uruskan/EliteNexus/releases/latest">Download</a>
+  </div>
+</header>
+
+<main class="wrap narrow">
+  <div class="page-title">
+    <h1>Odyssey glare and dark exposure</h1>
+    <p>Tame the glare of cockpit lights and lift the darks with the game's own tone-mapping values.</p>
+  </div>
+  <article>
+    <img class="shot" style="margin-top:28px" src="screenshots/glare.png" width="1480" height="920" alt="Elite Nexus glare and exposure tab with Morbad's Odyssey tweak applied">
+
+    <h2>Why Odyssey looks dark outside</h2>
+    <p>Odyssey's auto-exposure (brightness adaptation) reacts to the cockpit's own lights. With a bright dashboard
+      in view, everything outside the canopy is drawn darker. The game has no switch for it, so players change the
+      values it's built from instead, in <code>GraphicsConfigurationOverride.xml</code>.</p>
+
+    <h2>What you can set</h2>
+    <ul>
+      <li><strong>Glare from lights</strong> (<code>GlareCompensation</code>). The game uses 1.33; lower means less glare
+        around bright lights.</li>
+      <li><strong>Standard ACES curve.</strong> Draws darks and mid-tones brighter than the game's own curve, with
+        highlights the same. The page shows by how much.</li>
+      <li><strong>Auto-exposure targets</strong>: the three <code>Percentiles</code> the exposure is set from.</li>
+    </ul>
+    <p>Presets to start from: <strong>Game default</strong>, <strong>Less glare</strong> (glare 1.0) and
+      <strong>Morbad's Odyssey tweak</strong> (CMDR Morbad's 2021 forum settings). The game's own values are read from
+      your install.</p>
+
+    <div class="note honest"><strong>An experiment, honestly labelled.</strong> Frontier doesn't document these values.
+      They change the whole picture (space, stations, planets), the game reads them only when it starts, and
+      <strong>Game default</strong> + Apply puts the game's own values back. Only the values you change are written,
+      and your original file is copied aside first. To dim the cockpit lamps themselves, use the
+      <a href="cockpit-lights.html">cockpit-light dimmer</a>; <strong>Bloom</strong> in the game's graphics options sets
+      how much bright lights glow.</div>
+
+    <p style="margin:36px 0 56px"><a class="btn primary" href="https://github.com/uruskan/EliteNexus/releases/latest">Download Elite Nexus</a></p>
+  </article>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Elite Nexus is an unofficial community tool, not endorsed by Frontier Developments. Elite Dangerous is a
+      trademark of Frontier Developments plc.</span>
+    <span><a href="./">Home</a> · <a href="https://github.com/uruskan/EliteNexus">GitHub</a> · <a href="https://github.com/uruskan/EliteNexus/blob/main/docs/USER_GUIDE.md">User guide</a></span>
+  </div>
+</footer>
+</body>
+</html>

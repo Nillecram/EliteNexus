@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elite Dangerous HUD colours that keep hostile red | Elite Nexus</title>
+<meta name="description" content="Change the Elite Dangerous HUD colour with a live cockpit preview and community themes, and keep hostile red, friendly green and shield blue. A free HUD colour editor built on GraphicsConfigurationOverride.xml.">
+<link rel="canonical" href="https://uruskan.github.io/EliteNexus/hud-colours.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Elite Dangerous HUD colours that keep hostile red">
+<meta property="og:description" content="A HUD colour editor with a live cockpit preview and community themes, that can keep friend and foe colours.">
+<meta property="og:url" content="https://uruskan.github.io/EliteNexus/hud-colours.html">
+<meta property="og:image" content="https://uruskan.github.io/EliteNexus/screenshots/hud-colours.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='4' fill='%23ff9f0a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./">Elite Nexus</a>
+    <nav class="links">
+      <a href="hud-colours.html" aria-current="page">HUD colours</a>
+      <a href="cockpit-lights.html">Cockpit lights</a>
+      <a href="odyssey-glare.html">Glare</a>
+      <a href="exobiology.html">Exobiology</a>
+      <a href="trading.html">Trading</a>
+      <a href="alternatives.html">Compared</a>
+      <a href="https://github.com/uruskan/EliteNexus">GitHub</a>
+    </nav>
+    <a class="btn primary small" href="https://github.com/uruskan/EliteNexus/releases/latest">Download</a>
+  </div>
+</header>
+
+<main class="wrap narrow">
+  <div class="page-title">
+    <h1>Elite Dangerous HUD colours that keep hostile red</h1>
+    <p>Recolour or dim the HUD with a live cockpit preview, start from community themes, and keep friend and foe
+      colours where they belong.</p>
+  </div>
+  <article>
+    <img class="shot" style="margin-top:28px" src="screenshots/hud-colours.png" width="1480" height="920" alt="Elite Nexus HUD colour editor: an Empire blue theme in the live cockpit preview, hostile contacts still red">
+
+    <h2>The problem with HUD colour themes</h2>
+    <p>Elite Dangerous recolours its HUD with a colour matrix: nine numbers in
+      <code>GraphicsConfigurationOverride.xml</code> (the <code>&lt;MatrixRed&gt;</code>, <code>&lt;MatrixGreen&gt;</code>
+      and <code>&lt;MatrixBlue&gt;</code> lines commanders share on forums). The matrix moves every colour at once. Turn
+      the orange HUD blue and hostile contacts stop being red, friendly ones stop being green, and shields change
+      too, which is the last thing you want in a fight.</p>
+
+    <h2>What Elite Nexus does</h2>
+    <ul>
+      <li><strong>Themes and a colour wheel.</strong> Start from the standard orange or a community theme (Mocha,
+        Lemon, Empire blue and more, each credited to its author), then turn the colour wheel, lower the saturation, or
+        lower the brightness to dim the whole HUD. The nine matrix numbers are there for exact themes.</li>
+      <li><strong>A live cockpit preview</strong> and swatches showing what HUD orange, hostile red, friendly green,
+        highlight blue and white turn into. It warns when hostile and friendly contacts would look alike, or the HUD
+        gets too dark.</li>
+      <li><strong>Keep hostile red, friendly green and shield blue.</strong> With Elite Nexus's optional graphics hook,
+        the shaders that apply the game's matrix apply it only to the HUD's orange. Hostile contacts stay red, friendly
+        ones green, and shields, other highlights and white keep their colours.</li>
+      <li><strong>Share themes</strong> as the <code>&lt;MatrixRed&gt;</code> lines forums use, paste one someone shared,
+        and save your own.</li>
+      <li><strong>Safe edits.</strong> Applying writes only the three colour lines of the settings file and keeps
+        everything else in it. Your original file is copied aside the first time, and a malformed file is never
+        touched.</li>
+    </ul>
+
+    <h2>How to use it</h2>
+    <ol>
+      <li>Download Elite Nexus, run it, and open <strong>HUD &amp; cockpit › HUD colours</strong>.</li>
+      <li>Pick a theme under <strong>Start from</strong>, adjust it, and check the preview and the warnings.</li>
+      <li>Click <strong>Apply to Elite Dangerous</strong>. The game reads the file only when it starts, so quit to
+        the desktop and start it again.</li>
+      <li>To keep friend and foe colours, install the graphics hook from the <strong>Cockpit lights</strong> tab
+        (switch its dimmer off there if you only want the colours) and turn on <strong>Keep hostile red, friendly
+        green and shield blue</strong>.</li>
+    </ol>
+
+    <div class="note honest"><strong>What it can't do.</strong> The game has one matrix for the whole interface. It
+      also tints station menus, the on-foot HUD and mission-board portraits, while the main menu stays orange, so no
+      single element can be coloured on its own. The "keep hostile red" option needs the graphics hook,
+      <a href="https://github.com/bo3b/3Dmigoto">3Dmigoto</a>, an open-source Direct3D 11 hook that Elite Nexus downloads
+      from its official release and checks against pinned checksums. It can't run alongside EDHM or another 3Dmigoto
+      mod. Frontier tolerates mods like this without having approved them. Frontier documents none of the colour
+      rules, so the thresholds that decide what counts as the HUD's orange can be adjusted under Options.</div>
+
+    <h2>Coming from EDHM?</h2>
+    <p>EDHM can colour single HUD elements, which Elite Nexus can't. Elite Nexus keeps to one theme for the HUD with
+      friend-and-foe colours protected, plus a cockpit-light dimmer, and installs or removes everything in one click.
+      The two can't be installed together; Elite Nexus warns when it finds EDHM.</p>
+
+    <p style="margin:36px 0 56px"><a class="btn primary" href="https://github.com/uruskan/EliteNexus/releases/latest">Download Elite Nexus</a></p>
+  </article>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Elite Nexus is an unofficial community tool, not endorsed by Frontier Developments. Elite Dangerous is a
+      trademark of Frontier Developments plc.</span>
+    <span><a href="./">Home</a> · <a href="https://github.com/uruskan/EliteNexus">GitHub</a> · <a href="https://github.com/uruskan/EliteNexus/blob/main/docs/USER_GUIDE.md">User guide</a></span>
+  </div>
+</footer>
+</body>
+</html>

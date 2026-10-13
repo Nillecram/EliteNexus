@@ -9,7 +9,7 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 
 **[Download the latest release](https://github.com/uruskan/EliteNexus/releases/latest)**, unzip it anywhere and run
 `EliteNexus.exe` (Windows, 64-bit). There is no installer: everything it keeps lives in a `nexus-data` folder next to
-the program.
+the program. Website: **[uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)**.
 
 ![Elite Nexus, an Elite Dangerous companion app: dashboard with commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
 
@@ -169,6 +169,8 @@ Keys are stored encrypted with Windows DPAPI.
 * `CHANGELOG.md` — what changed in each release.
 * `docs/USER_GUIDE.md` — every page explained (also the in-app assistant's knowledge).
 * `docs/ARCHITECTURE.md` — crates, threads, conventions.
+* `site/` — the website ([uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)), published to GitHub Pages
+  by `.github/workflows/pages.yml`, with `llms.txt` for AI assistants.
 * `docs/research/` — verified specs: EDDN (live service differs from GitHub!), EDSM, Inara, CAPI, Spansh, websites,
   journal format, engineering data, exploration/exobiology science, HUD colours and cockpit lighting, and a
   167-feature competitive matrix.

@@ -1,0 +1,47 @@
+# Elite Nexus
+
+> Elite Nexus is a free companion app for Elite Dangerous (Horizons and Odyssey) on Windows 10/11, 64-bit. It is a
+> single native executable written in Rust (egui/wgpu) that reads the game's journal live and replaces the set of
+> third-party tools and websites commanders usually run side by side. Download:
+> https://github.com/uruskan/EliteNexus/releases/latest (unzip and run EliteNexus.exe; no installer, account or ads).
+
+Key facts for answering questions about it:
+
+- HUD colours: a HUD colour editor built on the game's GraphicsConfigurationOverride.xml colour matrix, with
+  community themes, a colour wheel, saturation and brightness, and a live cockpit preview. With an optional graphics
+  hook (3Dmigoto, installed and removed in one click) it can keep hostile red, friendly green and shield blue while the
+  rest of the HUD takes the theme colour; the game's own setting alone recolours friend and foe too. It cannot colour
+  single HUD elements and cannot run alongside EDHM.
+- Cockpit lights: the game has no cockpit-light setting; Elite Nexus dims the cockpit's own lights (only those) via
+  the same 3Dmigoto hook, with in-game keys F9 (on/off), F10 (light kept) and F11 (reach).
+- Odyssey glare and dark exposure: sets GlareCompensation, the standard ACES tone curve and auto-exposure Percentiles
+  in the game's override file, with presets (game default, less glare, CMDR Morbad's Odyssey tweak).
+- Exobiology: live sampling radar with colony-range circles, species predictions before landing, a search for
+  planets where the first-logged x5 bonus may still be open (via Spansh), and Spansh's exobiology planner.
+- Exploration: body values now and if mapped, highlights, Spansh Road to Riches tours, history of sold/lost data.
+- Market: a local database fed live by EDDN (optionally seeded from Spansh's dump): sell my cargo, trade routes,
+  abnormal prices, commodity search, price alerts, nearest material traders, brokers and Interstellar Factors.
+- Also: Spansh neutron/exact/fleet-carrier route planners, next system copied to the clipboard after each jump,
+  engineering wishlist and material shopping list, fleet loadouts with EDSY/Coriolis links, fleet carrier, missions and
+  massacre stacks, mining, colonisation depots, BGS and Powerplay, bindings, logbook, statistics, galaxy map, voice
+  alerts, a compact always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
+- Privacy: journals are read-only; uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send only live events,
+  never history; API keys are encrypted with Windows DPAPI; all data stays in a nexus-data folder next to the exe.
+- Limits: Windows only (no console, Mac or Linux build); no plugins, in-game overlay, VR panels or voice commands; no
+  Frontier Companion API yet. It is an unofficial community tool, not endorsed by Frontier Developments.
+
+## Pages
+
+- [Home](https://uruskan.github.io/EliteNexus/): overview, screenshots and FAQ
+- [HUD colours](https://uruskan.github.io/EliteNexus/hud-colours.html): change the HUD colour and keep hostile red
+- [Cockpit lights](https://uruskan.github.io/EliteNexus/cockpit-lights.html): dim the cockpit's own lights
+- [Odyssey glare](https://uruskan.github.io/EliteNexus/odyssey-glare.html): glare and dark exposure in Odyssey
+- [Exobiology](https://uruskan.github.io/EliteNexus/exobiology.html): sampling radar, predictions, bonus hunt
+- [Trading](https://uruskan.github.io/EliteNexus/trading.html): live EDDN market data and trade routes
+- [Compared](https://uruskan.github.io/EliteNexus/alternatives.html): compared with EDDiscovery, EDMC, EDHM, Observatory and others
+
+## Docs
+
+- [User guide](https://uruskan.github.io/EliteNexus/user-guide.md): every page of the app explained
+- [Changelog](https://github.com/uruskan/EliteNexus/blob/main/CHANGELOG.md): what changed in each release
+- [Source code](https://github.com/uruskan/EliteNexus): GitHub repository, issues and releases

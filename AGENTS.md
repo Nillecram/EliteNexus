@@ -10,6 +10,8 @@ alike. Read it before your first change; several rules protect the owner's game,
 * `docs/USER_GUIDE.md`: what every page does. It's compiled into the in-app assistant's knowledge base, together
   with `crates/nexus-ai/knowledge/*.md`, so the assistant tells users whatever it says. When behaviour changes,
   update it in the same commit.
+* `site/`: the website (GitHub Pages, `.github/workflows/pages.yml`) and its `llms.txt`, which AI assistants read.
+  They describe features too: keep them true when behaviour changes.
 * `CHANGELOG.md`: what changed in each release. Add your user-visible changes under "Unreleased" as you go; the
   release workflow publishes each version's section as its release notes.
 * `docs/research/`: verified specs (EDDN, EDSM, Inara, CAPI, Spansh, the journal, engineering, exploration, HUD

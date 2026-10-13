@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dim the Elite Dangerous cockpit lights | Elite Nexus</title>
+<meta name="description" content="Elite Dangerous has no setting for its cockpit lights. Elite Nexus dims the cockpit's own lamps and glow, and nothing else, with in-game keys for on/off, how much light stays and reach.">
+<link rel="canonical" href="https://uruskan.github.io/EliteNexus/cockpit-lights.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Dim the Elite Dangerous cockpit lights">
+<meta property="og:description" content="A cockpit-light dimmer for Elite Dangerous Odyssey: only the cockpit's own lights change, with in-game keys.">
+<meta property="og:url" content="https://uruskan.github.io/EliteNexus/cockpit-lights.html">
+<meta property="og:image" content="https://uruskan.github.io/EliteNexus/screenshots/cockpit-lights.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='4' fill='%23ff9f0a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./">Elite Nexus</a>
+    <nav class="links">
+      <a href="hud-colours.html">HUD colours</a>
+      <a href="cockpit-lights.html" aria-current="page">Cockpit lights</a>
+      <a href="odyssey-glare.html">Glare</a>
+      <a href="exobiology.html">Exobiology</a>
+      <a href="trading.html">Trading</a>
+      <a href="alternatives.html">Compared</a>
+      <a href="https://github.com/uruskan/EliteNexus">GitHub</a>
+    </nav>
+    <a class="btn primary small" href="https://github.com/uruskan/EliteNexus/releases/latest">Download</a>
+  </div>
+</header>
+
+<main class="wrap narrow">
+  <div class="page-title">
+    <h1>Dim the Elite Dangerous cockpit lights</h1>
+    <p>The game has no setting for its cockpit lights. Elite Nexus dims the cockpit's own lamps and glow, and
+      nothing else.</p>
+  </div>
+  <article>
+    <img class="shot" style="margin-top:28px" src="screenshots/cockpit-lights.png" width="1480" height="920" alt="Elite Nexus cockpit lights tab: installed, with light kept, reach and the in-game keys">
+
+    <h2>Why the cockpit is so bright</h2>
+    <p>In Odyssey the cockpit's own lamps light the dashboard brightly, and the auto-exposure reacts to them, so
+      space and planets outside look darker. There's no option in the game to turn those lamps down.</p>
+
+    <h2>How the dimmer works</h2>
+    <ul>
+      <li>Elite Nexus installs <a href="https://github.com/bo3b/3Dmigoto">3Dmigoto</a> (a Direct3D 11 hook, open
+        source, GPL-3.0) next to the game, downloaded from its official GitHub release and checked against pinned
+        checksums.</li>
+      <li>A pattern adjusts the game's light shader as the game loads it: lights within a <strong>reach</strong> of your
+        eyes (about 5 m covers most cockpits) keep only the share of light you choose.</li>
+      <li>Stations, carriers, planets and the HUD stay as they are.</li>
+      <li>Elite Nexus never copies the game's code. The pattern finds the light shader by what its code looks like,
+        so most game updates don't break it. If one does, the dimmer simply stops until Elite Nexus is updated.</li>
+    </ul>
+
+    <h2>In-game keys</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Key</th><th>What it does</th></tr>
+      <tr><td>F9</td><td>Dimmer on or off</td></tr>
+      <tr><td>F10</td><td>Light kept: 0, 15, 35, 60 or 100 %</td></tr>
+      <tr><td>F11</td><td>Reach: 5, 8 or 12 m</td></tr>
+    </table></div>
+    <p>They work while the game window is in front, without Shift, Ctrl or Alt. If your control presets already use
+      one of these keys on its own, the tab names the action, because pressing the key would then do both.</p>
+
+    <h2>Install and remove in one click</h2>
+    <p><strong>Install the dimmer</strong> first says exactly what will happen. <strong>Remove</strong> takes out exactly
+      the files that were installed (any that changed since are left in place) and the files 3Dmigoto made. The same
+      install is the graphics hook that lets <a href="hud-colours.html">HUD colours</a> keep hostile red, friendly
+      green and shield blue.</p>
+
+    <div class="note honest"><strong>Good to know.</strong> 3Dmigoto can't run alongside EDHM or another 3Dmigoto mod;
+      the tab tells you if one is there. Frontier tolerates mods like this without having approved them. Settings
+      saved in the tab apply the next time the game starts.</div>
+
+    <p style="margin:36px 0 56px"><a class="btn primary" href="https://github.com/uruskan/EliteNexus/releases/latest">Download Elite Nexus</a></p>
+  </article>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Elite Nexus is an unofficial community tool, not endorsed by Frontier Developments. Elite Dangerous is a
+      trademark of Frontier Developments plc.</span>
+    <span><a href="./">Home</a> · <a href="https://github.com/uruskan/EliteNexus">GitHub</a> · <a href="https://github.com/uruskan/EliteNexus/blob/main/docs/USER_GUIDE.md">User guide</a></span>
+  </div>
+</footer>
+</body>
+</html>
