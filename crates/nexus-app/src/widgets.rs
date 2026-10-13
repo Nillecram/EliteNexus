@@ -361,6 +361,75 @@ pub fn th(ui: &mut Ui, text: &str) {
     ui.label(RichText::new(text).font(display(size::FOOTNOTE)).color(pal::DIM));
 }
 
+/// How a table is sorted: a column (the table's own numbering) and the direction; no column = the
+/// order the rows came in. Remembered per table ([`TableSort::load`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct TableSort {
+    pub column: Option<u8>,
+    pub descending: bool,
+}
+
+impl TableSort {
+    pub fn load(ui: &Ui, table: &str) -> TableSort {
+        ui.data_mut(|d| *d.get_persisted_mut_or_default::<TableSort>(egui::Id::new(("table-sort", table))))
+    }
+
+    fn store(self, ui: &Ui, table: &str) {
+        ui.data_mut(|d| d.insert_persisted(egui::Id::new(("table-sort", table)), self));
+    }
+
+    /// After a click on `column`'s heading: sorted by it, then reversed, then back to the usual order.
+    pub fn clicked(self, column: u8, desc_first: bool) -> TableSort {
+        match (self.column == Some(column), self.descending == desc_first) {
+            (false, _) => TableSort { column: Some(column), descending: desc_first },
+            (true, true) => TableSort { column: Some(column), descending: !desc_first },
+            (true, false) => TableSort::default(),
+        }
+    }
+
+    /// The order to show `rows` in: `cmp` compares two rows by a column, smallest first.
+    pub fn order<T>(self, rows: &[T], cmp: impl Fn(&T, &T, u8) -> std::cmp::Ordering) -> Vec<usize> {
+        let mut idx: Vec<usize> = (0..rows.len()).collect();
+        if let Some(c) = self.column {
+            idx.sort_by(|&a, &b| {
+                let o = cmp(&rows[a], &rows[b], c);
+                if self.descending { o.reverse() } else { o }
+            });
+        }
+        idx
+    }
+}
+
+/// A column heading that sorts its table: the first click sorts by it (`desc_first` for amounts and
+/// times, so the biggest or newest comes first), the second reverses, the third goes back to the
+/// table's own order. The sorted column shows an arrow. `table` names the table, for remembering.
+pub fn th_sort(ui: &mut Ui, text: &str, column: u8, sort: &mut TableSort, table: &str, desc_first: bool) {
+    let on = sort.column == Some(column);
+    let arrow = match (on, sort.descending) {
+        (true, true) => format!(" {}", egui_phosphor::regular::CARET_DOWN),
+        (true, false) => format!(" {}", egui_phosphor::regular::CARET_UP),
+        _ => String::new(),
+    };
+    let r = ui
+        .add(egui::Label::new(RichText::new(format!("{text}{arrow}")).font(display(size::FOOTNOTE)).color(if on { pal::TEXT } else { pal::DIM })).sense(Sense::click()))
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(if on { "Click to reverse; a third click goes back to the usual order" } else { "Click to sort by this column" });
+    if r.clicked() {
+        *sort = sort.clicked(column, desc_first);
+        sort.store(ui, table);
+    }
+}
+
+/// Compares two optional numbers, smallest first; an unknown value counts as the largest.
+pub fn cmp_opt(a: Option<f64>, b: Option<f64>) -> std::cmp::Ordering {
+    a.unwrap_or(f64::INFINITY).total_cmp(&b.unwrap_or(f64::INFINITY))
+}
+
+/// Case-insensitive text order.
+pub fn cmp_text(a: &str, b: &str) -> std::cmp::Ordering {
+    a.to_lowercase().cmp(&b.to_lowercase())
+}
+
 // ---------------------------------------------------------------------------------------------
 // Meters and tags
 
@@ -750,5 +819,32 @@ pub fn duration(secs: i64) -> String {
 pub fn hover_xy(h: &egui_plot::HoverPosition<'_>) -> (f64, f64) {
     match h {
         egui_plot::HoverPosition::NearDataPoint { position, .. } | egui_plot::HoverPosition::Elsewhere { position } => (position.x, position.y),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_heading_sorts_reverses_and_lets_go() {
+        // Amounts start with the biggest; a second click reverses; a third gives the usual order back.
+        let s = TableSort::default().clicked(2, true);
+        assert_eq!(s, TableSort { column: Some(2), descending: true });
+        let s = s.clicked(2, true);
+        assert_eq!(s, TableSort { column: Some(2), descending: false });
+        assert_eq!(s.clicked(2, true), TableSort::default());
+        // Another column starts over.
+        assert_eq!(s.clicked(0, false), TableSort { column: Some(0), descending: false });
+    }
+
+    #[test]
+    fn rows_come_in_the_chosen_order() {
+        let rows = [("b", Some(3.0)), ("A", None), ("c", Some(1.0))];
+        let cmp = |a: &(&str, Option<f64>), b: &(&str, Option<f64>), c: u8| if c == 0 { cmp_text(a.0, b.0) } else { cmp_opt(a.1, b.1) };
+        assert_eq!(TableSort::default().order(&rows, cmp), vec![0, 1, 2], "unsorted: as they came");
+        assert_eq!(TableSort { column: Some(0), descending: false }.order(&rows, cmp), vec![1, 0, 2], "text ignores case");
+        assert_eq!(TableSort { column: Some(1), descending: false }.order(&rows, cmp), vec![2, 0, 1], "unknown last");
+        assert_eq!(TableSort { column: Some(1), descending: true }.order(&rows, cmp), vec![1, 0, 2]);
     }
 }

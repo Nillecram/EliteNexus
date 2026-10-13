@@ -6,6 +6,8 @@ release time that section becomes the new version and the release workflow publi
 ## Unreleased
 
 ### Added
+- Market: click a column heading (price, demand, distance, updated, ...) to sort any list by it; click again to
+  reverse it, a third time for the usual order. Each list remembers how it was sorted.
 - **Market › Find commodity is a commodity page**: suggestions as you type ("ltd" finds Low Temperature Diamonds,
   "thar pro" Thargoid Probe, "salvage" lists all salvage), the galactic average, how many markets sell and buy it,
   and three lists: where to buy, where to sell, and the latest prices of every market trading it. Click a row for that

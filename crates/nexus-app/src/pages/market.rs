@@ -8,7 +8,7 @@ use crate::market::{ImportJob, ImportSource, MarketService, SPANSH_STATIONS_URL}
 use crate::runplan::{self, Order, PlanInput, RunPlan};
 use crate::settings::PriceWatch;
 use crate::theme::{display, pal, size};
-use crate::widgets::{Suggestion, badge, bar, card, duration, empty, short_credits};
+use crate::widgets::{Suggestion, TableSort, badge, bar, card, cmp_opt, cmp_text, duration, empty, short_credits};
 use egui::{Color32, Grid, RichText, Ui};
 use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular as icon;
@@ -623,6 +623,18 @@ fn age(updated_unix: i64) -> (String, egui::Color32) {
 
 fn cr(v: i64) -> String {
     format!("{} Cr", nexus_data::names::group_digits(v))
+}
+
+/// A table's headings: (label, sortable as (column, biggest or newest first)).
+type Heads<'a> = Vec<(&'a str, Option<(u8, bool)>)>;
+
+fn headings(h: &mut egui_extras::TableRow<'_, '_>, heads: &[(&str, Option<(u8, bool)>)], sort: &mut TableSort, table: &str) {
+    for (t, col) in heads {
+        h.col(|ui| match col {
+            Some((c, desc)) => crate::widgets::th_sort(ui, t, *c, sort, table, *desc),
+            None => crate::widgets::th(ui, t),
+        });
+    }
 }
 
 /// Text that leads somewhere when clicked: a pointing hand and an underline on hover.
@@ -1255,6 +1267,7 @@ fn hits_table(ui: &mut Ui, id: &str, hits: &[CommodityHit], mode: TradeMode, ave
     let buying = mode == TradeMode::BuyFromStation;
     let wide = ui.available_width() >= 700.0;
     let mut action = None;
+    let mut sort = TableSort::load(ui, id);
     let mut table = TableBuilder::new(ui)
         .id_salt(id)
         .striped(true)
@@ -1274,24 +1287,36 @@ fn hits_table(ui: &mut Ui, id: &str, hits: &[CommodityHit], mode: TradeMode, ave
         table = table.column(Column::initial(36.0));
     }
     table = table.column(Column::initial(60.0));
-    let mut heads = Vec::new();
+    // Sortable columns: 0 price, 1 quantity, 2 station, 3 distance, 4 pad, 5 age. Cheapest first
+    // where you buy, best price first where you sell.
+    let mut heads: Heads = Vec::new();
     if pins.is_some() {
-        heads.push("");
+        heads.push(("", None));
     }
-    heads.extend([if buying { "Buy for" } else { "Sell for" }, "vs avg", if buying { "Stock" } else { "Demand" }, "Station", "Distance"]);
+    heads.extend([
+        (if buying { "Buy for" } else { "Sell for" }, Some((0, !buying))),
+        ("vs avg", Some((0, !buying))),
+        (if buying { "Stock" } else { "Demand" }, Some((1, true))),
+        ("Station", Some((2, false))),
+        ("Distance", Some((3, false))),
+    ]);
     if wide {
-        heads.push("Pad");
+        heads.push(("Pad", Some((4, true))));
     }
-    heads.push("Updated");
+    heads.push(("Updated", Some((5, true))));
+    let table = table.header(28.0, |mut h| headings(&mut h, &heads, &mut sort, id));
+    let order = sort.order(hits, |a, b, c| match c {
+        0 => a.price.cmp(&b.price),
+        1 => a.quantity.cmp(&b.quantity),
+        2 => cmp_text(&a.station, &b.station),
+        3 => cmp_opt(a.distance_ly, b.distance_ly),
+        4 => pad_rank(a.max_pad).cmp(&pad_rank(b.max_pad)),
+        _ => a.updated_unix.cmp(&b.updated_unix),
+    });
     table
-        .header(28.0, |mut h| {
-            for t in &heads {
-                h.col(|ui| crate::widgets::th(ui, t));
-            }
-        })
         .body(|body| {
             body.rows(40.0, hits.len(), |mut row| {
-                let h = &hits[row.index()];
+                let h = &hits[order[row.index()]];
                 row.set_selected(selected == Some(h.market_id));
                 if let Some(((symbol, name), prefs)) = pins {
                     row.col(|ui| {
@@ -1343,6 +1368,8 @@ fn hits_table(ui: &mut Ui, id: &str, hits: &[CommodityHit], mode: TradeMode, ave
 fn latest_table(ui: &mut Ui, quotes: &[CommodityQuote], average: Option<i64>, selected: Option<u64>, (symbol, name): (&str, &str), prefs: &MarketPrefs) -> Option<RowAction> {
     let wide = ui.available_width() >= 760.0;
     let mut action = None;
+    const TABLE: &str = "commodity-latest";
+    let mut sort = TableSort::load(ui, TABLE);
     let mut table = TableBuilder::new(ui)
         .id_salt("commodity-latest")
         .striped(true)
@@ -1360,24 +1387,34 @@ fn latest_table(ui: &mut Ui, quotes: &[CommodityQuote], average: Option<i64>, se
         table = table.column(Column::initial(66.0));
     }
     table = table.column(Column::initial(72.0)).column(Column::initial(60.0));
-    let mut heads = vec!["", "Station", "Buy for"];
+    // Sortable columns: 0 station, 1 buy price, 2 stock, 3 sell price, 4 demand, 5 distance, 6 age. A
+    // market that doesn't trade that way sorts after the ones that do.
+    let mut heads: Heads = vec![("", None), ("Station", Some((0, false))), ("Buy for", Some((1, false)))];
     if wide {
-        heads.push("Stock");
+        heads.push(("Stock", Some((2, true))));
     }
-    heads.push("Sell for");
+    heads.push(("Sell for", Some((3, true))));
     if wide {
-        heads.push("Demand");
+        heads.push(("Demand", Some((4, true))));
     }
-    heads.extend(["Distance", "Updated"]);
+    heads.extend([("Distance", Some((5, false))), ("Updated", Some((6, true)))]);
+    let table = table.header(28.0, |mut h| headings(&mut h, &heads, &mut sort, TABLE));
+    let desc = sort.descending;
+    // A missing price: last whichever way the column is sorted.
+    let price = move |v: i64| if v > 0 { Some(v as f64) } else if desc { Some(f64::NEG_INFINITY) } else { None };
+    let order = sort.order(quotes, |a, b, c| match c {
+        0 => cmp_text(&a.station, &b.station),
+        1 => cmp_opt(price(a.buy), price(b.buy)),
+        2 => a.stock.cmp(&b.stock),
+        3 => cmp_opt(price(a.sell), price(b.sell)),
+        4 => a.demand.cmp(&b.demand),
+        5 => cmp_opt(a.distance_ly, b.distance_ly),
+        _ => a.updated_unix.cmp(&b.updated_unix),
+    });
     table
-        .header(28.0, |mut h| {
-            for t in &heads {
-                h.col(|ui| crate::widgets::th(ui, t));
-            }
-        })
         .body(|body| {
             body.rows(40.0, quotes.len(), |mut row| {
-                let q = &quotes[row.index()];
+                let q = &quotes[order[row.index()]];
                 row.set_selected(selected == Some(q.market_id));
                 let avg = Some(q.mean).filter(|m| *m > 0).or(average);
                 row.col(|ui| {
@@ -1661,6 +1698,8 @@ fn abnormal_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) -
     let side = if sell { Side::Sell } else { Side::Buy };
     let mut nav = None;
     let mut pin = None;
+    const TABLE: &str = "abnormal";
+    let mut sort = TableSort::load(ui, TABLE);
     // Narrow windows drop the average and quantity columns rather than spilling off the page.
     let wide = ui.available_width() >= 1040.0;
     let mut table = TableBuilder::new(ui)
@@ -1676,25 +1715,33 @@ fn abnormal_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) -
     } else {
         table = table.column(Column::initial(64.0));
     }
-    let mut headers = vec!["", "Commodity", if sell { "They pay" } else { "They sell for" }];
+    // Sortable columns: 0 commodity, 1 price, 2 average, 3 multiple, 4 quantity, 5 station, 6 distance, 7 age.
+    let mut heads: Heads = vec![("", None), ("Commodity", Some((0, false))), (if sell { "They pay" } else { "They sell for" }, Some((1, sell)))];
     if wide {
-        headers.extend(["Average", "×", if sell { "Demand" } else { "Stock" }]);
+        heads.extend([("Average", Some((2, true))), ("×", Some((3, true))), (if sell { "Demand" } else { "Stock" }, Some((4, true)))]);
     } else {
-        headers.push("×");
+        heads.push(("×", Some((3, true))));
     }
-    headers.extend(["Station", "Distance", "Updated"]);
-    table
+    heads.extend([("Station", Some((5, false))), ("Distance", Some((6, false))), ("Updated", Some((7, true)))]);
+    let table = table
         .column(Column::remainder().at_least(140.0).clip(true))
         .column(Column::initial(76.0))
         .column(Column::initial(76.0))
-        .header(30.0, |mut h| {
-            for t in &headers {
-                h.col(|ui| crate::widgets::th(ui, t));
-            }
-        })
+        .header(30.0, |mut h| headings(&mut h, &heads, &mut sort, TABLE));
+    let order = sort.order(deals, |a, b, c| match c {
+        0 => cmp_text(&a.commodity_name, &b.commodity_name),
+        1 => a.price.cmp(&b.price),
+        2 => a.average.cmp(&b.average),
+        3 => a.ratio.total_cmp(&b.ratio),
+        4 => a.quantity.cmp(&b.quantity),
+        5 => cmp_text(&a.station, &b.station),
+        6 => cmp_opt(a.distance_ly, b.distance_ly),
+        _ => a.updated_unix.cmp(&b.updated_unix),
+    });
+    table
         .body(|body| {
             body.rows(34.0, deals.len(), |mut row| {
-                let d = &deals[row.index()];
+                let d = &deals[order[row.index()]];
                 row.col(|ui| {
                     if pin_button(ui, p.is_pinned(d.market_id, &d.commodity, sell)) {
                         pin = Some(Pin {
@@ -2281,7 +2328,9 @@ fn results_routes(ui: &mut Ui, slot: &Slot<Res<TradeRoute>>) -> Option<Nav> {
         return None;
     }
     let mut nav = None;
-    TableBuilder::new(ui)
+    const TABLE: &str = "trade-routes";
+    let mut sort = TableSort::load(ui, TABLE);
+    let table = TableBuilder::new(ui)
         .striped(true)
         .resizable(false)
         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
@@ -2292,15 +2341,22 @@ fn results_routes(ui: &mut Ui, slot: &Slot<Res<TradeRoute>>) -> Option<Nav> {
         .column(Column::initial(260.0))
         .column(Column::remainder())
         .header(30.0, |mut h| {
-            for t in ["Commodity", "Profit/t", "Trip profit", "Buy at", "Sell at", "Hop"] {
-                h.col(|ui| {
-                    crate::widgets::th(ui, t);
-                });
-            }
-        })
+            // Buy at / Sell at sort by how far from you the station is.
+            let heads: Heads = vec![("Commodity", Some((0, false))), ("Profit/t", Some((1, true))), ("Trip profit", Some((2, true))), ("Buy at", Some((3, false))), ("Sell at", Some((4, false))), ("Hop", Some((5, false)))];
+            headings(&mut h, &heads, &mut sort, TABLE);
+        });
+    let order = sort.order(routes, |a, b, c| match c {
+        0 => cmp_text(&a.commodity_name, &b.commodity_name),
+        1 => a.profit_per_ton.cmp(&b.profit_per_ton),
+        2 => a.total_profit.cmp(&b.total_profit),
+        3 => a.from.distance_from_origin_ly.total_cmp(&b.from.distance_from_origin_ly),
+        4 => a.to.distance_from_origin_ly.total_cmp(&b.to.distance_from_origin_ly),
+        _ => a.hop_ly.total_cmp(&b.hop_ly),
+    });
+    table
         .body(|body| {
             body.rows(44.0, routes.len(), |mut row| {
-                let r = &routes[row.index()];
+                let r = &routes[order[row.index()]];
                 row.col(|ui| {
                     if nav_label(ui, RichText::new(&r.commodity_name).color(pal::TEXT), "Where to buy and sell it, latest prices") {
                         nav = Some(Nav::Commodity { name: r.commodity.clone(), side: None });
@@ -2336,7 +2392,9 @@ fn results_stations(ui: &mut Ui, slot: &Slot<Res<StationHit>>) {
         return;
     }
     let Some(Ok(list)) = &slot.last else { return };
-    TableBuilder::new(ui)
+    const TABLE: &str = "services";
+    let mut sort = TableSort::load(ui, TABLE);
+    let table = TableBuilder::new(ui)
         .striped(true)
         .resizable(false)
         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
@@ -2347,15 +2405,21 @@ fn results_stations(ui: &mut Ui, slot: &Slot<Res<StationHit>>) {
         .column(Column::initial(50.0))
         .column(Column::remainder())
         .header(30.0, |mut h| {
-            for t in ["Station", "System", "Distance", "From star", "Pad", "Economy"] {
-                h.col(|ui| {
-                    crate::widgets::th(ui, t);
-                });
-            }
-        })
+            let heads: Heads = vec![("Station", Some((0, false))), ("System", Some((1, false))), ("Distance", Some((2, false))), ("From star", Some((3, false))), ("Pad", Some((4, true))), ("Economy", Some((5, false)))];
+            headings(&mut h, &heads, &mut sort, TABLE);
+        });
+    let order = sort.order(list, |a, b, c| match c {
+        0 => cmp_text(&a.station.name, &b.station.name),
+        1 => cmp_text(&a.station.system, &b.station.system),
+        2 => a.distance_ly.total_cmp(&b.distance_ly),
+        3 => cmp_opt(a.station.dist_ls, b.station.dist_ls),
+        4 => pad_rank(a.station.max_pad).cmp(&pad_rank(b.station.max_pad)),
+        _ => cmp_text(a.station.economy.as_deref().unwrap_or_default(), b.station.economy.as_deref().unwrap_or_default()),
+    });
+    table
         .body(|body| {
             body.rows(32.0, list.len(), |mut row| {
-                let s = &list[row.index()];
+                let s = &list[order[row.index()]];
                 row.col(|ui| {
                     ui.label(&s.station.name);
                 });
@@ -2483,7 +2547,9 @@ fn db_market(ui: &mut Ui, m: &StationMarket, origin: Option<[f64; 3]>, prefs: &M
     }
     let mut nav = None;
     let mut pin = None;
-    TableBuilder::new(ui)
+    const TABLE: &str = "db-market";
+    let mut sort = TableSort::load(ui, TABLE);
+    let table = TableBuilder::new(ui)
         .id_salt("db-market")
         .striped(true)
         .resizable(false)
@@ -2497,13 +2563,44 @@ fn db_market(ui: &mut Ui, m: &StationMarket, origin: Option<[f64; 3]>, prefs: &M
         .column(Column::initial(76.0))
         .column(Column::initial(60.0))
         .header(30.0, |mut h| {
-            for t in ["", "Commodity", "Category", "Buy for", "Stock", "Sell for", "Demand", "vs avg"] {
-                h.col(|ui| crate::widgets::th(ui, t));
-            }
-        })
+            let heads: Heads = vec![
+                ("", None),
+                ("Commodity", Some((0, false))),
+                ("Category", Some((1, false))),
+                ("Buy for", Some((2, false))),
+                ("Stock", Some((3, true))),
+                ("Sell for", Some((4, true))),
+                ("Demand", Some((5, true))),
+                ("vs avg", Some((6, true))),
+            ];
+            headings(&mut h, &heads, &mut sort, TABLE);
+        });
+    let desc = sort.descending;
+    // A price the station doesn't trade at: last whichever way the column is sorted.
+    let price = move |v: i64, qty: i64| if v > 0 && qty > 0 { Some(v as f64) } else if desc { Some(f64::NEG_INFINITY) } else { None };
+    // How far its price is from the galactic average, on the side it trades (good for you = high).
+    let deal = |i: &&nexus_galaxy::MarketRow| {
+        if i.mean <= 0 {
+            None
+        } else if i.buy > 0 && i.stock > 0 {
+            Some((i.mean - i.buy) as f64 / i.mean as f64)
+        } else {
+            Some((i.sell - i.mean) as f64 / i.mean as f64)
+        }
+    };
+    let order = sort.order(&items, |a, b, c| match c {
+        0 => cmp_text(&a.name, &b.name),
+        1 => cmp_text(&a.category, &b.category).then_with(|| cmp_text(&a.name, &b.name)),
+        2 => cmp_opt(price(a.buy, a.stock), price(b.buy, b.stock)),
+        3 => a.stock.cmp(&b.stock),
+        4 => cmp_opt(price(a.sell, a.demand), price(b.sell, b.demand)),
+        5 => a.demand.cmp(&b.demand),
+        _ => cmp_opt(deal(a).or(if desc { Some(f64::NEG_INFINITY) } else { None }), deal(b).or(if desc { Some(f64::NEG_INFINITY) } else { None })),
+    });
+    table
         .body(|body| {
             body.rows(32.0, items.len(), |mut row| {
-                let i = items[row.index()];
+                let i = items[order[row.index()]];
                 let sells = i.buy > 0 && i.stock > 0;
                 let buys = i.sell > 0 && i.demand > 0;
                 row.col(|ui| {
@@ -2574,7 +2671,9 @@ fn docked_market(ui: &mut Ui, gs: &GameState) -> Option<Nav> {
     let mut items: Vec<_> = m.items.iter().filter(|i| i.buy_price > 0 || i.sell_price > 0).collect();
     items.sort_by(|a, b| a.category_localised.cmp(&b.category_localised).then(a.name_localised.cmp(&b.name_localised)));
     let mut nav = None;
-    TableBuilder::new(ui)
+    const TABLE: &str = "docked-market";
+    let mut sort = TableSort::load(ui, TABLE);
+    let table = TableBuilder::new(ui)
         .striped(true)
         .resizable(false)
         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
@@ -2585,15 +2684,24 @@ fn docked_market(ui: &mut Ui, gs: &GameState) -> Option<Nav> {
         .column(Column::initial(90.0))
         .column(Column::remainder())
         .header(30.0, |mut h| {
-            for t in ["Commodity", "Category", "Buy", "Sell", "Stock", "Demand"] {
-                h.col(|ui| {
-                    crate::widgets::th(ui, t);
-                });
-            }
-        })
+            let heads: Heads = vec![("Commodity", Some((0, false))), ("Category", Some((1, false))), ("Buy", Some((2, false))), ("Sell", Some((3, true))), ("Stock", Some((4, true))), ("Demand", Some((5, true)))];
+            headings(&mut h, &heads, &mut sort, TABLE);
+        });
+    let desc = sort.descending;
+    let price = move |v: i64| if v > 0 { Some(v as f64) } else if desc { Some(f64::NEG_INFINITY) } else { None };
+    let name = |i: &&nexus_journal::companion::MarketItem| i.name_localised.clone().unwrap_or_else(|| i.symbol());
+    let order = sort.order(&items, |a, b, c| match c {
+        0 => cmp_text(&name(a), &name(b)),
+        1 => cmp_text(a.category_localised.as_deref().unwrap_or_default(), b.category_localised.as_deref().unwrap_or_default()),
+        2 => cmp_opt(price(a.buy_price), price(b.buy_price)),
+        3 => cmp_opt(price(a.sell_price), price(b.sell_price)),
+        4 => a.stock.cmp(&b.stock),
+        _ => a.demand.cmp(&b.demand),
+    });
+    table
         .body(|body| {
             body.rows(32.0, items.len(), |mut row| {
-                let i = items[row.index()];
+                let i = items[order[row.index()]];
                 row.col(|ui| {
                     if nav_label(ui, RichText::new(i.name_localised.clone().unwrap_or_else(|| i.symbol())).color(pal::TEXT), "Where to buy and sell it, latest prices") {
                         nav = Some(Nav::Commodity { name: i.symbol(), side: None });
@@ -2860,7 +2968,9 @@ fn sell_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) -> Op
     }
     let mut nav = None;
     card(ui, "Best single stop", |ui| {
-        TableBuilder::new(ui)
+        const TABLE: &str = "sell-stops";
+        let mut sort = TableSort::load(ui, TABLE);
+        let table = TableBuilder::new(ui)
             .id_salt("sellstops")
             .striped(true)
             .resizable(false)
@@ -2873,15 +2983,23 @@ fn sell_tab(ui: &mut Ui, gs: &GameState, db: &GalaxyDb, st: &mut MarketUi) -> Op
             .column(Column::initial(90.0))
             .column(Column::remainder())
             .header(30.0, |mut h| {
-                for t in ["Station", "System", "Distance", "Pays", "Buys", "Age"] {
-                    h.col(|ui| {
-                        crate::widgets::th(ui, t);
-                    });
-                }
-            })
+                let heads: Heads = vec![("Station", Some((0, false))), ("System", Some((1, false))), ("Distance", Some((2, false))), ("Pays", Some((3, true))), ("Buys", Some((4, true))), ("Age", Some((5, false)))];
+                headings(&mut h, &heads, &mut sort, TABLE);
+            });
+        // "Buys": how many tonnes of the hold it takes. "Age": newest first.
+        let tonnes = |s: &finder::SellStop| s.lines.iter().map(|l| l.1).sum::<i64>();
+        let order = sort.order(&plan.stops, |a, b, c| match c {
+            0 => cmp_text(&a.hit.station, &b.hit.station),
+            1 => cmp_text(&a.hit.system, &b.hit.system),
+            2 => cmp_opt(a.hit.distance_ly, b.hit.distance_ly),
+            3 => a.total.cmp(&b.total),
+            4 => tonnes(a).cmp(&tonnes(b)),
+            _ => b.hit.updated_unix.cmp(&a.hit.updated_unix),
+        });
+        table
             .body(|body| {
                 body.rows(32.0, plan.stops.len(), |mut row| {
-                    let s = &plan.stops[row.index()];
+                    let s = &plan.stops[order[row.index()]];
                     let h = &s.hit;
                     row.col(|ui| {
                         ui.horizontal(|ui| {
