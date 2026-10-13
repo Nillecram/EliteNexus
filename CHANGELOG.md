@@ -5,6 +5,11 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.3.0] - 2026-10-13
+
+The HUD & cockpit page: HUD colours that keep hostile red, a cockpit-light dimmer, and glare and exposure. (The
+v0.2.3 download already had these, but still called itself 0.2.2 and had no release notes.)
+
 ### Added
 - **HUD & cockpit** (System), tab **HUD colours**: recolour or dim the HUD with the game's own colour setting. Start from the standard
   orange or a community theme (credited to its author), turn the colour wheel, lower saturation or brightness, or set
