@@ -15,8 +15,11 @@ pub struct ServiceStatus {
     pub sent: u64,
     /// Messages/events rejected by the service or dropped after retries/expiry.
     pub failed: u64,
-    /// The most recent error (rejection text, HTTP status, transport error).
+    /// The most recent error (rejection text, HTTP status, transport error), and when it happened.
     pub last_error: Option<String>,
+    pub last_error_at: Option<Timestamp>,
+    /// The service accepted something after that error.
+    pub recovered: bool,
     /// When the service last accepted something.
     pub last_success: Option<Timestamp>,
     /// Set while sending is suspended (bad credentials, blocked software, rate limit, backoff).
@@ -55,16 +58,22 @@ impl Counters {
         let mut s = self.inner.lock();
         s.sent += n;
         s.last_success = Some(Timestamp::now());
+        s.recovered = s.last_error.is_some();
     }
 
     pub fn failed(&self, n: u64, error: impl Into<String>) {
         let mut s = self.inner.lock();
         s.failed += n;
         s.last_error = Some(error.into());
+        s.last_error_at = Some(Timestamp::now());
+        s.recovered = false;
     }
 
     pub fn error(&self, error: impl Into<String>) {
-        self.inner.lock().last_error = Some(error.into());
+        let mut s = self.inner.lock();
+        s.last_error = Some(error.into());
+        s.last_error_at = Some(Timestamp::now());
+        s.recovered = false;
     }
 
     pub fn set_paused(&self, reason: Option<String>) {
@@ -76,5 +85,30 @@ impl Counters {
         s.enabled = enabled;
         s.queued = queued;
         s
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_error_followed_by_a_success_is_history() {
+        let c = Counters::default();
+        c.error("connection reset");
+        let s = c.snapshot(true, 0);
+        assert!(s.last_error_at.is_some() && !s.recovered);
+        c.sent(3);
+        let s = c.snapshot(true, 0);
+        assert!(s.recovered, "{s:?}");
+        assert_eq!(s.last_error.as_deref(), Some("connection reset"), "kept, to show as earlier");
+        // Accepted and rejected in one batch: the rejection is the news.
+        c.sent(2);
+        c.failed(1, "rejected");
+        assert!(!c.snapshot(true, 0).recovered);
+        // A success with no error before it isn't a recovery.
+        let fresh = Counters::default();
+        fresh.sent(1);
+        assert!(!fresh.snapshot(true, 0).recovered);
     }
 }

@@ -53,7 +53,10 @@ fn status_row(g: &mut Group, s: &ServiceStatus) {
             ui.add(egui::Label::new(RichText::new(format!("{} Paused: {p}", icon::PAUSE_CIRCLE)).size(size::FOOTNOTE).color(pal::WARN)).wrap());
         }
         if let Some(e) = &s.last_error {
-            ui.add(egui::Label::new(RichText::new(e).size(size::FOOTNOTE).color(pal::BAD)).wrap());
+            // An error the service has recovered from since is history: shown dimmed, with its age.
+            let when = s.last_error_at.map(|t| format!(" ({})", ago(t))).unwrap_or_default();
+            let (text, col) = if s.recovered { (format!("Earlier{when}, since recovered: {e}"), pal::DIM) } else { (format!("{e}{when}"), pal::BAD) };
+            ui.add(egui::Label::new(RichText::new(text).size(size::FOOTNOTE).color(col)).wrap());
         }
     });
 }
