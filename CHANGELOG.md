@@ -14,6 +14,8 @@ release time that section becomes the new version and the release workflow publi
   viewer with zoom and keyboard navigation. Added responsive navigation, a product tour and clearer setup guidance.
 
 ### Fixed
+- Market: stations listing a good they produce (the game gives it a token demand of 1, "no demand") no longer show
+  as buyers of it in searches, Sell my cargo, trade routes or alerts. Existing data is corrected once on start.
 - Accounts & sync › EDAstro: uploads no longer pause with "unreadable response" when EDAstro writes its reply's
   status as text (`"200"`), the way EDMC already accepts it; any reply that still can't be read now shows what
   EDAstro sent.

@@ -185,6 +185,7 @@ DROP TABLE IF EXISTS system_factions;
 DROP TABLE IF EXISTS ring_signals;
 DROP TABLE IF EXISTS price_history;
 DROP TABLE IF EXISTS bodies;
+DROP TABLE IF EXISTS fixes;
 "#;
 
 /// Pragmas shared by every connection.
@@ -227,9 +228,39 @@ pub(crate) fn open_writer(path: &std::path::Path) -> Result<Connection> {
     // Abnormal-price scans (built once on an existing database, then maintained by SQLite).
     conn.execute_batch(crate::deals::ANOMALY_INDEXES)?;
     add_missing_columns(&conn)?;
+    run_fixes(&conn)?;
     conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION}"))?;
     seed_commodities(&conn)?;
     Ok(conn)
+}
+
+/// The demand to store. The game lists a good a station produces with demand 1 and demand bracket 0,
+/// which EDDN defines as "no demand": the station isn't buying it, so it's stored as 0.
+pub(crate) fn real_demand(demand: i64, bracket: Option<i8>) -> i64 {
+    if bracket == Some(0) { 0 } else { demand }
+}
+
+/// One-off data repairs, each run once per database (remembered in `fixes`).
+const FIXES: &[(&str, &str)] = &[(
+    // Rows stored before `real_demand`: producers listed as buyers of their own goods.
+    "producer-demand",
+    "UPDATE market SET demand = 0 WHERE sell > 0 AND demand > 0 AND demand_bracket = 0",
+)];
+
+fn run_fixes(conn: &Connection) -> Result<()> {
+    conn.execute_batch("CREATE TABLE IF NOT EXISTS fixes (name TEXT PRIMARY KEY, applied INTEGER NOT NULL)")?;
+    for (name, sql) in FIXES {
+        let done: bool = conn.prepare("SELECT 1 FROM fixes WHERE name = ?1")?.exists([name])?;
+        if done {
+            continue;
+        }
+        let tx = conn.unchecked_transaction()?;
+        let n = tx.execute(sql, [])?;
+        tx.execute("INSERT INTO fixes (name, applied) VALUES (?1, strftime('%s','now'))", [name])?;
+        tx.commit()?;
+        tracing::info!(fix = name, rows = n, "galaxy database repaired");
+    }
+    Ok(())
 }
 
 /// `CREATE TABLE IF NOT EXISTS` leaves an existing table alone: add the columns it lacks.
@@ -300,6 +331,29 @@ mod tests {
             .expect("query");
         assert_eq!(used, 1);
         conn.execute_batch(TABLES).expect("schema");
+    }
+
+    #[test]
+    fn producer_demand_is_repaired_once() {
+        let conn = Connection::open_in_memory().expect("open");
+        conn.execute_batch(TABLES).expect("schema");
+        let row = |mid: i64, demand: i64, bracket: Option<i64>| {
+            conn.execute(
+                "INSERT INTO market (market_id, commodity_id, buy, sell, mean, stock, demand, demand_bracket, updated) VALUES (?1, 1, 100, 90, 95, 50, ?2, ?3, 1)",
+                rusqlite::params![mid, demand, bracket],
+            )
+            .expect("insert");
+        };
+        row(1, 1, Some(0)); // a producer's own good
+        row(2, 1, Some(2)); // a real (small) demand
+        row(3, 7, None); // Spansh: no brackets
+        run_fixes(&conn).expect("fix");
+        let demand = |mid: i64| -> i64 { conn.query_row("SELECT demand FROM market WHERE market_id = ?1", [mid], |r| r.get(0)).expect("row") };
+        assert_eq!((demand(1), demand(2), demand(3)), (0, 1, 7));
+        row(4, 1, Some(0));
+        run_fixes(&conn).expect("again");
+        assert_eq!(demand(4), 1, "runs once; new rows are stored right by the writer");
+        assert_eq!((real_demand(1, Some(0)), real_demand(1, Some(1)), real_demand(5, None)), (0, 1, 5));
     }
 
     #[test]

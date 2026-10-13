@@ -927,7 +927,7 @@ impl Ctx {
                     it.mean,
                     it.stock,
                     it.stock_bracket.map(i64::from),
-                    it.demand,
+                    crate::schema::real_demand(it.demand, it.demand_bracket),
                     it.demand_bracket.map(i64::from),
                     m.timestamp
                 ])?;
