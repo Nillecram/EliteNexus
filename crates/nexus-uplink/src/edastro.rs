@@ -100,16 +100,37 @@ pub struct EdastroItem {
     pub queued_at: Timestamp,
 }
 
-/// `{"status":200|401,...}` = accepted (401: nothing new, not an error).
+/// `{"status":200|401,...}` = accepted (401: nothing new, not an error). EDMC and the old EDAstro
+/// plugin compare `status` as text, so `"200"` counts as well as `200`.
 pub fn classify_response(resp: &HttpResponse) -> Result<(), String> {
     if !resp.is_success() {
         return Err(format!("HTTP {}", resp.status));
     }
-    let status = serde_json::from_str::<Value>(&resp.body).ok().and_then(|v| v.get("status").and_then(Value::as_i64));
+    let reply = serde_json::from_str::<Value>(&resp.body).ok();
+    let status = reply
+        .as_ref()
+        .and_then(|v| v.get("status"))
+        .and_then(|s| s.as_i64().or_else(|| s.as_str().and_then(|t| t.trim().parse().ok())));
     match status {
         Some(200) | Some(401) => Ok(()),
-        Some(other) => Err(format!("EDAstro status {other}")),
-        None => Err("unreadable response".into()),
+        Some(other) => match reply.as_ref().and_then(|v| v.get("message")).and_then(Value::as_str) {
+            Some(msg) => Err(format!("EDAstro status {other}: {}", excerpt(msg))),
+            None => Err(format!("EDAstro status {other}")),
+        },
+        // Say what came back, so an unexpected answer can be recognised.
+        None => Err(format!("unreadable response: {}", excerpt(&resp.body))),
+    }
+}
+
+/// The start of a server reply on one line, for status messages.
+fn excerpt(text: &str) -> String {
+    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.is_empty() {
+        return "empty".into();
+    }
+    match flat.char_indices().nth(80) {
+        Some((i, _)) => format!("\"{}…\"", &flat[..i]),
+        None => format!("\"{flat}\""),
     }
 }
 
@@ -144,5 +165,14 @@ mod tests {
         assert!(classify_response(&HttpResponse::new(200, r#"{"status":401,"message":"nothing"}"#)).is_ok());
         assert!(classify_response(&HttpResponse::new(200, r#"{"status":500,"message":"x"}"#)).is_err());
         assert!(classify_response(&HttpResponse::new(502, "")).is_err());
+        // The status as text, as EDMC accepts it.
+        assert!(classify_response(&HttpResponse::new(200, r#"{"status":"200","message":"OK"}"#)).is_ok());
+        assert!(classify_response(&HttpResponse::new(200, r#"{"status":"401","message":"No valid events"}"#)).is_ok());
+        assert_eq!(classify_response(&HttpResponse::new(200, r#"{"status":"500","message":"db down"}"#)), Err("EDAstro status 500: \"db down\"".into()));
+        // Anything else says what came back.
+        assert_eq!(classify_response(&HttpResponse::new(200, "<html>\n  <b>Error</b>")), Err("unreadable response: \"<html> <b>Error</b>\"".into()));
+        assert_eq!(classify_response(&HttpResponse::new(200, "")), Err("unreadable response: empty".into()));
+        let long = classify_response(&HttpResponse::new(200, "x".repeat(300))).unwrap_err();
+        assert!(long.ends_with("…\"") && long.len() < 120, "{long}");
     }
 }

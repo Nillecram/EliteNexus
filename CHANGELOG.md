@@ -14,6 +14,9 @@ release time that section becomes the new version and the release workflow publi
   viewer with zoom and keyboard navigation. Added responsive navigation, a product tour and clearer setup guidance.
 
 ### Fixed
+- Accounts & sync › EDAstro: uploads no longer pause with "unreadable response" when EDAstro writes its reply's
+  status as text (`"200"`), the way EDMC already accepts it; any reply that still can't be read now shows what
+  EDAstro sent.
 - Accounts & sync › Inara: "Check again", or a new key, within 35 seconds of the last Inara request no longer
   leaves the check spinning until your next sync; it now goes out as soon as Inara's request spacing allows.
 

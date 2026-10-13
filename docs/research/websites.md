@@ -229,6 +229,11 @@ Header fields by client:
 - `status` 200 means at least one event was accepted.
 - `status` 401 means none were accepted but there was no error (EDMC treats both as success).
 - Anything else is an error; log it.
+- EDMC (and the Silarn plugin before it) compares `str(status)`, so accept `"200"` as well as `200`. EDD checks
+  only the HTTP status. A batch with no valid events returns a numeric `{"status":401,"message":"No valid events"}`
+  [VERIFIED 2026-10-13, header-only POST to `/api/journal.test`]. Elite Nexus 0.3.0 accepted only a number and
+  reported live batches as "unreadable response" (then retried them); what EDAstro sends for accepted events is
+  not verified.
 
 A test endpoint `/api/journal.test` appears in EDAstro's own `send-test-to-api.sh` (https://github.com/Orvidius/edastro/blob/main/api/send-test-to-api.sh).
 
