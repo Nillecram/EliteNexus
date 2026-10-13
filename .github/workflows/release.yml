@@ -28,6 +28,9 @@ jobs:
           # The bundled Inter font's licence (SIL OFL) travels with the program.
           Copy-Item data\fonts\inter\LICENSE.txt "out\$name\Inter-LICENSE.txt"
           Compress-Archive -Path "out\$name\*" -DestinationPath "out\$name.zip"
+          # A checksum file next to the zip, so a download can be checked (Get-FileHash <zip>).
+          $hash = (Get-FileHash -Algorithm SHA256 "out\$name.zip").Hash.ToLower()
+          "$hash  $name.zip" | Set-Content "out\$name.zip.sha256" -Encoding ascii
       - name: Release notes
         shell: pwsh
         run: |
@@ -49,6 +52,8 @@ jobs:
           $notes | Set-Content out\notes.md -Encoding utf8NoBOM
       - uses: softprops/action-gh-release@v2
         with:
-          files: out/*.zip
+          files: |
+            out/*.zip
+            out/*.zip.sha256
           body_path: out/notes.md
           generate_release_notes: true
