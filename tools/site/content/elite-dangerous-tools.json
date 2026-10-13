@@ -1,0 +1,25 @@
+{
+  "slug": "elite-dangerous-tools",
+  "title": "Elite Dangerous Third-Party Tools: Alternatives to EDDiscovery, EDMC, EDOMH & Observatory | Elite Nexus",
+  "description": "Which Elite Dangerous third-party tools do what, and where Elite Nexus fits: an all-in-one alternative to EDDiscovery, ED Market Connector, Odyssey Materials Helper, Observatory, EDHM and more, including what each still does better.",
+  "kicker": "Elite Dangerous third-party tools",
+  "heading": "One app for the tools you run side by side.",
+  "lead": "Many commanders run four to eight third-party tools next to Elite Dangerous, plus a few websites. Here is what each popular tool does, which parts Elite Nexus covers in one native Windows app, and where the specialist tool is still the better choice.",
+  "hero_image": "dashboard.png",
+  "hero_alt": "Elite Nexus dashboard with commander ranks, ship status, location and session stats in one window",
+  "hero_caption": "One window for the jobs that usually take several tools and browser tabs.",
+  "toc": [
+    { "id": "eddiscovery", "label": "EDDiscovery" },
+    { "id": "edmc", "label": "ED Market Connector" },
+    { "id": "edomh", "label": "Odyssey Materials Helper" },
+    { "id": "observatory", "label": "Observatory & exobiology" },
+    { "id": "edhm", "label": "EDHM & HUD colours" },
+    { "id": "voice", "label": "EDCoPilot & EDDI" },
+    { "id": "websites", "label": "Inara, Spansh, EDSM" }
+  ],
+  "related": [
+    { "href": "alternatives.html", "label": "Why one companion", "description": "How the pages hand work to each other." },
+    { "href": "exobiology.html", "label": "Exobiology", "description": "Sampling radar, predictions and the bonus hunt." },
+    { "href": "hud-colours.html", "label": "HUD colours", "description": "Themes that keep hostile red, friendly green and shield blue." }
+  ]
+}
