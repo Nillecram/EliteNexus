@@ -6,7 +6,8 @@ use crate::theme::{display, pal, size};
 use crate::widgets::{self, card, footnote, group, section};
 use egui::{RichText, Ui};
 use egui_phosphor::regular as icon;
-use nexus_hud::dimmer::{self, Dimmer, Status};
+use nexus_binds::{Bindings, Input};
+use nexus_hud::dimmer::{self, Dimmer, Removed, Status};
 use nexus_hud::install::GameInstall;
 use std::path::{Path, PathBuf};
 
@@ -24,18 +25,71 @@ pub struct CockpitUi {
     confirm_install: bool,
     confirm_remove: bool,
     download: Slot<Result<Files, String>>,
+    /// Bytes of capture files left in the game folder, measured in the background.
+    leftovers: Slot<u64>,
+    cleanup: Slot<Result<Removed, String>>,
+    /// The dimmer's keys that the game's own controls use too, with the actions bound to them.
+    clashes: Vec<(&'static str, String)>,
     message: Option<(bool, String)>,
 }
 
 impl CockpitUi {
-    fn refresh(&mut self, installs: &[GameInstall]) {
+    fn refresh(&mut self, ctx: &egui::Context, installs: &[GameInstall]) {
         self.loaded = true;
         self.folder = installs.iter().find(|i| i.is_live()).or(installs.first()).map(|i| i.folder.clone());
         self.status = self.folder.as_deref().map(dimmer::status);
         if let Some(Status::Installed { dimmer } | Status::Unmanaged { dimmer }) = &self.status {
             self.edit = *dimmer;
         }
+        self.leftovers = Slot::default();
+        self.clashes.clear();
+        if let (Some(folder), Some(Status::Installed { .. })) = (self.folder.clone(), &self.status) {
+            self.clashes = key_clashes(&folder);
+            self.leftovers.run(ctx, move || dimmer::leftovers(&folder));
+        }
     }
+}
+
+/// The dimmer's keys that the commander's active control presets bind too.
+fn key_clashes(game: &Path) -> Vec<(&'static str, String)> {
+    let Some(dir) = nexus_binds::default_bindings_dir() else { return Vec::new() };
+    let Ok(presets) = nexus_binds::find_presets(&dir) else { return Vec::new() };
+    // Built-in presets (KeyboardMouseOnly, ...) live in the game's ControlSchemes folder.
+    let schemes = game.join("ControlSchemes");
+    let bindings = presets.load_effective(&[schemes.as_path()]).ok().or_else(|| presets.primary()?.load().ok());
+    bindings.map(|b| clashes(&b)).unwrap_or_default()
+}
+
+fn clashes(b: &Bindings) -> Vec<(&'static str, String)> {
+    let mut out = Vec::new();
+    for (key, _) in dimmer::KEYS {
+        let name = format!("Key_{key}");
+        let mut actions: Vec<String> = Vec::new();
+        for a in b.actions.iter().filter(|a| a.inputs().any(|(_, i)| fires_with(i, &name))) {
+            let info = a.info();
+            let what = format!("{} ({})", info.name, info.context.label());
+            if !actions.contains(&what) {
+                actions.push(what);
+            }
+        }
+        if !actions.is_empty() {
+            out.push((key, actions.join(", ")));
+        }
+    }
+    out
+}
+
+/// Whether pressing `key` on its own also triggers the binding `i`. 3Dmigoto's keys fire only with
+/// no Shift, Ctrl, Alt or Windows key held, so a binding that needs one of those doesn't clash.
+fn fires_with(i: &Input, key: &str) -> bool {
+    let keyboard = |d: &str| d.eq_ignore_ascii_case("Keyboard");
+    let held = i.modifiers.iter().any(|(d, k)| keyboard(d) && ["Shift", "Control", "Alt", "Win"].iter().any(|m| k.ends_with(m)));
+    (keyboard(&i.device) && i.key == key && !held) || i.modifiers.iter().any(|(d, k)| keyboard(d) && k == key)
+}
+
+fn megabytes(bytes: u64) -> String {
+    let mb = bytes as f64 / (1u64 << 20) as f64;
+    if mb >= 10.0 { format!("{mb:.0} MB") } else { format!("{mb:.1} MB") }
 }
 
 /// Downloads the official 3Dmigoto release and unpacks the two DLLs (checked against pinned
@@ -49,7 +103,7 @@ async fn fetch() -> Result<Files, String> {
 
 pub fn show(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: bool, rt: &tokio::runtime::Handle) {
     if !st.loaded {
-        st.refresh(installs);
+        st.refresh(ui.ctx(), installs);
     }
     if st.download.tick() {
         match (st.download.last.take(), st.folder.clone()) {
@@ -59,11 +113,21 @@ pub fn show(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: 
                     Err(e) => (false, e.to_string()),
                 });
                 st.confirm_install = false;
-                st.refresh(installs);
+                st.refresh(ui.ctx(), installs);
             }
             (Some(Err(e)), _) => st.message = Some((false, format!("The download didn't work: {e}"))),
             _ => {}
         }
+    }
+    st.leftovers.tick();
+    if st.cleanup.tick() {
+        let bytes = st.leftovers.last.unwrap_or(0);
+        st.message = match st.cleanup.last.take() {
+            Some(Ok(done)) => Some((true, format!("Deleted {} of capture files: {}.", megabytes(bytes), done.removed.join(", ")))),
+            Some(Err(e)) => Some((false, format!("Not all capture files could be deleted: {e}"))),
+            None => None,
+        };
+        st.refresh(ui.ctx(), installs);
     }
     widgets::split(ui, 0.5, 400.0, |ui| controls(ui, st, installs, playing, rt), explain);
 }
@@ -148,7 +212,7 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
                 Ok(()) => (true, "Done: Elite Nexus manages the dimmer now. The game picks up the change the next time it starts.".into()),
                 Err(e) => (false, e.to_string()),
             });
-            st.refresh(installs);
+            st.refresh(ui.ctx(), installs);
         }
         return;
     }
@@ -180,7 +244,7 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
                 Ok(()) => (true, "Saved. The game uses it the next time it starts; F9, F10 and F11 change it while you play.".into()),
                 Err(e) => (false, e.to_string()),
             });
-            st.refresh(installs);
+            st.refresh(ui.ctx(), installs);
         }
         if !st.confirm_remove {
             if widgets::button(ui, &format!("{} Remove", icon::TRASH)).clicked() {
@@ -196,7 +260,7 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
                     Err(e) => (false, e.to_string()),
                 });
                 st.confirm_remove = false;
-                st.refresh(installs);
+                st.refresh(ui.ctx(), installs);
             }
             if widgets::button(ui, "Cancel").clicked() {
                 st.confirm_remove = false;
@@ -206,12 +270,34 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
     if !saved {
         ui.label(RichText::new("Not saved yet.").size(size::FOOTNOTE).color(pal::WARN));
     }
+    let leftover = st.leftovers.last.unwrap_or(0);
+    if leftover > 0 && !st.cleanup.busy() {
+        ui.add_space(6.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new(format!("Capture files from the setup are still in the game folder ({}).", megabytes(leftover))).color(pal::DIM));
+            let tip = "Frame captures (FrameAnalysis-…) and the game's shaders as 3Dmigoto exported them (ShaderCache), written while the dimmer was being worked out. The dimmer doesn't use them.";
+            if widgets::button(ui, &format!("{} Delete them", icon::TRASH)).on_hover_text(tip).clicked() {
+                let folder = folder.to_path_buf();
+                st.message = None;
+                st.cleanup.run(ui.ctx(), move || dimmer::remove_leftovers(&folder).map_err(|e| e.to_string()));
+            }
+        });
+    } else if st.cleanup.busy() {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label(RichText::new("Deleting the capture files…").color(pal::DIM));
+        });
+    }
     section(ui, "Keys in the game");
     for (key, what) in dimmer::KEYS {
+        let clash = st.clashes.iter().find(|(k, _)| *k == key);
         ui.horizontal(|ui| {
-            widgets::badge(ui, key, pal::ACCENT);
+            widgets::badge(ui, key, if clash.is_some() { pal::WARN } else { pal::ACCENT });
             ui.label(RichText::new(what).color(pal::DIM));
         });
+        if let Some((_, actions)) = clash {
+            ui.add(egui::Label::new(RichText::new(format!("{}  {key} is bound in your game controls too: {actions}. Pressing it does both, so give the game's action another key (Options › Controls in the game).", icon::WARNING)).size(size::FOOTNOTE).color(pal::WARN)).wrap());
+        }
     }
     footnote(ui, "The keys work while the game window is in front; what they set lasts until the game closes.");
 }
@@ -238,4 +324,37 @@ fn explain(ui: &mut Ui) {
 fn slider(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, decimals: usize, suffix: &str) -> bool {
     ui.add_sized([56.0, 20.0], egui::Label::new(RichText::new(format!("{:.*}{suffix}", decimals, *value)).color(pal::DIM)));
     ui.add(egui::Slider::new(value, range).show_value(false)).changed()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finds_dimmer_keys_the_game_uses_too() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8" ?>
+<Root PresetName="Test" MajorVersion="4" MinorVersion="2">
+	<GalaxyMapOpen>
+		<Primary Device="Keyboard" Key="Key_F10" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</GalaxyMapOpen>
+	<SystemMapOpen>
+		<Primary Device="Keyboard" Key="Key_F9">
+			<Modifier Device="Keyboard" Key="Key_LeftShift" />
+		</Primary>
+		<Secondary Device="{NoDevice}" Key="" />
+	</SystemMapOpen>
+	<FocusLeftPanel>
+		<Primary Device="Keyboard" Key="Key_1">
+			<Modifier Device="Keyboard" Key="Key_F11" />
+		</Primary>
+		<Secondary Device="Keyboard" Key="Key_F12" />
+	</FocusLeftPanel>
+</Root>
+"#;
+        let b = Bindings::parse(xml).unwrap();
+        // F9 needs Shift in the game, and the dimmer's keys fire only without modifiers: no clash.
+        assert_eq!(clashes(&b), vec![("F10", "Open Galaxy Map (Ship)".to_string()), ("F11", "Left Panel (Navigation) (Ship)".to_string())]);
+        assert!(clashes(&Bindings::default()).is_empty());
+    }
 }

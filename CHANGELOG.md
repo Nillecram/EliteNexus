@@ -23,8 +23,10 @@ release time that section becomes the new version and the release workflow publi
   installs 3Dmigoto (downloaded from its official release and checked against pinned checksums) with a pattern
   that adjusts the game's light shader as it loads, so lights within a reach of your eyes keep only part of their
   light; stations, carriers, planets and the HUD are untouched. Set the light kept, the reach and on/off in the
-  tab or with F9, F10 and F11 in the game; Remove takes out exactly what was installed. The game's code is never
-  copied, so most game updates don't break it. Leaves EDHM and other 3Dmigoto mods alone.
+  tab or with F9, F10 and F11 in the game (the tab warns when your controls use one of those keys too); Remove
+  takes out exactly what was installed, and Delete them clears frame captures and exported shaders left over from
+  setting 3Dmigoto up. The game's code is never copied, so most game updates don't break it. Leaves EDHM and other
+  3Dmigoto mods alone.
 
 ## [0.2.2] - 2026-10-12
 

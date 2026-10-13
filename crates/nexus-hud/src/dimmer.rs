@@ -247,12 +247,7 @@ pub fn uninstall(game: &Path) -> Result<Removed, DimmerError> {
         }
     }
     let mut dirs: Vec<String> = BYPRODUCT_DIRS.iter().map(|d| d.to_string()).collect();
-    for e in std::fs::read_dir(game).map_err(io(game))?.flatten() {
-        let name = e.file_name().to_string_lossy().to_string();
-        if name.starts_with("FrameAnalysis-") && e.path().is_dir() {
-            dirs.push(name);
-        }
-    }
+    dirs.extend(frame_captures(game));
     for name in dirs {
         let path = game.join(&name);
         if path.is_dir() {
@@ -279,6 +274,90 @@ pub fn uninstall(game: &Path) -> Result<Removed, DimmerError> {
     Ok(done)
 }
 
+/// The `FrameAnalysis-…` folders 3Dmigoto's frame analysis wrote next to the game.
+fn frame_captures(game: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    for e in std::fs::read_dir(game).into_iter().flatten().flatten() {
+        let name = e.file_name().to_string_lossy().to_string();
+        if name.starts_with("FrameAnalysis-") && e.file_type().is_ok_and(|t| t.is_dir()) {
+            out.push(name);
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Folders of capture files the dimmer doesn't use: frame captures, and the shaders 3Dmigoto
+/// exported (`ShaderCache`, unless the config still exports or caches them; `ShaderFromGame`, from
+/// hunting mode). They hold the game's own shader code and can run to hundreds of MB.
+fn leftover_dirs(game: &Path) -> Vec<String> {
+    let mut dirs = frame_captures(game);
+    let config = std::fs::read_to_string(game.join(CONFIG)).unwrap_or_default();
+    let in_use = section(&config, "Rendering").any(|(k, v)| (k.eq_ignore_ascii_case("export_shaders") || k.eq_ignore_ascii_case("cache_shaders")) && v != "0");
+    if !in_use {
+        dirs.push("ShaderCache".to_string());
+    }
+    dirs.push("ShaderFromGame".to_string());
+    dirs.retain(|d| game.join(d).symlink_metadata().is_ok_and(|m| m.is_dir()));
+    dirs
+}
+
+/// Bytes of capture files left in the game folder ([`remove_leftovers`] deletes them); 0 unless
+/// Elite Nexus manages the install there.
+pub fn leftovers(game: &Path) -> u64 {
+    if !matches!(status(game), Status::Installed { .. }) {
+        return 0;
+    }
+    leftover_dirs(game).iter().map(|d| dir_size(&game.join(d))).sum()
+}
+
+/// Deletes the capture files [`leftovers`] counts; everything the dimmer needs stays.
+pub fn remove_leftovers(game: &Path) -> Result<Removed, DimmerError> {
+    if !matches!(status(game), Status::Installed { .. }) {
+        return Err(DimmerError::NotOurs);
+    }
+    let mut done = Removed::default();
+    for name in leftover_dirs(game) {
+        let path = game.join(&name);
+        std::fs::remove_dir_all(&path).map_err(io(&path))?;
+        done.removed.push(format!("{name}\\"));
+    }
+    Ok(done)
+}
+
+/// Total size of the files under `dir`; links aren't followed.
+fn dir_size(dir: &Path) -> u64 {
+    let mut total = 0;
+    let mut todo = vec![dir.to_path_buf()];
+    while let Some(d) = todo.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            match e.file_type() {
+                Ok(t) if t.is_dir() => todo.push(e.path()),
+                Ok(t) if t.is_file() => total += e.metadata().map(|m| m.len()).unwrap_or(0),
+                _ => {}
+            }
+        }
+    }
+    total
+}
+
+/// The `key = value` lines of one `[name]` section of an ini (comments skipped).
+fn section<'a>(ini: &'a str, name: &'a str) -> impl Iterator<Item = (&'a str, &'a str)> + 'a {
+    let mut inside = false;
+    ini.lines().filter_map(move |line| {
+        let line = line.trim();
+        if let Some(head) = line.strip_prefix('[') {
+            inside = head.strip_suffix(']').is_some_and(|h| h.trim().eq_ignore_ascii_case(name));
+            return None;
+        }
+        if !inside || line.starts_with(';') {
+            return None;
+        }
+        let (key, value) = line.split_once('=')?;
+        Some((key.trim(), value.trim()))
+    })
+}
+
 fn matches_hash(path: &Path, expected: &str) -> bool {
     std::fs::read(path).is_ok_and(|b| sha256_hex(&b) == expected)
 }
@@ -292,19 +371,9 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), DimmerError> {
 /// The dimmer settings in a config's `[Constants]` (defaults for anything missing).
 pub fn read_settings(ini: &str) -> Dimmer {
     let mut d = Dimmer::default();
-    let mut in_constants = false;
-    for line in ini.lines() {
-        let line = line.trim();
-        if line.starts_with('[') {
-            in_constants = line.eq_ignore_ascii_case("[Constants]");
-            continue;
-        }
-        if !in_constants {
-            continue;
-        }
-        let Some((key, value)) = line.split_once('=') else { continue };
-        let Ok(v) = value.trim().parse::<f32>() else { continue };
-        match key.trim() {
+    for (key, value) in section(ini, "Constants") {
+        let Ok(v) = value.parse::<f32>() else { continue };
+        match key {
             "x" => d.strength = v.clamp(0.0, 1.0),
             "y" => d.reach = v.max(0.0),
             "z" => d.on = v != 0.0,
@@ -548,6 +617,36 @@ mod tests {
             assert!(!game.join(gone).exists(), "{gone} should be gone: {done:?}");
         }
         assert!(game.join("d3dcompiler_47.dll").is_file() && game.join("EliteDangerous64.exe").is_file());
+        let _ = std::fs::remove_dir_all(&game);
+    }
+
+    #[test]
+    fn capture_leftovers_are_measured_and_deleted() {
+        let game = temp_game("leftovers");
+        let capture = game.join("FrameAnalysis-2026-10-13-083851");
+        std::fs::create_dir_all(capture.join("deduped")).unwrap();
+        std::fs::write(capture.join("log.txt"), [0u8; 1000]).unwrap();
+        std::fs::write(capture.join("deduped").join("000001-ps-t0.jpg"), [0u8; 500]).unwrap();
+        std::fs::create_dir_all(game.join("ShaderCache")).unwrap();
+        std::fs::write(game.join("ShaderCache").join("x-ps.txt"), [0u8; 200]).unwrap();
+        // Not Elite Nexus's install (yet): nothing is counted or deleted.
+        assert_eq!(leftovers(&game), 0);
+        assert!(matches!(remove_leftovers(&game), Err(DimmerError::NotOurs)));
+        install(&game, &fake_files(), &Dimmer::default()).unwrap();
+        assert_eq!(leftovers(&game), 1700);
+        // While the config exports shaders, ShaderCache is in use and stays.
+        let config = std::fs::read_to_string(game.join(CONFIG)).unwrap();
+        std::fs::write(game.join(CONFIG), config.replace("export_shaders=0", "export_shaders=1")).unwrap();
+        assert_eq!(leftovers(&game), 1500);
+        std::fs::write(game.join(CONFIG), &config).unwrap();
+        let done = remove_leftovers(&game).unwrap();
+        assert_eq!(done.removed, vec!["FrameAnalysis-2026-10-13-083851\\".to_string(), "ShaderCache\\".to_string()]);
+        assert_eq!(leftovers(&game), 0);
+        // What the dimmer needs stays.
+        for kept in ["d3d11.dll", "d3dcompiler_47.dll", CONFIG, MANIFEST, FIXES_DIR, "EliteDangerous64.exe"] {
+            assert!(game.join(kept).exists(), "{kept} should stay");
+        }
+        assert!(matches!(status(&game), Status::Installed { .. }));
         let _ = std::fs::remove_dir_all(&game);
     }
 
