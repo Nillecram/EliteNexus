@@ -598,6 +598,21 @@ fn inara_new_key_is_checked_at_once() {
 }
 
 #[test]
+fn inara_check_again_right_after_a_request_is_still_sent() {
+    let h = Harness::new(UplinkConfig::default(), RecordingTransport::simulated());
+    h.uplink().set_config(inara_cfg());
+    assert!(h.wait_for(|r| r.iter().any(|q| q.url == inara::API_URL)));
+    // "Check again" within the request spacing: the check waits it out, then goes.
+    h.uplink().check_inara();
+    assert!(h.wait_for(|r| r.iter().filter(|q| q.url == inara::API_URL).count() >= 2), "second check never sent");
+    let posts = h.transport.requests_to(inara::API_URL);
+    let body: Value = serde_json::from_str(&posts[1].body_text()).unwrap();
+    assert_eq!(body["events"][0]["eventName"], "getCommanderProfile");
+    let st = wait_status(&h, |s| !s.checking);
+    assert_eq!(st.account.map(|a| a.name), Some("Jameson".into()));
+}
+
+#[test]
 fn inara_rejected_key_is_reported() {
     let t = RecordingTransport::new(|r| {
         if r.url == inara::API_URL {

@@ -1184,13 +1184,14 @@ async fn run_inara(shared: Arc<Shared>) {
         // "Who is this key?": normally asked inside the next batch (no extra request); on its own
         // only right after the key was entered or changed and nothing else is waiting.
         if shared.inara_check_now.load(Ordering::Relaxed) && svc.queue.lock().is_empty() {
-            shared.inara_check_now.store(false, Ordering::Relaxed);
             if let Some(t) = last_post
                 && t.elapsed() < timing().inara_min_gap
             {
+                // Still due after the wait ("Check again" right after another request).
                 tokio::time::sleep(timing().inara_min_gap - t.elapsed()).await;
                 continue;
             }
+            shared.inara_check_now.store(false, Ordering::Relaxed);
             let header = json!({
                 "appName": software, "appVersion": version, "isBeingDeveloped": creds.is_being_developed, "APIkey": creds.api_key.trim(),
             });

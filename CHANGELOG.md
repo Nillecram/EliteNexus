@@ -13,6 +13,10 @@ release time that section becomes the new version and the release workflow publi
   companion pages, and trading content focused on the app's trading tools. Screenshots now open in a full-size
   viewer with zoom and keyboard navigation. Added responsive navigation, a product tour and clearer setup guidance.
 
+### Fixed
+- Accounts & sync › Inara: "Check again", or a new key, within 35 seconds of the last Inara request no longer
+  leaves the check spinning until your next sync; it now goes out as soon as Inara's request spacing allows.
+
 ## [0.3.0] - 2026-10-13
 
 The HUD & cockpit page: HUD colours that keep hostile red, a cockpit-light dimmer, and glare and exposure. (The
