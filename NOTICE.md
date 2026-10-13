@@ -6,7 +6,7 @@ Each source's licence text and exact commit are kept next to the data in `data/*
 
 | Source | Used for | Licence | Notes |
 |---|---|---|---|
-| EDCD/FDevIDs (`data/fdevids`) | commodity, module, ship, material and micro-resource names/IDs | **none published** | Fine for private use. Ask EDCD for permission (or switch to a runtime download) before distributing binaries. |
+| EDCD/FDevIDs (`data/fdevids`) | commodity, module, ship, material and micro-resource names/IDs | none published; factual game data | Frontier's own game identifiers, compiled by EDCD. Asked in [EDCD/FDevIDs#105](https://github.com/EDCD/FDevIDs/issues/105) (2025): contributors call the data "free for all, like public domain" and note it belongs to Frontier; closed without a licence or objection. Every EDCD tool ships it. |
 | EDEngineer by msarilar (`data/engineering/edengineer`) | ship blueprints, experimental effects, synthesis, technology broker costs | MIT | Archived 2024; Odyssey costs come from EDDiscovery instead. |
 | EDDiscovery (`data/engineering/eddiscovery-src`) | Odyssey suit/weapon upgrades & modifications, engineers incl. Colonia (+ journal EngineerIDs), journal blueprint symbols, synthesis recipes, technology broker unlocks, Thargoid-war materials, one blueprint (Short Range Blaster) | Apache-2.0 | Data transcribed (changes listed in `data/engineering/nexus/SOURCE.txt`), no code linked. Ship the Apache-2.0 text with binaries. |
 | jixxed/ed-journal-schemas (`data/journal-schemas`) | reference for undocumented journal events (Colonisation, Powerplay 2.0, Flags2 bits) | Apache-2.0 | |

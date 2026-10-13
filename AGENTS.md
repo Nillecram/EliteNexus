@@ -151,7 +151,6 @@ and writes `dist\EliteNexus-vx.y.z-windows-x64.zip`. It never touches `nexus-dat
 
 * EDGalaxyData (online footfall lookups) publishes no terms: ask its operator. The switch is
   `ai_tools::ONLINE_FOOTFALL_LOOKUP`.
-* The EDCD FDevIDs CSVs in `data/fdevids` have no licence file; ask EDCD now that binaries are distributed.
 * Inara accepts uploads only after its author whitelists the app name "Elite Nexus".
 * `GalaxyOptions::all_eddn_bodies` (keep every landable EDDN body, not just biology and valuable worlds) is off.
 * Small known issue: the EDDN "updates stored" counter slightly over-counts body updates.

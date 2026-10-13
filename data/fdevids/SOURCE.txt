@@ -10,6 +10,8 @@ LICENSE STATUS: NONE DECLARED.
   default is "all rights reserved" by the contributors; the content itself is factual
   game identifiers (Frontier IDs/symbols/names) collected by the community and is
   widely consumed by EDCD tools (EDMC, EDDN, EDDiscovery, Inara, Spansh, ...).
-  Recommendation: before redistributing these files inside a released Elite Nexus
-  build, ask EDCD to add an explicit licence (e.g. open an issue on the repo), or
-  fetch them at build/run time instead of vendoring them.
+  This was asked in https://github.com/EDCD/FDevIDs/issues/105 (Oct 2025): EDCD
+  contributors replied that they see the data as "free for all, like public domain"
+  and that it belongs to Frontier (the game's own IDs); the issue was closed in
+  Nov 2025 without a licence or any objection. Elite Nexus ships the files unchanged
+  and credits EDCD in NOTICE.md.
