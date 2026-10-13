@@ -31,6 +31,8 @@ pub struct Settings {
     pub ai: AiSettings,
     /// HUD colour themes the commander saved (HUD colours page).
     pub hud_themes: Vec<HudTheme>,
+    /// The Market page's last searches and filters.
+    pub market: crate::pages::market::MarketPrefs,
 }
 
 /// A named HUD colour matrix.
@@ -140,6 +142,7 @@ impl Default for Settings {
             price_watches: Vec::new(),
             ai: AiSettings::default(),
             hud_themes: Vec::new(),
+            market: Default::default(),
         }
     }
 }

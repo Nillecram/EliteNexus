@@ -11,6 +11,7 @@ mod finder;
 mod jobs;
 mod market;
 mod pages;
+mod runplan;
 mod secrets;
 mod settings;
 mod sync;

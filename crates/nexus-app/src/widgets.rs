@@ -569,6 +569,11 @@ pub fn disclosure(ui: &mut Ui, open: &mut bool, label: &str) -> bool {
 
 /// A capsule search field with a magnifying-glass icon.
 pub fn search_field(ui: &mut Ui, text: &mut String, hint: &str, width: f32) -> Response {
+    search_capsule(ui, text, hint, width, None).inner
+}
+
+/// The search capsule: the text field's response inside the capsule's.
+fn search_capsule(ui: &mut Ui, text: &mut String, hint: &str, width: f32, id: Option<egui::Id>) -> egui::InnerResponse<Response> {
     Frame::new()
         .fill(pal::FIELD)
         .stroke(Stroke::new(1.0, pal::SEPARATOR))
@@ -578,14 +583,137 @@ pub fn search_field(ui: &mut Ui, text: &mut String, hint: &str, width: f32) -> R
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 ui.label(RichText::new(egui_phosphor::regular::MAGNIFYING_GLASS).size(14.0).color(pal::DIM));
-                ui.add_sized(
-                    [width - 40.0, 28.0],
-                    egui::TextEdit::singleline(text).frame(Frame::new().inner_margin(Margin::symmetric(0, 4))).hint_text(hint).vertical_align(Align::Center),
-                )
+                let mut edit = egui::TextEdit::singleline(text).frame(Frame::new().inner_margin(Margin::symmetric(0, 4))).hint_text(hint).vertical_align(Align::Center);
+                if let Some(id) = id {
+                    edit = edit.id(id);
+                }
+                ui.add_sized([width - 40.0, 28.0], edit)
             })
             .inner
         })
-        .inner
+}
+
+/// One entry of an [`autocomplete`] list: the text it puts in the field, and a dim detail on the right.
+pub struct Suggestion {
+    pub text: String,
+    pub detail: String,
+}
+
+/// What an [`autocomplete`] field did this frame.
+pub struct Completion {
+    /// The suggestion taken this frame (a click, or Enter on the highlighted one); it is in the field now.
+    pub picked: Option<String>,
+    /// Enter pressed while no suggestion list was open.
+    pub submitted: bool,
+}
+
+#[derive(Clone, Copy, Default)]
+struct CompletionState {
+    open: bool,
+    sel: usize,
+    /// Where the list was drawn last frame (a click on it must not close it).
+    list: Option<Rect>,
+}
+
+/// A capsule search field with a suggestion list underneath. The list opens as you type (or when you
+/// click into the empty field), ↑/↓ move the highlight, Enter or a click takes a suggestion, Escape
+/// or a click elsewhere closes it. `suggest` gets the text and returns suggestions, best first.
+pub fn autocomplete(ui: &mut Ui, id_salt: &str, text: &mut String, hint: &str, width: f32, suggest: impl Fn(&str) -> Vec<Suggestion>) -> Completion {
+    let id = ui.make_persistent_id(id_salt);
+    let edit_id = id.with("edit");
+    let mut s: CompletionState = ui.data(|d| d.get_temp(id)).unwrap_or_default();
+    let mut items = if s.open { suggest(text) } else { Vec::new() };
+    // Arrow keys move the highlight; they are taken before the text field sees them.
+    let mut moved = false;
+    if s.open && !items.is_empty() && ui.memory(|m| m.has_focus(edit_id)) {
+        let n = items.len();
+        ui.input_mut(|i| {
+            if i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown) {
+                s.sel = (s.sel + 1) % n;
+                moved = true;
+            }
+            if i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp) {
+                s.sel = (s.sel + n - 1) % n;
+                moved = true;
+            }
+        });
+    }
+    let capsule = search_capsule(ui, text, hint, width, Some(edit_id));
+    let resp = capsule.inner;
+    if resp.changed() || (resp.gained_focus() && text.trim().is_empty()) {
+        s.open = true;
+        s.sel = 0;
+        items = suggest(text);
+    }
+    s.sel = s.sel.min(items.len().saturating_sub(1));
+    let mut picked = None;
+    let mut submitted = false;
+    if resp.lost_focus() {
+        if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+            if s.open && !items.is_empty() {
+                picked = Some(s.sel);
+            } else {
+                submitted = true;
+            }
+            s.open = false;
+        } else if !s.list.zip(ui.ctx().pointer_latest_pos()).is_some_and(|(r, p)| r.contains(p)) {
+            // Tab or a click elsewhere; a press on the list keeps it open until the click lands.
+            s.open = false;
+        }
+    }
+    s.list = None;
+    if s.open && !items.is_empty() {
+        let mut open = true;
+        let shown = egui::Popup::new(id.with("list"), ui.ctx().clone(), &capsule.response, ui.layer_id())
+            .open_bool(&mut open)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .width(capsule.response.rect.width())
+            .gap(4.0)
+            .show(|ui| {
+                ui.set_min_width(capsule.response.rect.width() - 16.0);
+                egui::ScrollArea::vertical().max_height(320.0).show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = 0.0;
+                    for (i, it) in items.iter().enumerate() {
+                        let r = suggestion_row(ui, it, i == s.sel);
+                        if r.clicked() {
+                            picked = Some(i);
+                        }
+                        if moved && i == s.sel {
+                            r.scroll_to_me(None);
+                        }
+                    }
+                });
+            });
+        s.list = shown.map(|r| r.response.rect);
+        if !open {
+            s.open = false;
+        }
+    }
+    let picked = picked.and_then(|i| items.into_iter().nth(i)).map(|it| {
+        text.clone_from(&it.text);
+        s.open = false;
+        it.text
+    });
+    ui.data_mut(|d| d.insert_temp(id, s));
+    Completion { picked, submitted }
+}
+
+fn suggestion_row(ui: &mut Ui, it: &Suggestion, selected: bool) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 30.0), Sense::click());
+    if ui.is_rect_visible(rect) {
+        let p = ui.painter();
+        if selected || resp.hovered() {
+            p.rect_filled(rect, CornerRadius::same(6), if selected { pal::ACCENT_BG } else { Color32::from_white_alpha(14) });
+        }
+        let detail = p.layout_no_wrap(it.detail.clone(), FontId::proportional(size::CAPTION), pal::DIM);
+        let room = (rect.width() - detail.size().x - 28.0).max(40.0);
+        let mut job = egui::text::LayoutJob::simple_singleline(it.text.clone(), FontId::proportional(size::CALLOUT), if selected { pal::ACCENT_SOFT } else { pal::TEXT });
+        job.wrap = egui::text::TextWrapping::truncate_at_width(room);
+        let main = p.layout_job(job);
+        p.galley(Pos2::new(rect.left() + 8.0, rect.center().y - main.size().y / 2.0), main, pal::TEXT);
+        p.galley(Pos2::new(rect.right() - 8.0 - detail.size().x, rect.center().y - detail.size().y / 2.0), detail, pal::DIM);
+    }
+    resp
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -308,6 +308,7 @@ pub struct FssSignal {
     pub is_station: bool,
     pub threat: Option<u32>,
     pub faction: Option<String>,
+    /// When it was last logged (fleet carriers come and go between visits).
     pub ts: Timestamp,
 }
 
@@ -720,7 +721,9 @@ impl Exploration {
     pub fn on_fss_signal(&mut self, f: &ev::FSSSignalDiscovered, system_name: &str, ts: Timestamp) {
         let sys = self.system_mut(f.system_address, system_name, ts);
         let name = f.signal_name_localised.clone().unwrap_or_else(|| f.signal_name.clone());
-        if sys.signals.iter().any(|s| s.name == name) {
+        if let Some(s) = sys.signals.iter_mut().find(|s| s.name == name) {
+            // Seen again (another visit): fleet carriers come and go, so "when" matters.
+            s.ts = s.ts.max(ts);
             return;
         }
         sys.signals.push(FssSignal {

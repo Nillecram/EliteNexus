@@ -113,7 +113,7 @@ impl NexusApp {
         market.set_listen(settings.accounts.eddn_listen, rt.handle());
         // Test runs (CLI journal folder, screenshots) never upload: replayed journals must not reach the services.
         let sync = if ov.journal_dir.is_none() && shot.is_none() { crate::sync::SyncService::start(&core, &settings.accounts, &data_dir, rt.handle()) } else { crate::sync::SyncService::disabled() };
-        let mut market_ui = pages::market::MarketUi::default();
+        let mut market_ui = pages::market::MarketUi::new(settings.market.clone());
         if let Some(t) = ov.tab.as_deref().and_then(pages::market::Tab::from_name) {
             market_ui.tab = t;
         }
@@ -505,6 +505,15 @@ impl NexusApp {
             }
             Page::Market => {
                 settings_changed |= pages::market::show(ui, gs, &mut self.market, &mut self.market_ui, self.rt.handle(), &mut self.settings.price_watches);
+                // A planned trade run becomes the active route.
+                if let Some(r) = self.market_ui.follow.take() {
+                    follow = Some(r);
+                }
+                // Searches, filters and pins are kept for the next run.
+                if self.market_ui.prefs != self.settings.market {
+                    self.settings.market.clone_from(&self.market_ui.prefs);
+                    self.settings_dirty = Some(Instant::now());
+                }
                 // Feed counters and headlines move every second or so.
                 ui.ctx().request_repaint_after(Duration::from_millis(1000));
             }

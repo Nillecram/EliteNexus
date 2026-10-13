@@ -1,7 +1,7 @@
 {
   "slug": "trading",
   "title": "Elite Dangerous Trading Tools, Live Markets & Cargo Selling | Elite Nexus",
-  "description": "Find buyers for your cargo, filter commodity prices, plan trade routes, spot abnormal prices and set live market alerts. Mining and colonisation tools included.",
+  "description": "Find buyers for your cargo, look up any commodity, pin orders and plan a run, spot abnormal prices and set live market alerts. Mining and colonisation tools included.",
   "kicker": "Trading, mining & colonisation",
   "heading": "Make every tonne count.",
   "lead": "Find a buyer for the hold you already have. Plan the next profitable run. Catch unusual prices as commanders report them. Elite Nexus puts your cargo, ship and market data together in dedicated trading tools.",
@@ -16,6 +16,10 @@
     {
       "id": "trade-routes",
       "label": "Trade routes"
+    },
+    {
+      "id": "run-planner",
+      "label": "Run planner"
     },
     {
       "id": "abnormal-prices",

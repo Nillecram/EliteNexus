@@ -16,6 +16,7 @@ Use the live market database, not guesses:
 3. Trade routes: the best buy-here, sell-there pairs within range, sized to the ship's cargo and credits.
 4. Mining hotspots near the commander, with the best nearby sell prices.
 5. Exobiology or Road to Riches routes (Spansh) for exploration income.
+6. Pins and the Run planner (Market): pin the orders worth filling (a carrier buy order, a station paying far above average), and the planner finds where to buy each good, fits the hold and credits, and orders the stops. In the pinned carrier's system, the pin says whether the game has listed that carrier there since arrival (carriers move).
 Data comes from EDDN in real time; Market > Database & feed in Elite Nexus offers a one-click import of every station from Spansh when the database is still empty.
 
 ## Billion-credit goals

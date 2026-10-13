@@ -5,7 +5,25 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Added
+- **Market › Find commodity is a commodity page**: suggestions as you type ("ltd" finds Low Temperature Diamonds,
+  "thar pro" Thargoid Probe, "salvage" lists all salvage), the galactic average, how many markets sell and buy it,
+  and three lists: where to buy, where to sell, and the latest prices of every market trading it. Click a row for that
+  market's details and this commodity's price history there. An empty list explains why ("Nobody in range buys
+  Thargoid Probe"), names the nearest market your filters left out and widens them in one click.
+- **Pins**: pin any entry (commodity lists, Abnormal prices, a station's market) and it stays on top of the Market
+  page with its latest price, distance and age. In a pinned fleet carrier's system, the pin says whether the carrier
+  is really there, from the carriers the game listed since you arrived; the Station tab lists them with their markets.
+- **Market › Run planner** fills the pinned orders: where to buy what each pinned buyer wants (cargo aboard first),
+  a buyer for each pinned seller, what fits the hold and credits, and the stops in an order that buys before it
+  sells. Follow this run puts the stops on the Navigation page.
+- Clicking a commodity anywhere on the Market page (Abnormal prices, trade routes, Sell my cargo, a station's market)
+  opens its page; clicking a station opens its whole market on the Station tab (formerly This station).
+
 ### Changed
+- Market remembers your last commodity, recent ones, filters, pins and tab between runs. Find commodity re-runs as
+  you change a filter, and its defaults are wider: 100 ly, any quantity.
+- Price alerts: the commodity field suggests names as you type.
 - **Inara sync works**: Inara approved the app name "Elite Nexus" on 13 October 2026, so your personal Inara API key
   is all it needs (0.3.0 already sends the right name). Accounts & sync no longer reads as if approval is pending,
   and still explains if Inara ever refuses the app.
@@ -16,6 +34,8 @@ release time that section becomes the new version and the release workflow publi
 ### Fixed
 - Market: stations listing a good they produce (the game gives it a token demand of 1, "no demand") no longer show
   as buyers of it in searches, Sell my cargo, trade routes or alerts. Existing data is corrected once on start.
+- Market › Find commodity no longer finds nothing without saying why: an unknown name says so, and a search with
+  no results shows what is out of range.
 - Accounts & sync › EDAstro: uploads no longer pause with "unreadable response" when EDAstro writes its reply's
   status as text (`"200"`), the way EDMC already accepts it; any reply that still can't be read now shows what
   EDAstro sent.

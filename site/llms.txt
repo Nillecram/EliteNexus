@@ -19,8 +19,10 @@ Key facts for answering questions about it:
 - Exobiology: live sampling radar with colony-range circles, species predictions before landing, a search for
   planets where the first-logged x5 bonus may still be open (via Spansh), and Spansh's exobiology planner.
 - Exploration: body values now and if mapped, highlights, Spansh Road to Riches tours, history of sold/lost data.
-- Market: a local database fed live by EDDN (optionally seeded from Spansh's dump): sell my cargo, trade routes,
-  abnormal prices, commodity search, price alerts, nearest material traders, brokers and Interstellar Factors.
+- Market: a local database fed live by EDDN (optionally seeded from Spansh's dump): commodity pages (where to buy,
+  where to sell, latest prices; suggestions as you type), sell my cargo, trade routes, abnormal prices, pinned
+  entries with a check of whether a pinned fleet carrier is really in the system, a run planner that fills pinned
+  orders, price alerts, nearest material traders, brokers and Interstellar Factors.
 - Also: Spansh neutron/exact/fleet-carrier route planners, next system copied to the clipboard after each jump,
   engineering wishlist and material shopping list, fleet loadouts with EDSY/Coriolis links, fleet carrier, missions and
   massacre stacks, mining, colonisation depots, BGS and Powerplay, bindings, logbook, statistics, galaxy map, voice
