@@ -5,8 +5,9 @@
 # -Tab:  market sections (abnormal, database, ...), galaxy (whole-galaxy map), find / history /
 #        unsold (Exploration), untouched / known (Exobiology > Find planets). find, untouched and
 #        known start their search on the first frame, so give them -Delay 15-25 for Spansh.
-#        With -Page Hud: glare (the Glare and exposure tab) or a preset name (mocha, royalpurple, ...)
-#        to start the HUD colours tab from.
+#        With -Page Hud: glare or cockpit (those tabs), or a preset name (mocha, royalpurple, ...)
+#        to start the HUD colours tab from. Set ELITE_NEXUS_GAME_DIR to show Cockpit lights for a
+#        test copy of the game folder instead of the real one.
 # -Demo: a sample Ask conversation and an alert banner. -Exe: another build (e.g. an agent's own
 #        CARGO_TARGET_DIR). The data folder is the build's own (target\debug\nexus-data).
 param(

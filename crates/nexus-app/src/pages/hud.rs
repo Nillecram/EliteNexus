@@ -28,11 +28,13 @@ enum View {
 enum Tab {
     Colours,
     Glare,
+    Cockpit,
 }
 
 pub struct HudUi {
     tab: Tab,
     glare: super::glare::GlareUi,
+    cockpit: super::cockpit::CockpitUi,
     /// The override file as last read or written.
     file: Option<Result<OverrideFile, String>>,
     /// The colours the game will use from the file: `Ok(None)` = standard.
@@ -57,6 +59,7 @@ impl Default for HudUi {
         HudUi {
             tab: Tab::Colours,
             glare: Default::default(),
+            cockpit: Default::default(),
             file: None,
             current: Ok(None),
             installs: Vec::new(),
@@ -74,11 +77,12 @@ impl Default for HudUi {
 }
 
 impl HudUi {
-    /// `tab` (screenshots): `glare` opens Glare and exposure; a preset name such as `mocha` or
-    /// `royalpurple` starts the colours from that theme.
+    /// `tab` (screenshots): `glare` opens Glare and exposure, `cockpit` Cockpit lights; a preset name
+    /// such as `mocha` or `royalpurple` starts the colours from that theme.
     pub fn new(tab: Option<&str>) -> Self {
         match tab {
             Some(t) if t.eq_ignore_ascii_case("glare") => HudUi { tab: Tab::Glare, ..Default::default() },
+            Some(t) if t.eq_ignore_ascii_case("cockpit") => HudUi { tab: Tab::Cockpit, ..Default::default() },
             _ => HudUi { start_preset: tab.map(str::to_owned), ..Default::default() },
         }
     }
@@ -101,7 +105,14 @@ impl HudUi {
         };
         self.start_from(self.current.clone().ok().flatten().unwrap_or(HudMatrix::IDENTITY));
         self.file = Some(file);
-        self.installs = nexus_hud::install::find_installs();
+        // ELITE_NEXUS_GAME_DIR: another game folder (one holding EliteDangerous64.exe), e.g. a test copy.
+        self.installs = match std::env::var_os("ELITE_NEXUS_GAME_DIR") {
+            Some(dir) => {
+                let folder = std::path::PathBuf::from(dir);
+                vec![GameInstall { shader_mod: nexus_hud::install::shader_mod(&folder), folder, store: "custom" }]
+            }
+            None => nexus_hud::install::find_installs(),
+        };
         self.glare.reload(self.file.as_ref(), &self.installs);
         let wanted = self.start_preset.take().map(|t| t.replace([' ', '-', '_'], "").to_ascii_lowercase());
         if let Some(p) = wanted.and_then(|t| presets::ALL.iter().find(|p| p.name.replace(' ', "").eq_ignore_ascii_case(&t))) {
@@ -130,11 +141,11 @@ impl HudUi {
 }
 
 /// Returns true when the saved themes changed (settings to save).
-pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bool) -> bool {
+pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bool, rt: &tokio::runtime::Handle) -> bool {
     if st.file.is_none() {
         st.load();
     }
-    if let Some(t) = widgets::tabs(ui, st.tab, &[(Tab::Colours, "HUD colours"), (Tab::Glare, "Glare and exposure")]) {
+    if let Some(t) = widgets::tabs(ui, st.tab, &[(Tab::Colours, "HUD colours"), (Tab::Glare, "Glare and exposure"), (Tab::Cockpit, "Cockpit lights")]) {
         st.tab = t;
     }
     ui.add_space(widgets::GAP);
@@ -142,6 +153,10 @@ pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bo
         Tab::Colours => colours(ui, st, themes, playing),
         Tab::Glare => {
             super::glare::show(ui, &mut st.glare, &mut st.file, playing);
+            false
+        }
+        Tab::Cockpit => {
+            super::cockpit::show(ui, &mut st.cockpit, &st.installs, playing, rt);
             false
         }
     }
@@ -458,15 +473,15 @@ fn limits_card(ui: &mut Ui) {
         for l in lines {
             ui.add(egui::Label::new(RichText::new(format!("•  {l}")).color(pal::TEXT)).wrap());
         }
-        section(ui, "Cockpit lights and per-element colours");
-        ui.add(
-            egui::Label::new(
-                RichText::new("The game has no setting for these. EDHM (Elite Dangerous HUD Mod) changes them by adding a graphics hook (3Dmigoto) to the game's folder that swaps the game's shaders while it runs. It needs a fix after almost every game update, and Frontier tolerates it without having approved it.")
-                    .color(pal::DIM),
-            )
-            .wrap(),
-        );
-        ui.hyperlink_to(format!("{} EDHM-UI on GitHub", icon::ARROW_SQUARE_OUT), "https://github.com/BlueMystical/EDHM_UI");
+        section(ui, "Elsewhere on this page");
+        let more = [
+            "Cockpit lights: the game has no setting for them, so the Cockpit lights tab dims them with Elite Nexus's own dimmer.",
+            "Glare and exposure: how bright lights glare and how the picture is exposed, in the same file as these colours.",
+            "Colours for single HUD elements (a scanner of its own colour, say) aren't possible with the game's setting, and Elite Nexus doesn't offer them yet.",
+        ];
+        for l in more {
+            ui.add(egui::Label::new(RichText::new(format!("•  {l}")).color(pal::DIM)).wrap());
+        }
     });
 }
 

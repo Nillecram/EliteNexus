@@ -5,6 +5,7 @@ pub mod ask;
 pub mod bgs;
 pub mod bindings;
 pub mod carrier;
+pub mod cockpit;
 pub mod colonisation;
 pub mod compact;
 pub mod dashboard;

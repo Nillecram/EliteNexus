@@ -9,7 +9,9 @@
 //! * [`presets`]: community themes, credited.
 //! * [`install`]: the game's install folders and whether a shader mod (EDHM) is in one.
 //! * [`tone`]: glare and exposure, the tone-mapping values in the same file.
+//! * [`dimmer`]: the cockpit-light dimmer (3Dmigoto and a pattern for the game's box-light shader).
 
+pub mod dimmer;
 pub mod error;
 pub mod install;
 pub mod matrix;

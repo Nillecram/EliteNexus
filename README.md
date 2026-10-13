@@ -80,7 +80,9 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 * **HUD & cockpit** — recolour or dim the HUD with the game's own colour setting: community themes, a colour wheel,
   brightness, a live cockpit preview that warns when friend and foe would look alike. **Glare and exposure** tames
   the glare of cockpit lights with the game's tone-mapping values. Safe edits of `GraphicsConfigurationOverride.xml`:
-  only the values you change are written, and the original is kept.
+  only the values you change are written, and the original is kept. **Cockpit lights** dims the cockpit's own
+  lights (and nothing else) with 3Dmigoto and a pattern for the game's light shader, installed and removed in one
+  click.
 * **Accounts & sync** — strictly compliant EDDN contribution, EDSM journal sync, Inara profile sync, EDAstro. All opt-in;
   only live events (never history); persistent retry queues that respect each service's rate limits.
 * **Alerts & voice** — toasts plus Windows speech for high-value bodies, likely high-value biology, sample spacing,

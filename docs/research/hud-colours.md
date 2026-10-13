@@ -166,6 +166,14 @@ shaders are kept outside git in `target-agents\cockpit-capture-2026-10-13\` (Fro
   confirmed: only the cockpit lights dim, strength and on/off behave, nothing else changes. A 3 m reach let
   some of this ship's cockpit lights back (they sit up to ~5 m away), so the reach should not go below ~5 m
   by default and should be adjustable per ship.
+- **In Elite Nexus** (`nexus_hud::dimmer`, HUD & cockpit › Cockpit lights): the test's hash-named fix held the
+  game's whole shader, which can't be shipped, so the dimmer is a `[ShaderRegex]`: the pattern requires the box
+  light's four input declarations and its last three lines (`mul o0.xyz, rN.xyzx, cb2[0].xxxx`, the luminance
+  `dp3` with 0.3086/0.6094/0.082 and `mul o1.x`), and the replacement inserts the distance test before them with
+  two `temps` and `t120` declared through `InsertDeclarations`. Checked offline against the 309 pixel shaders the
+  game loaded (Rust `regex`, case-insensitive, as 3Dmigoto's PCRE2): it matches exactly `3f366702d540af3e` and
+  `7d85f63f9ab11daf`, a box-light variant with the same inputs. Pinned: the release archive (SHA-256 `d5d05e78…`),
+  `x64\d3d11.dll` (`791aa68b…`) and `x64\d3dcompiler_47.dll` (`a05f9973…`).
 - HUD: the panels are first drawn into their own textures (draws 3-192) by three small shared shaders that output
   texture × colour + colour, the colours coming from per-element data. The compositor `f2ce89f2c5d390ce` then
   places each panel in the cockpit (with a per-panel tint `cb2[8]`), and other HUD parts are drawn straight into

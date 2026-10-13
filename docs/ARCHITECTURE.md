@@ -21,9 +21,11 @@ Agents/parallel builds: set your own `CARGO_TARGET_DIR` (e.g. `target-agents\<na
 the window is placed off-screen and never takes focus). `--size 1000x700` tests responsive layouts, `--tab <name>` opens
 a Market section (`abnormal`, `database`, …), the whole-galaxy map (`galaxy`), an Exploration tab (`find`, `history`,
 `unsold`), Exobiology › Find planets (`untouched`, `known`; these three searches start on the first frame of a
-screenshot run), HUD & cockpit's Glare and exposure tab (`glare`) or a HUD colours preset to start from (`mocha`,
+screenshot run), HUD & cockpit's tabs (`glare`, `cockpit`) or a HUD colours preset to start from (`mocha`,
 `royalpurple`, …), `--demo` adds a sample Ask conversation and an alert banner, `--shot-delay 8` waits longer (the
-galaxy image paints in the background, Spansh searches take 5–20 s).
+galaxy image paints in the background, Spansh searches take 5–20 s). `ELITE_NEXUS_GAME_DIR` points HUD & cockpit at
+another game folder (one holding `EliteDangerous64.exe`): test the Cockpit lights installer against a copy, never
+the owner's game.
 
 ## Crates
 
@@ -37,7 +39,7 @@ galaxy image paints in the background, Spansh searches take 5–20 s).
 | `nexus-uplink` | **uploads**: EDDN (schema-validated, strictly compliant), EDSM journal sync, Inara, EDAstro; persistent retry queues (`nexus-data\uplink\*.jsonl`), per-service rate limits | journal |
 | `nexus-spansh` | Spansh API client: neutron/galaxy/carrier/riches/exobio/trade plotters, system/station/body search | — |
 | `nexus-binds` | `.binds` parser, conflicts/missing essentials, printable reference card | — |
-| `nexus-hud` | HUD colour matrix: maths and previews (linear light), surgical edits of `GraphicsConfigurationOverride.xml` (only the `<Matrix…>` rows, backup once, atomic), credited community presets, friend/foe readability checks, game install and EDHM detection, tone mapping (glare, ACES curve, auto-exposure targets in `<HDRNode_Reference>`) | — |
+| `nexus-hud` | HUD colour matrix: maths and previews (linear light), surgical edits of `GraphicsConfigurationOverride.xml` (only the `<Matrix…>` rows, backup once, atomic), credited community presets, friend/foe readability checks, game install and EDHM detection, tone mapping (glare, ACES curve, auto-exposure targets in `<HDRNode_Reference>`), the cockpit-light dimmer (`dimmer`: 3Dmigoto from its official release with pinned SHA-256s and a pure-Rust 7z reader, a `[ShaderRegex]` pattern that patches the game's box-light shader at load, install / settings / removal tracked by a manifest in the game folder) | — |
 | `nexus-ai` | built-in assistant: providers (Gemini via its OpenAI-compatible endpoint, Claude Messages API with prompt caching, local/other OpenAI-compatible), tool-calling loop, embedded knowledge base (`knowledge/*.md` + `docs/USER_GUIDE.md`, BM25 search) | — |
 | `nexus-app` | egui 0.36 / eframe (wgpu) GUI, services wiring, TTS, toasts | everything |
 

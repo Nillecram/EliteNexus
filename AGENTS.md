@@ -12,7 +12,8 @@ alike. Read it before your first change; several rules protect the owner's game,
   update it in the same commit.
 * `CHANGELOG.md`: what changed in each release. Add your user-visible changes under "Unreleased" as you go; the
   release workflow publishes each version's section as its release notes.
-* `docs/research/`: verified specs (EDDN, EDSM, Inara, CAPI, Spansh, the journal, engineering, exploration). Check
+* `docs/research/`: verified specs (EDDN, EDSM, Inara, CAPI, Spansh, the journal, engineering, exploration, HUD
+  colours and cockpit lights). Check
   them before touching an integration; the live EDDN service differs from its GitHub docs, for one.
 
 ## This machine
@@ -27,6 +28,10 @@ alike. Read it before your first change; several rules protect the owner's game,
   with DPAPI-sealed API keys, the galaxy database, upload queues). Never read, change or delete that data. Debug
   builds keep their own in `target\debug\nexus-data\`.
 * The journals in `%USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous` are read-only to us.
+* The game folder (`D:\SteamLibrary\steamapps\common\Elite Dangerous\Products\elite-dangerous-odyssey-64`) is the
+  owner's too: Elite Nexus changes it only when the owner clicks (HUD & cockpit › Cockpit lights). Test that code
+  against a copy (`ELITE_NEXUS_GAME_DIR`). Frontier's shader code (3Dmigoto exports, frame captures) never goes
+  into git; keep it under `target-agents\`.
 
 ## Hard rules
 
@@ -68,8 +73,8 @@ open the PNG to look at it. Check a narrow (1000 px) and a wide size when a layo
 
 * `-Page`: a sidebar page (`Dashboard`, `Exploration`, `Exobiology`, `Navigation`, `Market`, `Settings`, ...).
 * `-Tab`: `abnormal`, `database`, ... (Market), `galaxy` (whole-galaxy map), `find`, `history`, `unsold`
-  (Exploration), `untouched`, `known` (Exobiology > Find planets), `glare` or a preset name such as `mocha` (Hud: the
-  Glare and exposure tab, or HUD colours starting from that theme; nothing is written). `find`, `untouched` and
+  (Exploration), `untouched`, `known` (Exobiology > Find planets), `glare`, `cockpit` or a preset name such as `mocha`
+  (Hud: that tab, or HUD colours starting from that theme; nothing is written). `find`, `untouched` and
   `known` start their search on the first frame: add `-Delay 15` to `-Delay 25` for Spansh to answer.
 * `-Demo` adds a sample Ask conversation and an alert banner.
 

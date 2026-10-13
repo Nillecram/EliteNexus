@@ -164,7 +164,7 @@ fn explain(ui: &mut Ui, defaults_from: Option<&str>) {
         }
         section(ui, "Not here");
         let not = [
-            "The cockpit lamps keep their own brightness: the game has no setting for them.",
+            "The cockpit lamps keep their own brightness here: the game has no setting for them. The Cockpit lights tab dims them.",
             "Bloom, in the game's Graphics options, sets how much bright lights glow; Off removes that glow altogether.",
         ];
         for l in not {

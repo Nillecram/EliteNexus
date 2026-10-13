@@ -1,6 +1,6 @@
 [package]
 name = "nexus-hud"
-description = "Elite Dangerous HUD colours: the GraphicsConfigurationOverride.xml colour matrix, presets and previews"
+description = "Elite Dangerous HUD and cockpit: the HUD colour matrix and tone mapping in GraphicsConfigurationOverride.xml, and the cockpit-light dimmer"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,5 +10,10 @@ publish.workspace = true
 roxmltree.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sevenz-rust2 = { version = "0.24", default-features = false }
+sha2 = "0.11"
 thiserror.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+regex = "1"

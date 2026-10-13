@@ -19,6 +19,12 @@ release time that section becomes the new version and the release workflow publi
   file: glare from lights (`GlareCompensation`), the standard ACES tone curve (the page shows how much brighter darks
   and mid-tones get) and the auto-exposure targets, with presets for the game's values, less glare, and CMDR
   Morbad's 2021 Odyssey settings. The game's own values are read from its install.
+- **HUD & cockpit › Cockpit lights**: dim the cockpit's own lights, which the game has no setting for. Elite Nexus
+  installs 3Dmigoto (downloaded from its official release and checked against pinned checksums) with a pattern
+  that adjusts the game's light shader as it loads, so lights within a reach of your eyes keep only part of their
+  light; stations, carriers, planets and the HUD are untouched. Set the light kept, the reach and on/off in the
+  tab or with F9, F10 and F11 in the game; Remove takes out exactly what was installed. The game's code is never
+  copied, so most game updates don't break it. Leaves EDHM and other 3Dmigoto mods alone.
 
 ## [0.2.2] - 2026-10-12
 
