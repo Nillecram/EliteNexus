@@ -274,6 +274,37 @@ impl GalaxyDb {
         )
     }
 
+    /// Galaxy-wide facts about one commodity: its galactic average, how many markets sell and buy
+    /// it (prices up to `max_age_hours` old), the cheapest and best prices. `None` when the name
+    /// is not a known commodity.
+    pub fn commodity_summary(
+        &self,
+        commodity: &str,
+        max_age_hours: Option<f64>,
+    ) -> Result<Option<CommoditySummary>> {
+        let conn = self.inner.pool.get()?;
+        let cache = self.inner.shared.commodities.read();
+        let Some(cid) = cache.resolve(commodity) else {
+            return Ok(None);
+        };
+        query::commodity_summary(&conn, &self.inner.shared.stations, &cache, cid, max_age_hours)
+    }
+
+    /// Every market trading one commodity, newest update first, with both its prices (the query's
+    /// `mode` and `sort` are ignored).
+    pub fn latest_prices(&self, q: &CommodityQuery) -> Result<Vec<CommodityQuote>> {
+        let cid = self.inner.shared.commodities.read().resolve(&q.commodity);
+        let Some(cid) = cid else {
+            return Ok(Vec::new());
+        };
+        query::latest_prices(
+            &*self.inner.pool.get()?,
+            &self.inner.shared.stations,
+            cid,
+            q,
+        )
+    }
+
     /// Station details + system + every market row with commodity names.
     pub fn station_market(&self, market_id: u64) -> Result<Option<StationMarket>> {
         let conn = self.inner.pool.get()?;

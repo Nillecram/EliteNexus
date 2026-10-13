@@ -1236,3 +1236,61 @@ fn price_deals_rank_by_value_and_fill_carrier_averages() {
     let anywhere = db.price_deals(&DealQuery { max_distance_ly: None, ..q }).expect("deals");
     assert_eq!(anywhere[0].station, "Far Out", "150 000 Cr over average beats the carrier when distance does not matter");
 }
+
+#[test]
+fn commodity_summary_and_latest_prices() {
+    let t = TempDb::new("summary");
+    let db = t.db();
+    let carrier = 3_700_000_002u64;
+    let ts = now() - 600;
+    db.ingest_many(vec![
+        system(SYS_A, "Alpha", [0.0, 0.0, 0.0]),
+        system(SYS_B, "Beta", [10.0, 0.0, 0.0]),
+        system(SYS_C, "Gamma", [100.0, 0.0, 0.0]),
+        station(21, "Alpha Port", SYS_A, "Alpha", "Coriolis", &["dock", "commodities"], "Industrial"),
+        station(22, "Beta Hub", SYS_B, "Beta", "Outpost", &["dock", "commodities"], "Industrial"),
+        station(23, "Far Out", SYS_C, "Gamma", "Coriolis", &["dock", "commodities"], "Industrial"),
+        station(carrier, "Q2Q-22Q", SYS_B, "Beta", "FleetCarrier", &["dock", "commodities"], "Carrier"),
+        // Alpha sells gold, Beta and Far Out buy it, the carrier buys it too (no average reported).
+        market(21, "Alpha", "Alpha Port", ts - 300, &[("gold", 9_000, 8_800, 500, 0)]),
+        market(22, "Beta", "Beta Hub", ts - 200, &[("gold", 0, 9_500, 0, 40)]),
+        market(23, "Gamma", "Far Out", ts - 100, &[("gold", 0, 9_900, 0, 2_000)]),
+        market(carrier, "Beta", "Q2Q-22Q", ts, &[("gold", 0, 12_000, 0, 10)]),
+    ]);
+    // Alpha re-priced, listing its own gold the way the game does: demand 1, demand bracket 0 ("no demand").
+    let mut producer = priced(21, "Alpha", "Alpha Port", Some("Coriolis"), &[("gold", 9_000, 8_800, 9_400, 500, 1)]);
+    if let Ingest::Market(m) = &mut producer {
+        m.items[0].demand_bracket = Some(0);
+    }
+    db.ingest(producer);
+    db.flush().expect("flush");
+
+    let s = db.commodity_summary("Gold", Some(72.0)).expect("summary").expect("known commodity");
+    assert_eq!((s.symbol.as_str(), s.name.as_str(), s.category.as_str()), ("gold", "Gold", "Metals"));
+    assert_eq!((s.sellers, s.carrier_sellers, s.buyers, s.carrier_buyers), (1, 0, 3, 1), "the producer's demand 1 is no demand");
+    let sell = CommodityQuery { commodity: "gold".into(), mode: TradeMode::SellToStation, ..Default::default() };
+    assert!(db.search_commodity(&sell).expect("sell").iter().all(|h| h.station != "Alpha Port"));
+    assert_eq!((s.lowest_buy, s.highest_sell), (Some(9_000), Some(12_000)));
+    assert_eq!(s.average, Some(9_400));
+    assert!(db.commodity_summary("no such thing", None).expect("summary").is_none());
+    // Thargoid salvage resolves by its display name although its symbol is UnknownArtifact2.
+    let probe = db.commodity_summary("thargoid probe", None).expect("summary").expect("known");
+    assert_eq!((probe.symbol.as_str(), probe.sellers, probe.buyers), ("unknownartifact2", 0, 0));
+
+    // Newest first, one row per market with both prices.
+    let q = CommodityQuery { commodity: "gold".into(), origin: Some([0.0; 3]), ..Default::default() };
+    let latest = db.latest_prices(&q).expect("latest");
+    let names: Vec<&str> = latest.iter().map(|l| l.station.as_str()).collect();
+    assert_eq!(names, vec!["Alpha Port", "Q2Q-22Q", "Far Out", "Beta Hub"], "the re-priced Alpha Port is newest");
+    assert_eq!((latest[0].buy, latest[0].sell, latest[0].stock, latest[0].demand, latest[0].mean), (9_000, 8_800, 500, 0, 9_400));
+    assert_eq!(latest[2].distance_ly, Some(100.0));
+    assert!(latest[1].is_carrier);
+    // The commodity search filters apply.
+    let near = db
+        .latest_prices(&CommodityQuery { max_distance_ly: Some(50.0), include_carriers: false, min_pad: Some('L'), ..q.clone() })
+        .expect("latest");
+    let names: Vec<&str> = near.iter().map(|l| l.station.as_str()).collect();
+    assert_eq!(names, vec!["Alpha Port"], "Far Out is too far, the carrier is excluded, the outpost has no large pad");
+    let busy = db.latest_prices(&CommodityQuery { min_quantity: 100, ..q }).expect("latest");
+    assert_eq!(busy.len(), 2, "stock or demand of at least 100: Alpha Port and Far Out");
+}

@@ -1,7 +1,7 @@
 //! Public data types: what goes into the database ([`Ingest`]) and what comes out of queries.
 
 use crate::services::{MaterialTrader, Services, TechBroker};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Where a piece of data came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize)]
@@ -303,7 +303,7 @@ pub struct BodySignals {
 // ---------------------------------------------------------------------------------------------
 
 /// Direction of a commodity search, from the player's point of view.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum TradeMode {
     /// Stations that sell the commodity (you buy): lowest price first, needs stock.
     #[default]
@@ -313,7 +313,7 @@ pub enum TradeMode {
 }
 
 /// Result ordering.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Sort {
     #[default]
     BestPrice,
@@ -376,6 +376,52 @@ pub struct CommodityHit {
     pub updated_unix: i64,
     pub is_carrier: bool,
     pub is_planetary: bool,
+}
+
+/// What the database knows about one commodity across the whole galaxy (no distance or station
+/// filters): for the head of a commodity page.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CommoditySummary {
+    pub symbol: String,
+    pub name: String,
+    pub category: String,
+    pub is_rare: bool,
+    /// The in-game galactic average: the one most stations report (`None` when none does).
+    pub average: Option<i64>,
+    /// Markets with stock to sell (you buy there), within the age limit.
+    pub sellers: u32,
+    pub carrier_sellers: u32,
+    /// Markets with demand (you sell there), within the age limit.
+    pub buyers: u32,
+    pub carrier_buyers: u32,
+    /// Cheapest price anyone sells for / best price anyone pays (carriers included).
+    pub lowest_buy: Option<i64>,
+    pub highest_sell: Option<i64>,
+    /// Newest price of this commodity anywhere (unix seconds).
+    pub newest_unix: Option<i64>,
+}
+
+/// One market's full row for a commodity (both directions), for a "latest prices" list.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CommodityQuote {
+    pub market_id: u64,
+    pub station: String,
+    pub station_type: Option<String>,
+    pub system: String,
+    pub distance_ly: Option<f64>,
+    pub dist_ls: Option<f64>,
+    pub max_pad: Option<char>,
+    pub is_carrier: bool,
+    pub is_planetary: bool,
+    /// 0 when the station does not sell it.
+    pub buy: i64,
+    /// 0 when the station does not buy it.
+    pub sell: i64,
+    /// The galactic average the station reports (0 for fleet carriers).
+    pub mean: i64,
+    pub stock: i64,
+    pub demand: i64,
+    pub updated_unix: i64,
 }
 
 // ---------------------------------------------------------------------------------------------

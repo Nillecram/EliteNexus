@@ -298,6 +298,159 @@ pub(crate) fn search_commodity(
     Ok(out)
 }
 
+/// Rows of one commodity with stock (`market_sellers`) or demand (`market_buyers`): the WHERE
+/// clauses repeat the partial-index conditions word for word, so SQLite reads only the index.
+const SELLER_ROWS: &str = "SELECT market_id, buy, stock, updated FROM market \
+     WHERE commodity_id = ?1 AND buy > 0 AND stock > 0 AND stock >= ?2 AND updated >= ?3";
+const BUYER_ROWS: &str = "SELECT market_id, sell, demand, updated FROM market \
+     WHERE commodity_id = ?1 AND sell > 0 AND demand > 0 AND demand >= ?2 AND updated >= ?3";
+
+/// Galaxy-wide counts and extremes for one commodity (only the age limit applies).
+pub(crate) fn commodity_summary(
+    conn: &Connection,
+    index: &RwLock<StationIndex>,
+    cache: &CommodityCache,
+    cid: i64,
+    max_age_hours: Option<f64>,
+) -> Result<Option<CommoditySummary>> {
+    let Some(meta) = cache.meta(cid) else {
+        return Ok(None);
+    };
+    let mut s = CommoditySummary {
+        symbol: meta.symbol.clone(),
+        name: meta.name.clone(),
+        category: meta.category.clone(),
+        is_rare: meta.rare,
+        average: crate::deals::global_average(conn, cid)?,
+        sellers: 0,
+        carrier_sellers: 0,
+        buyers: 0,
+        carrier_buyers: 0,
+        lowest_buy: None,
+        highest_sell: None,
+        newest_unix: None,
+    };
+    let cutoff = age_cutoff(max_age_hours);
+    let idx = index.read();
+    for (sql, selling) in [(SELLER_ROWS, true), (BUYER_ROWS, false)] {
+        let mut stmt = conn.prepare_cached(sql)?;
+        let mut rows = stmt.query(params![cid, 1, cutoff])?;
+        while let Some(r) = rows.next()? {
+            let Some(st) = idx.get(r.get(0)?) else {
+                continue;
+            };
+            let price: i64 = r.get(1)?;
+            let updated: i64 = r.get(3)?;
+            s.newest_unix = Some(s.newest_unix.map_or(updated, |n| n.max(updated)));
+            let carrier = u32::from(st.is_carrier());
+            if selling {
+                s.sellers += 1;
+                s.carrier_sellers += carrier;
+                s.lowest_buy = Some(s.lowest_buy.map_or(price, |p| p.min(price)));
+            } else {
+                s.buyers += 1;
+                s.carrier_buyers += carrier;
+                s.highest_sell = Some(s.highest_sell.map_or(price, |p| p.max(price)));
+            }
+        }
+    }
+    Ok(Some(s))
+}
+
+/// Every market trading one commodity (stock or demand of at least `min_quantity`), newest
+/// update first. `mode` and `sort` are ignored; the other filters apply as in a commodity search.
+pub(crate) fn latest_prices(
+    conn: &Connection,
+    index: &RwLock<StationIndex>,
+    cid: i64,
+    q: &CommodityQuery,
+) -> Result<Vec<CommodityQuote>> {
+    let limit = q.limit.clamp(1, 100_000);
+    let filter = StationFilter {
+        min_pad: pad_code(q.min_pad) as u8,
+        carriers: q.include_carriers,
+        planetary: q.include_planetary,
+        max_dist_ls: -1.0,
+    };
+    let max_d = q.max_distance_ly.filter(|d| d.is_finite() && *d >= 0.0);
+    // (market, updated, distance), one entry per market even when it both sells and buys.
+    let mut cands: Vec<(i64, i64, Option<f64>)> = Vec::new();
+    {
+        let idx = index.read();
+        let mut seen = rustc_hash::FxHashSet::default();
+        for sql in [SELLER_ROWS, BUYER_ROWS] {
+            let mut stmt = conn.prepare_cached(sql)?;
+            let mut rows = stmt.query(params![
+                cid,
+                q.min_quantity.max(1),
+                age_cutoff(q.max_age_hours)
+            ])?;
+            while let Some(r) = rows.next()? {
+                let market_id: i64 = r.get(0)?;
+                let Some(st) = idx.get(market_id) else {
+                    continue;
+                };
+                if !filter.passes(st) || seen.contains(&market_id) {
+                    continue;
+                }
+                let d = match (q.origin, st.pos) {
+                    (Some(o), Some(p)) => Some(dist(o, p)),
+                    _ => None,
+                };
+                if let Some(m) = max_d
+                    && !d.is_some_and(|d| d <= m)
+                {
+                    continue;
+                }
+                seen.insert(market_id);
+                cands.push((market_id, r.get(3)?, d));
+            }
+        }
+    }
+    let newest = |a: &(i64, i64, Option<f64>), b: &(i64, i64, Option<f64>)| {
+        b.1.cmp(&a.1)
+            .then(a.2.unwrap_or(f64::INFINITY).total_cmp(&b.2.unwrap_or(f64::INFINITY)))
+    };
+    if cands.len() > limit {
+        cands.select_nth_unstable_by(limit, newest);
+        cands.truncate(limit);
+    }
+    cands.sort_by(newest);
+
+    let mut stmt = conn.prepare_cached(
+        "SELECT m.buy, m.sell, m.mean, m.stock, m.demand, m.updated, \
+                s.name, s.type, s.system_name, s.dist_ls, s.max_pad, s.is_carrier, s.is_planetary \
+         FROM market AS m JOIN stations AS s ON s.market_id = m.market_id \
+         WHERE m.market_id = ?1 AND m.commodity_id = ?2",
+    )?;
+    let mut out = Vec::with_capacity(cands.len());
+    for (market_id, _, d) in cands {
+        let quote = stmt
+            .query_row(params![market_id, cid], |r| {
+                Ok(CommodityQuote {
+                    market_id: market_id as u64,
+                    buy: r.get(0)?,
+                    sell: r.get(1)?,
+                    mean: r.get(2)?,
+                    stock: r.get(3)?,
+                    demand: r.get(4)?,
+                    updated_unix: r.get(5)?,
+                    station: r.get(6)?,
+                    station_type: r.get(7)?,
+                    system: r.get(8)?,
+                    distance_ly: d,
+                    dist_ls: r.get(9)?,
+                    max_pad: Pad::from_code(r.get(10)?).map(Pad::as_char),
+                    is_carrier: r.get::<_, i64>(11)? != 0,
+                    is_planetary: r.get::<_, i64>(12)? != 0,
+                })
+            })
+            .optional()?;
+        out.extend(quote);
+    }
+    Ok(out)
+}
+
 // ---------------------------------------------------------------------------------------------
 // Stations
 // ---------------------------------------------------------------------------------------------
