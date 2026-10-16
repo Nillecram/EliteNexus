@@ -1,6 +1,6 @@
 # Push a tag like v0.1.0 (GitHub Desktop: History → right-click a commit → Create Tag, then Push)
-# and this builds EliteNexus.exe and publishes it as a GitHub Release, with that version's section of
-# CHANGELOG.md as the release notes. See AGENTS.md › Releases.
+# and this builds Elite Nexus for Windows and Linux and publishes both as a GitHub Release, with that
+# version's section of CHANGELOG.md as the release notes. See AGENTS.md › Releases.
 name: Release
 
 on:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -31,6 +31,47 @@ jobs:
           # A checksum file next to the zip, so a download can be checked (Get-FileHash <zip>).
           $hash = (Get-FileHash -Algorithm SHA256 "out\$name.zip").Hash.ToLower()
           "$hash  $name.zip" | Set-Content "out\$name.zip.sha256" -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            out/*.zip
+            out/*.zip.sha256
+
+  linux:
+    # Ubuntu 22.04's glibc (2.35), so the binary also starts on older distributions and SteamOS.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release -p nexus-app
+      - name: Package
+        run: |
+          name="EliteNexus-${GITHUB_REF_NAME}-linux-x64"
+          mkdir -p "out/$name"
+          cp target/release/EliteNexus LICENSE README.md NOTICE.md docs/USER_GUIDE.md "out/$name/"
+          cp data/fonts/inter/LICENSE.txt "out/$name/Inter-LICENSE.txt"
+          tar -C out -czf "out/$name.tar.gz" "$name"
+          # Check a download with: sha256sum -c <file>.sha256
+          (cd out && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            out/*.tar.gz
+            out/*.tar.gz.sha256
+
+  publish:
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
       - name: Release notes
         shell: pwsh
         run: |
@@ -49,11 +90,13 @@ jobs:
             if ($continues) { $notes[-1] = $notes[-1] + ' ' + $l.Trim() } else { $notes += $l }
           }
           if (-not ($notes -join '').Trim()) { $notes = @('See CHANGELOG.md for what changed.') }
-          $notes | Set-Content out\notes.md -Encoding utf8NoBOM
+          $notes | Set-Content out/notes.md -Encoding utf8NoBOM
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             out/*.zip
             out/*.zip.sha256
+            out/*.tar.gz
+            out/*.tar.gz.sha256
           body_path: out/notes.md
           generate_release_notes: true

@@ -1,7 +1,7 @@
 # Working on Elite Nexus
 
-Elite Nexus is a native Rust (egui) companion for Elite Dangerous: one Windows executable that replaces the pile of
-tools and websites commanders run side by side. This file is for anyone changing the code, people and AI agents
+Elite Nexus is a native Rust (egui) companion for Elite Dangerous: one executable for Windows (and Linux, where the
+game runs under Proton) that replaces the pile of tools and websites commanders run side by side. This file is for anyone changing the code, people and AI agents
 alike. Read it before your first change; several rules protect the owner's game, data and machine.
 
 ## Read first
@@ -34,6 +34,26 @@ alike. Read it before your first change; several rules protect the owner's game,
   owner's too: Elite Nexus changes it only when the owner clicks (HUD & cockpit › Cockpit lights). Test that code
   against a copy (`ELITE_NEXUS_GAME_DIR`). Frontier's shader code (3Dmigoto exports, frame captures) never goes
   into git; keep it under `target-agents\`.
+
+## Linux
+
+The game runs under Proton or Wine there, so its journals and Options sit in a Wine prefix
+(`nexus_journal::paths`: `default_journal_dir`, `options_dir`, `steam_libraries`). Keep Windows-only code behind
+`#[cfg(windows)]` with a Linux counterpart (`secrets.rs`, `tts.rs`, `main.rs`), and never link a system library
+the Linux binary might not find at start (that's why voice runs `spd-say` instead of the `tts` crate there).
+
+This PC has an Ubuntu 24.04 WSL1 distro for it, `EliteNexusLinux` (in `D:\WSL\EliteNexusLinux`; WSL2 would need a
+kernel update with admin rights). It holds Rust, Xvfb and Mesa's software Vulkan, and a Steam/Proton layout under
+`/root/.local/share/Steam` made of copies of this PC's journals, Options and control schemes. From the repository
+root:
+
+```powershell
+wsl -d EliteNexusLinux -u root -- bash tools/dev/linux.sh cargo clippy --workspace --all-targets -j 4 -- -D warnings
+wsl -d EliteNexusLinux -u root -- bash tools/dev/linux.sh cargo test --workspace -j 4
+wsl -d EliteNexusLinux -u root -- bash tools/dev/linux.sh shot --page Settings --out linux-settings --size 1000x760
+```
+
+Builds go to `/root/target` inside the distro. CI runs the same clippy and tests on `ubuntu-latest`.
 
 ## Hard rules
 
@@ -137,9 +157,10 @@ egui 0.36 layout lessons learned here:
 5. Tag `vx.y.z` **in GitHub Desktop** (History, right-click the commit, Create Tag, then Push origin). Desktop doesn't
    push tags made with the git command line; if one exists with that name, delete it (`git tag -d`) and have the
    owner click Fetch origin so Desktop forgets it.
-6. The tag runs `.github/workflows/release.yml` (about 10 minutes on a cold cache): it builds on `windows-latest`,
-   zips the exe with the README, NOTICE, user guide and Inter licence, and publishes the GitHub Release with that
-   version's CHANGELOG section as notes.
+6. The tag runs `.github/workflows/release.yml` (about 10 minutes on a cold cache): it builds on `windows-latest`
+   and `ubuntu-22.04` (an older glibc, so the binary starts on older distributions), packs the exe and the Linux
+   binary with the README, NOTICE, user guide and Inter licence (a zip and a tar.gz), and publishes the GitHub
+   Release with that version's CHANGELOG section as notes.
 7. Check it without credentials (the repo is public):
    `https://api.github.com/repos/uruskan/EliteNexus/releases/latest`.
 
