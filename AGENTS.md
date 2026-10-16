@@ -170,4 +170,11 @@ and writes `dist\EliteNexus-vx.y.z-windows-x64.zip`. It never touches `nexus-dat
   replay of a real exobiology landing (`cargo run --release -p nexus-journal --example replay`). The replay writes
   only the journal: the sampling radar takes each sample's position from `Status.json` (latitude and longitude at the
   `ScanOrganic`), and the route comes from `NavRoute.json`, so a retake has to write those next to the journal too.
+* A copy button next to every system name (a Reddit user's request, 0.4.0 launch thread; Inara has one). Click-to-copy
+  already exists on Market, Exploration, Exobiology, Engineering, Colonisation, Galaxy map and Navigation, but it
+  is invisible (a plain label with a tooltip) and each page calls `ctx.copy_text` by hand. Missing entirely: the
+  Dashboard Activity feed, because `FeedItem` (`nexus-model/src/state.rs`) keeps the system name only inside `text`;
+  give it a `system: Option<String>`. Plan: one shared `widgets::system_name` (name plus a copy icon, "Copied"
+  flash), used on every page that shows a system; then say so in `docs/USER_GUIDE.md` and `CHANGELOG.md`. Check
+  Stats, Missions, BGS, Carrier and Mining too.
 * Surface compass, on-foot farming guide, installer.
