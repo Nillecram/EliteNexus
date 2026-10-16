@@ -5,6 +5,19 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Added
+- **Linux build** (`EliteNexus-…-linux-x64.tar.gz`, 64-bit; X11 or Wayland, Vulkan or OpenGL). The game runs under
+  Proton or Wine; Elite Nexus finds its journals in the game's Proton prefix in every Steam library (native, Flatpak
+  and Snap Steam), then in Lutris's and Heroic's usual prefixes. For any other prefix, set Settings › Journal ›
+  Custom journal folder: Bindings and HUD colours then use the Options folder in that same prefix. Voice alerts use
+  speech-dispatcher's `spd-say`. API keys aren't encrypted on Linux (no DPAPI), and the app says so: the settings
+  file is readable only by your user account. Cockpit lights under Proton is untested; the tab names the Steam
+  launch option it may need. Built and tested on Ubuntu; not yet tried with the game itself under Proton.
+
+### Changed
+- Bindings finds the game's built-in control presets in every Steam library and the Epic and Frontier folders,
+  instead of four fixed Windows paths.
+
 ## [0.4.0] - 2026-10-13
 
 A rebuilt Market (a page for every commodity, pins, a run planner, lists you sort by clicking a heading), a readable

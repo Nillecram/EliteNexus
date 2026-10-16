@@ -226,6 +226,9 @@ fn controls(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: 
     });
 }
 
+/// Linux: what the game may need to load the hook under Proton. Elite Nexus hasn't been tried there.
+const PROTON_NOTE: &str = "On Linux this is untested. Proton brings its own d3d11.dll (DXVK) and may skip the one in the game folder: if calibrating finds no shaders, add WINEDLLOVERRIDES=\"d3d11,d3dcompiler_47=n,b\" %command% to Elite Dangerous's launch options in Steam (Properties › General).";
+
 fn not_installed(ui: &mut Ui, st: &mut CockpitUi, playing: bool, rt: &tokio::runtime::Handle) {
     ui.add(egui::Label::new(RichText::new("Dims your cockpit's own lights (lamps, panel glow, indicator lights) and nothing else: stations, carriers, planets and the HUD stay as they are.").color(pal::TEXT)).wrap());
     ui.add_space(6.0);
@@ -237,12 +240,15 @@ fn not_installed(ui: &mut Ui, st: &mut CockpitUi, playing: bool, rt: &tokio::run
         return;
     }
     section(ui, "Before you install");
-    let points = [
+    let mut points = vec![
         format!("Elite Nexus downloads 3Dmigoto {} (4.7 MB) from its official GitHub release and checks it against a pinned checksum. 3Dmigoto is an open-source (GPL-3.0) graphics modding tool; Elite Nexus uses it to load its own fixes, nothing else.", dimmer::MIGOTO_VERSION),
         format!("It puts d3d11.dll, d3dcompiler_47.dll, {}, {} and a ShaderFixes folder next to EliteDangerous64.exe, in the folder below. Remove takes them out again.", dimmer::CONFIG, dimmer::MANIFEST),
         "Then you calibrate once: start the game, get into your cockpit, quit. Elite Nexus finds the light shader among the ones your game loaded and keeps a fix for exactly that one.".to_string(),
         "No game file is changed: 3Dmigoto swaps the light shader in memory while the game runs. Frontier tolerates 3Dmigoto mods (commanders have used them for years) but has never approved them.".to_string(),
     ];
+    if cfg!(not(windows)) {
+        points.push(PROTON_NOTE.to_string());
+    }
     for p in points {
         ui.add(egui::Label::new(RichText::new(format!("•  {p}")).color(pal::TEXT)).wrap());
     }
@@ -513,7 +519,7 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
 
 fn explain(ui: &mut Ui) {
     card(ui, "What the dimmer does, and what it can't", |ui| {
-        let lines = [
+        let mut lines = vec![
             "The game has no setting for its cockpit lights. 3Dmigoto, a Direct3D 11 hook that sits next to the game, lets Elite Nexus change one step of how the game lights the cockpit: lights within the reach of your eyes keep only part of their light.",
             "Only the cockpit's own lights change. Stations, carriers, planets, the HUD and everything else stay exactly as the game draws them.",
             "Calibration: for one session the game records the shaders it loads; Elite Nexus finds the light shader among them by what its code looks like and keeps a fix for exactly that shader, by its fingerprint. In the game, 3Dmigoto only swaps that one shader: every other shader, including ones the game adds later (new ships, new carriers), is left alone.",
@@ -524,6 +530,9 @@ fn explain(ui: &mut Ui) {
             "It can't run alongside EDHM or another 3Dmigoto mod: they all need the game's d3d11.dll.",
             "Frontier tolerates mods like this but has never approved them.",
         ];
+        if cfg!(not(windows)) {
+            lines.push(PROTON_NOTE);
+        }
         for l in lines {
             ui.add(egui::Label::new(RichText::new(format!("•  {l}")).color(pal::TEXT)).wrap());
         }

@@ -13,7 +13,7 @@
 //! ```no_run
 //! use nexus_binds::{analyze, default_bindings_dir, find_presets, render_html};
 //!
-//! let dir = default_bindings_dir().expect("LOCALAPPDATA not set");
+//! let dir = default_bindings_dir().expect("no Options folder");
 //! let presets = find_presets(&dir)?;
 //! let bindings = presets.primary().expect("no presets").load()?;
 //! let report = analyze(&bindings);

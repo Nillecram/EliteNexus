@@ -1,6 +1,6 @@
 //! Elite Dangerous player journal access for Elite Nexus.
 //!
-//! * [`paths`] — finding the journal and bindings folders, ordering journal files.
+//! * [`paths`] — finding the journal and Options folders (on Linux in the game's Wine prefix), ordering journal files.
 //! * [`raw`] — allocation-free pre-scan of a line's timestamp and event name.
 //! * [`events`] — typed events (`Event::parse` only parses events Elite Nexus models).
 //! * [`companion`] — Status.json, Market.json, Cargo.json, NavRoute.json, …
@@ -19,7 +19,7 @@ pub mod watcher;
 pub use companion::{Companion, CompanionKind, Status};
 pub use events::Event;
 pub use index::{IndexEntry, JournalIndex};
-pub use paths::{default_bindings_dir, default_journal_dir, list_journal_files, JournalFile};
+pub use paths::{default_bindings_dir, default_journal_dir, list_journal_files, options_dir, set_journal_dir_in_use, steam_libraries, JournalFile};
 pub use raw::{LineSource, RawEvent};
 pub use reader::{load_history, FileEvents, LoadedEvent};
 pub use time::Timestamp;

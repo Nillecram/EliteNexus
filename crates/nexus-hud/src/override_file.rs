@@ -16,10 +16,9 @@ pub const FILE_NAME: &str = "GraphicsConfigurationOverride.xml";
 /// The commander's file as it was before Elite Nexus first changed it.
 pub const BACKUP_NAME: &str = "GraphicsConfigurationOverride.before-elite-nexus.xml";
 
-/// `%LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Graphics`.
+/// `%LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Graphics`; on Linux, in the game's Wine prefix.
 pub fn default_graphics_dir() -> Option<PathBuf> {
-    let base = std::env::var_os("LOCALAPPDATA")?;
-    Some(PathBuf::from(base).join("Frontier Developments").join("Elite Dangerous").join("Options").join("Graphics"))
+    Some(nexus_journal::options_dir()?.join("Graphics"))
 }
 
 /// The override file as found on disk.

@@ -60,7 +60,10 @@ fn single_instance(data_dir: &std::path::Path) -> Option<std::fs::File> {
     }
     #[cfg(not(windows))]
     {
-        std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(path).ok()
+        // An advisory lock (flock), released when the process ends.
+        let file = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(path).ok()?;
+        file.try_lock().ok()?;
+        Some(file)
     }
 }
 
@@ -75,6 +78,8 @@ fn already_running_message() {
             MessageBoxW(std::ptr::null_mut(), text.as_ptr(), title.as_ptr(), MB_OK | MB_ICONINFORMATION);
         }
     }
+    #[cfg(not(windows))]
+    eprintln!("Elite Nexus is already running.");
 }
 
 fn main() -> eframe::Result {
@@ -127,8 +132,12 @@ fn main() -> eframe::Result {
         .with_icon(app_icon());
     if screenshot_mode {
         // Render far outside the desktop, unfocused and without a taskbar button: UI checks must
-        // not pop up over the game.
-        viewport = viewport.with_active(false).with_position([-20_000.0, -20_000.0]).with_taskbar(false);
+        // not pop up over the game. On X11 a window off every screen counts as hidden and is never
+        // painted, so Linux runs stay on screen: they belong on a virtual display (tools/dev/linux.sh).
+        viewport = viewport.with_active(false).with_taskbar(false);
+        if cfg!(windows) {
+            viewport = viewport.with_position([-20_000.0, -20_000.0]);
+        }
     }
     let options = eframe::NativeOptions {
         viewport,

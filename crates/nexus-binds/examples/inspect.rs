@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let dir = dir
         .or_else(default_bindings_dir)
-        .ok_or("no bindings folder (LOCALAPPDATA not set)")?;
+        .ok_or("no bindings folder found")?;
     let game = game.or_else(probe_game_dir);
 
     println!("Bindings folder: {}", dir.display());

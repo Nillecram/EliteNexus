@@ -35,20 +35,19 @@ pub fn shader_mod(folder: &Path) -> Option<ShaderMod> {
     folder.join("d3dx.ini").is_file().then(|| ShaderMod { edhm: folder.join("EDHM-ini").is_dir(), enabled: folder.join("d3d11.dll").is_file() })
 }
 
-/// Every game client folder found in the usual Steam, Epic and Frontier locations.
+/// Every game client folder found in the usual Steam, Epic and Frontier locations. On Linux: every Steam
+/// library (Proton), and Program Files in the game's Wine prefix (a Frontier or Epic launcher under Wine).
 pub fn find_installs() -> Vec<GameInstall> {
     let env = |k: &str| std::env::var_os(k).map(PathBuf::from);
-    let mut roots: Vec<(PathBuf, &'static str)> = Vec::new();
-    for pf in [env("ProgramFiles(x86)"), env("ProgramFiles")].into_iter().flatten() {
-        let vdf = pf.join("Steam").join("steamapps").join("libraryfolders.vdf");
-        if let Ok(text) = std::fs::read_to_string(&vdf) {
-            for lib in steam_libraries(&text) {
-                roots.push((lib.join("steamapps").join("common").join("Elite Dangerous"), "Steam"));
-            }
-        }
-        roots.push((pf.join("Steam").join("steamapps").join("common").join("Elite Dangerous"), "Steam"));
+    let mut roots: Vec<(PathBuf, &'static str)> = nexus_journal::steam_libraries().into_iter().map(|lib| (lib.join("steamapps").join("common").join("Elite Dangerous"), "Steam")).collect();
+    let program_files: Vec<PathBuf> = match nexus_journal::paths::wine_drive_c() {
+        Some(c) => vec![c.join("Program Files (x86)"), c.join("Program Files")],
+        None => [env("ProgramFiles(x86)"), env("ProgramFiles")].into_iter().flatten().collect(),
+    };
+    for pf in program_files {
         roots.push((pf.join("Frontier").join("EDLaunch"), "Frontier"));
         roots.push((pf.join("Frontier").join("Elite Dangerous Launcher"), "Frontier"));
+        roots.push((pf.join("Epic Games").join("EliteDangerous"), "Epic"));
     }
     if let Some(data) = env("ProgramData") {
         let manifests = data.join("Epic").join("EpicGamesLauncher").join("Data").join("Manifests");
@@ -77,18 +76,6 @@ fn same_path(a: &Path, b: &Path) -> bool {
     a.to_string_lossy().eq_ignore_ascii_case(&b.to_string_lossy())
 }
 
-/// The library folders listed in Steam's `libraryfolders.vdf` (`"path"  "D:\\SteamLibrary"`).
-fn steam_libraries(vdf: &str) -> Vec<PathBuf> {
-    vdf.lines()
-        .filter_map(|l| {
-            let l = l.trim();
-            let rest = l.strip_prefix("\"path\"")?.trim();
-            let v = rest.strip_prefix('"')?.strip_suffix('"')?;
-            Some(PathBuf::from(v.replace("\\\\", "\\")))
-        })
-        .collect()
-}
-
 /// The install folder in an Epic Games Launcher manifest, if it is Elite Dangerous.
 fn epic_location(manifest: &str) -> Option<PathBuf> {
     #[derive(serde::Deserialize, Default)]
@@ -104,12 +91,6 @@ fn epic_location(manifest: &str) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn reads_steam_library_folders() {
-        let vdf = "\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t\"C:\\\\Program Files (x86)\\\\Steam\"\n\t\t\"label\"\t\t\"\"\n\t}\n\t\"1\"\n\t{\n\t\t\"path\"\t\t\"D:\\\\SteamLibrary\"\n\t}\n}";
-        assert_eq!(steam_libraries(vdf), vec![PathBuf::from(r"C:\Program Files (x86)\Steam"), PathBuf::from(r"D:\SteamLibrary")]);
-    }
 
     #[test]
     fn reads_epic_manifests() {

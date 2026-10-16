@@ -65,8 +65,8 @@ fn status_row(g: &mut Group, s: &ServiceStatus) {
 /// the stored (sealed) value changed.
 fn key_row(g: &mut Group, stored: &mut String, input: &mut String, hint: &str) -> bool {
     let mut changed = false;
-    let detail = if stored.is_empty() { "Not set" } else { "Saved and encrypted on this PC" };
-    g.row("API key", detail, |ui| {
+    let detail = if stored.is_empty() { "Not set".to_string() } else { format!("Saved, {}", secrets::KEPT) };
+    g.row("API key", &detail, |ui| {
         // Right to left: the buttons, then the field.
         if !stored.is_empty() && widgets::button(ui, "Remove").clicked() {
             stored.clear();
@@ -92,7 +92,7 @@ fn link_row(g: &mut Group, text: &str, url: &str) {
 /// Returns true if settings changed.
 pub fn show(ui: &mut Ui, acc: &mut Accounts, st: &mut AccountsUi, cmdr_name: &str, status: &StatusView) -> bool {
     let mut changed = false;
-    footnote(ui, "Connect your commander to the community services. Everything is off until you switch it on, keys are encrypted on this PC, and history is never uploaded: only what happens while Elite Nexus is running.");
+    footnote(ui, &format!("Connect your commander to the community services. Everything is off until you switch it on, keys are {}, and history is never uploaded: only what happens while Elite Nexus is running.", secrets::KEPT));
     ui.add_space(4.0);
     if acc.edsm_commander.is_empty() && !cmdr_name.is_empty() {
         acc.edsm_commander = cmdr_name.to_string();

@@ -159,6 +159,12 @@ impl Settings {
         if let Ok(s) = serde_json::to_string_pretty(self) {
             let tmp = dir.join("settings.json.tmp");
             if std::fs::write(&tmp, s).is_ok() {
+                // Linux keeps API keys unencrypted (no DPAPI): only this user account may read them.
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
+                }
                 let _ = std::fs::rename(&tmp, dir.join("settings.json"));
             }
         }
@@ -168,8 +174,8 @@ impl Settings {
 /// Where Elite Nexus keeps its data.
 ///
 /// Portable by default: a `nexus-data` folder next to the executable (keeps everything on the
-/// drive the app lives on). Falls back to `%LOCALAPPDATA%\EliteNexus` if that isn't writable.
-/// `ELITE_NEXUS_HOME` overrides both.
+/// drive the app lives on). Falls back to `%LOCALAPPDATA%\EliteNexus` if that isn't writable (on Linux
+/// `$XDG_DATA_HOME/EliteNexus`, usually `~/.local/share/EliteNexus`). `ELITE_NEXUS_HOME` overrides both.
 pub fn data_dir() -> PathBuf {
     if let Some(p) = std::env::var_os("ELITE_NEXUS_HOME") {
         let p = PathBuf::from(p);
@@ -182,10 +188,20 @@ pub fn data_dir() -> PathBuf {
             return p;
         }
     }
-    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
-    let p = base.join("EliteNexus");
+    let p = user_data_base().unwrap_or_else(|| PathBuf::from(".")).join("EliteNexus");
     let _ = std::fs::create_dir_all(&p);
     p
+}
+
+#[cfg(windows)]
+fn user_data_base() -> Option<PathBuf> {
+    std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
+}
+
+#[cfg(not(windows))]
+fn user_data_base() -> Option<PathBuf> {
+    let xdg = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).filter(|p| p.is_absolute());
+    xdg.or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share")))
 }
 
 fn is_writable(dir: &Path) -> bool {

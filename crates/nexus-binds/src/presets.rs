@@ -205,17 +205,8 @@ impl PresetDirectory {
     }
 }
 
-/// `%LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Bindings`.
-pub fn default_bindings_dir() -> Option<PathBuf> {
-    let base = std::env::var_os("LOCALAPPDATA")?;
-    Some(
-        PathBuf::from(base)
-            .join("Frontier Developments")
-            .join("Elite Dangerous")
-            .join("Options")
-            .join("Bindings"),
-    )
-}
+/// `%LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Bindings`; on Linux, in the game's Wine prefix.
+pub use nexus_journal::default_bindings_dir;
 
 /// Splits a preset file name: `Custom.4.2.binds` → (`Custom`, 4.2), `My.Preset.3.binds` →
 /// (`My.Preset`, 3.0), `KeyboardMouseOnly.binds` → (`KeyboardMouseOnly`, none). `None` for

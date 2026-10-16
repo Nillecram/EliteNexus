@@ -125,7 +125,7 @@ fn setup(ui: &mut Ui, st: &mut AskUi, ai: &mut AiSettings) -> AskAction {
                     });
                     if !ai.api_key.is_empty() {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new(format!("{} A key is saved, encrypted on this PC", icon::LOCK_KEY)).size(13.0).color(pal::GOOD));
+                            ui.label(RichText::new(format!("{} A key is saved, {}", icon::LOCK_KEY, secrets::KEPT)).size(13.0).color(pal::GOOD));
                             if ui.small_button("Remove").clicked() {
                                 ai.api_key.clear();
                                 action = AskAction::SettingsChanged;
@@ -141,11 +141,12 @@ fn setup(ui: &mut Ui, st: &mut AskUi, ai: &mut AiSettings) -> AskAction {
                     }
                 }
                 ui.add_space(8.0);
+                let kept = format!("Your key stays {}.", secrets::KEPT);
                 let note = match kind {
-                    ProviderKind::Gemini => "Your key stays encrypted on this PC. On Google's free tier, questions may be used to improve Google's models; paid use is not.",
-                    ProviderKind::Claude => "Your key stays encrypted on this PC. Claude Haiku costs about a tenth of a cent per question.",
-                    ProviderKind::Local => "Nothing leaves this PC.",
-                    ProviderKind::Custom => "Your key stays encrypted on this PC.",
+                    ProviderKind::Gemini => format!("{kept} On Google's free tier, questions may be used to improve Google's models; paid use is not."),
+                    ProviderKind::Claude => format!("{kept} Claude Haiku costs about a tenth of a cent per question."),
+                    ProviderKind::Local => "Nothing leaves this PC.".to_string(),
+                    ProviderKind::Custom => kept,
                 };
                 ui.add(Label::new(RichText::new(note).size(12.5).color(pal::FAINT)).wrap());
             });

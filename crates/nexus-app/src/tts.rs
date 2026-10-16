@@ -1,4 +1,5 @@
-//! Text-to-speech on a background thread (Windows: WinRT speech synthesis via the `tts` crate).
+//! Text-to-speech on a background thread. Windows: WinRT speech synthesis via the `tts` crate.
+//! Linux: speech-dispatcher's `spd-say`, which desktop distributions ship; without it the app stays quiet.
 
 use crossbeam_channel::{Receiver, Sender};
 
@@ -33,6 +34,7 @@ impl Speaker {
     }
 }
 
+#[cfg(windows)]
 fn run(rx: Receiver<TtsCmd>) {
     let mut engine = match tts::Tts::default() {
         Ok(t) => t,
@@ -60,5 +62,50 @@ fn run(rx: Receiver<TtsCmd>) {
                 let _ = engine.set_volume(v.clamp(0.0, 1.0));
             }
         }
+    }
+}
+
+#[cfg(not(windows))]
+fn run(rx: Receiver<TtsCmd>) {
+    let (mut rate, mut volume) = (1.0, 1.0);
+    while let Ok(cmd) = rx.recv() {
+        match cmd {
+            TtsCmd::Say(text) => {
+                // -w waits until the line is spoken, so back-to-back alerts queue rather than interrupt.
+                let spoken = std::process::Command::new("spd-say")
+                    .args(["-w", "-r", &spd_rate(rate).to_string(), "-i", &spd_volume(volume).to_string(), "--", &text])
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status();
+                if let Err(e) = spoken {
+                    tracing::warn!("text-to-speech unavailable (spd-say, from speech-dispatcher): {e}");
+                    while rx.recv().is_ok() {}
+                    return;
+                }
+            }
+            TtsCmd::Rate(r) => rate = r,
+            TtsCmd::Volume(v) => volume = v,
+        }
+    }
+}
+
+/// The speed setting (1.0 = normal) as spd-say's rate, -100 to 100 with 0 normal.
+#[cfg(not(windows))]
+fn spd_rate(rate: f32) -> i32 {
+    ((rate - 1.0) * 100.0).clamp(-100.0, 100.0).round() as i32
+}
+
+/// The volume setting (0 to 1) as spd-say's, -100 (silent) to 100 (full).
+#[cfg(not(windows))]
+fn spd_volume(volume: f32) -> i32 {
+    (volume.clamp(0.0, 1.0) * 200.0 - 100.0).round() as i32
+}
+
+#[cfg(all(test, not(windows)))]
+mod tests {
+    #[test]
+    fn spd_say_ranges() {
+        assert_eq!((super::spd_rate(1.0), super::spd_rate(1.5), super::spd_rate(3.0), super::spd_rate(0.5)), (0, 50, 100, -50));
+        assert_eq!((super::spd_volume(1.0), super::spd_volume(0.5), super::spd_volume(0.0)), (100, 0, -100));
     }
 }

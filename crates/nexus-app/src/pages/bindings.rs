@@ -26,7 +26,7 @@ pub struct BindsUi {
 impl BindsUi {
     pub fn load(&mut self) {
         let result = (|| -> Result<Loaded, String> {
-            let dir_path = nexus_binds::default_bindings_dir().ok_or("LOCALAPPDATA is not set")?;
+            let dir_path = nexus_binds::default_bindings_dir().ok_or("The game's Options folder wasn't found (on Linux: set the journal folder in Settings to the one in the game's Wine prefix)")?;
             let dir = find_presets(&dir_path).map_err(|e| e.to_string())?;
             let builtin = builtin_dirs();
             let builtin_refs: Vec<&std::path::Path> = builtin.iter().map(|p| p.as_path()).collect();
@@ -43,24 +43,7 @@ impl BindsUi {
 
 /// The game's ControlSchemes folders (built-in presets), if we can find the install.
 fn builtin_dirs() -> Vec<std::path::PathBuf> {
-    let mut out = Vec::new();
-    for root in [
-        r"D:\SteamLibrary\steamapps\common\Elite Dangerous",
-        r"C:\Program Files (x86)\Steam\steamapps\common\Elite Dangerous",
-        r"C:\Program Files\Epic Games\EliteDangerous",
-        r"C:\Program Files (x86)\Frontier\EDLaunch",
-    ] {
-        let products = std::path::Path::new(root).join("Products");
-        if let Ok(rd) = std::fs::read_dir(&products) {
-            for e in rd.flatten() {
-                let cs = e.path().join("ControlSchemes");
-                if cs.is_dir() {
-                    out.push(cs);
-                }
-            }
-        }
-    }
-    out
+    nexus_hud::install::find_installs().into_iter().map(|i| i.folder.join("ControlSchemes")).filter(|cs| cs.is_dir()).collect()
 }
 
 pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
