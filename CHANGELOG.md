@@ -5,6 +5,10 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.5.0] - 2026-10-17
+
+Elite Nexus now runs natively on Linux, next to Elite Dangerous under Proton or Wine.
+
 ### Added
 - **Linux build** (`EliteNexus-…-linux-x64.tar.gz`, 64-bit; X11 or Wayland, Vulkan or OpenGL). The game runs under
   Proton or Wine; Elite Nexus finds its journals in the game's Proton prefix in every Steam library (native, Flatpak
