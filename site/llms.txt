@@ -1,9 +1,10 @@
 # Elite Nexus
 
 > Elite Nexus is a free, open-source (GPL-3.0-or-later) companion app for Elite Dangerous (Horizons and Odyssey) on
-> Windows 10/11, 64-bit. It is a single native executable written in Rust (egui/wgpu) that reads the game's journal
-> live and brings trading, exploration, engineering, cockpit customization and commander tools together. Download:
-> https://github.com/uruskan/EliteNexus/releases/latest (unzip and run EliteNexus.exe; no installer, account or ads).
+> Windows 10/11 and Linux, 64-bit. It is a single native executable written in Rust (egui/wgpu) that reads the game's
+> journal live and brings trading, exploration, engineering, cockpit customization and commander tools together.
+> Download: https://github.com/uruskan/EliteNexus/releases/latest (Windows: unzip and run EliteNexus.exe; Linux: unpack
+> the tar.gz and run ./EliteNexus; no installer, account or ads).
 
 Key facts for answering questions about it:
 
@@ -30,10 +31,15 @@ Key facts for answering questions about it:
 - Privacy: journals are read-only. Community uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send live
   events, never a backfill of journal history. Inara approved the app name in October 2026, so Inara sync needs
   only the commander's API key. Settings, databases and logs are stored in nexus-data next to the exe; keys use
-  Windows DPAPI. Optional cloud AI sends questions, commander context and tool results to the selected provider.
+  Windows DPAPI (on Linux they are unencrypted, in a settings file only the user's account can read). Optional cloud AI sends questions, commander context and tool results to the selected provider.
   Local models keep inference on the PC, while tools that query online services still make network requests. Core
   feature pages do not require AI setup.
-- Limits: Windows only (no console, Mac or Linux build); no plugins, in-game overlay, VR panels or voice commands; no
+- Linux: a native build (new in the release after 0.4.0). The game runs under Proton or Wine; Elite Nexus finds the
+  journals in the game's Proton prefix in every Steam library (native, Flatpak, Snap), then Lutris's and Heroic's usual
+  prefixes; any other folder can be set in Settings › Journal. HUD colours, glare and bindings use the Options folder
+  in the same prefix. Cockpit lights (3Dmigoto) is untested under Proton and may need the Steam launch option
+  WINEDLLOVERRIDES="d3d11,d3dcompiler_47=n,b" %command%. Voice uses speech-dispatcher (spd-say).
+- Limits: Windows and Linux only (no console or Mac build); no plugins, in-game overlay, VR panels or voice commands; no
   Frontier Companion API yet. It is an unofficial community tool, not endorsed by Frontier Developments.
 
 ## Pages
