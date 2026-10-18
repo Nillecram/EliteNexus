@@ -74,6 +74,7 @@ pub struct NexusApp {
     map: pages::galaxy_map::MapUi,
     binds: pages::bindings::BindsUi,
     hud: pages::hud::HudUi,
+    settings_ui: pages::settings::SettingsUi,
     bgs: pages::bgs::BgsUi,
     nav: pages::navigation::NavUi,
     /// Shared async runtime for network services (Spansh, EDDN, uploads).
@@ -104,6 +105,7 @@ impl NexusApp {
     pub fn new(cc: &eframe::CreationContext<'_>, data_dir: PathBuf, start_page: Option<Page>, shot: Option<ScreenshotJob>, ov: Overrides) -> Self {
         crate::theme::install(&cc.egui_ctx);
         let settings = Settings::load(&data_dir);
+        nexus_hud::install::set_game_dir(settings.game_dir.as_deref());
         let page = start_page.or_else(|| cc.storage.and_then(|s| eframe::get_value(s, "page"))).unwrap_or(Page::Dashboard);
         let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).thread_name("nexus-net").enable_all().build().expect("tokio runtime");
         let mut market = crate::market::MarketService::open(&data_dir, &cc.egui_ctx);
@@ -148,6 +150,7 @@ impl NexusApp {
             map,
             binds: Default::default(),
             hud: pages::hud::HudUi::new(ov.tab.as_deref()),
+            settings_ui: Default::default(),
             bgs: Default::default(),
             nav: Default::default(),
             rt,
@@ -482,6 +485,7 @@ impl NexusApp {
             Page::Settings => {
                 let mut cx = pages::settings::SettingsCtx {
                     settings: &mut self.settings,
+                    ui: &mut self.settings_ui,
                     status: &status,
                     data_dir: &self.data_dir,
                     changed: false,
@@ -496,8 +500,11 @@ impl NexusApp {
             Page::Navigation => {
                 settings_changed |= pages::navigation::show(ui, gs, &mut self.nav, &mut self.settings.auto_copy_next_system, &self.spansh, self.rt.handle())
             }
-            Page::Bindings => pages::bindings::show(ui, &mut self.binds, &self.data_dir),
-            Page::Hud => settings_changed |= pages::hud::show(ui, &mut self.hud, &mut self.settings.hud_themes, !gs.game_closed, (&gs.cmdr.game_version, &gs.cmdr.game_build), self.rt.handle()),
+            Page::Bindings => settings_changed |= pages::bindings::show(ui, &mut self.binds, &self.data_dir, &mut self.settings.game_dir),
+            Page::Hud => {
+                let s = &mut self.settings;
+                settings_changed |= pages::hud::show(ui, &mut self.hud, &mut s.hud_themes, &mut s.game_dir, !gs.game_closed, (&gs.cmdr.game_version, &gs.cmdr.game_build), self.rt.handle());
+            }
             Page::Accounts => {
                 let name = gs.cmdr.name.clone();
                 let status = pages::accounts::StatusView { eddn_feed: self.market.feed_summary().map(|(_, line)| line), uplink: self.sync.status() };

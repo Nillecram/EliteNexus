@@ -10,6 +10,7 @@ mod core;
 mod desktop_entry;
 mod export;
 mod finder;
+mod folders;
 mod icon;
 mod jobs;
 mod market;

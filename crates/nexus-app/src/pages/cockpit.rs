@@ -37,6 +37,8 @@ pub struct CockpitUi {
     cleanup: Slot<Result<Removed, String>>,
     /// The dimmer's keys that the game's own controls use too, with the actions bound to them.
     clashes: Vec<(&'static str, String)>,
+    /// Why the game's controls couldn't be read for that check.
+    clash_error: Option<String>,
     message: Option<(bool, String)>,
     /// The last calibration, and pixel shaders recorded so far while one runs.
     calibration: Option<Calibration>,
@@ -48,6 +50,9 @@ pub struct CockpitUi {
     hook_missing: bool,
     /// The game was running last frame (a calibration finishes when it closes).
     was_playing: bool,
+    /// Choosing the game folder when it wasn't found, and the folder chosen (for the settings).
+    picker: crate::folders::Picker,
+    pub game_dir_picked: Option<Option<PathBuf>>,
 }
 
 impl CockpitUi {
@@ -69,12 +74,16 @@ impl CockpitUi {
         }
         self.leftovers = Slot::default();
         self.clashes.clear();
+        self.clash_error = None;
         self.calibration = None;
         self.recorded = 0;
         self.old_patterns = false;
         self.hook_missing = false;
         if let (Some(folder), Some(Status::Installed { .. })) = (self.folder.clone(), &self.status) {
-            self.clashes = key_clashes(&folder);
+            (self.clashes, self.clash_error) = match key_clashes(&folder) {
+                Ok(c) => (c, None),
+                Err(e) => (Vec::new(), Some(e)),
+            };
             self.calibration = dimmer::read_calibration(&folder);
             self.recorded = dimmer::recorded_shaders(&folder);
             self.old_patterns = dimmer::uses_patterns(&folder);
@@ -88,14 +97,15 @@ impl CockpitUi {
     }
 }
 
-/// The dimmer's keys that the commander's active control presets bind too.
-fn key_clashes(game: &Path) -> Vec<(&'static str, String)> {
-    let Some(dir) = nexus_binds::default_bindings_dir() else { return Vec::new() };
-    let Ok(presets) = nexus_binds::find_presets(&dir) else { return Vec::new() };
+/// The dimmer's keys that the commander's active control presets bind too. Only the presets the game uses count:
+/// when they can't be read, the error says why (no guess from another preset).
+fn key_clashes(game: &Path) -> Result<Vec<(&'static str, String)>, String> {
+    let dir = nexus_binds::default_bindings_dir().ok_or("the game's Options folder wasn't found")?;
+    let presets = nexus_binds::find_presets(&dir).map_err(|e| e.to_string())?;
     // Built-in presets (KeyboardMouseOnly, ...) live in the game's ControlSchemes folder.
     let schemes = game.join("ControlSchemes");
-    let bindings = presets.load_effective(&[schemes.as_path()]).ok().or_else(|| presets.primary()?.load().ok());
-    bindings.map(|b| clashes(&b)).unwrap_or_default()
+    let bindings = presets.load_effective(&[schemes.as_path()]).map_err(|e| e.to_string())?;
+    Ok(clashes(&bindings))
 }
 
 fn clashes(b: &Bindings) -> Vec<(&'static str, String)> {
@@ -203,7 +213,12 @@ fn finish(st: &mut CockpitUi, ctx: &egui::Context, installs: &[GameInstall], (ve
 fn controls(ui: &mut Ui, st: &mut CockpitUi, installs: &[GameInstall], playing: bool, game: GameBuild, rt: &tokio::runtime::Handle) {
     card(ui, "Cockpit-light dimmer", |ui| {
         let Some(folder) = st.folder.clone() else {
-            ui.add(egui::Label::new(RichText::new("Elite Dangerous wasn't found in the usual Steam, Epic or Frontier folders, so the dimmer can't be installed from here.").color(pal::DIM)).wrap());
+            let mut dir = nexus_hud::install::game_dir();
+            let why = if dir.is_some() { "The dimmer goes into Elite Dangerous's folder.".to_string() } else { format!("The dimmer goes into Elite Dangerous's folder. {}", crate::folders::game_not_found()) };
+            ui.add(egui::Label::new(RichText::new(why).color(pal::DIM)).wrap());
+            if crate::folders::choose_game_folder(ui, &mut st.picker, &mut dir) {
+                st.game_dir_picked = Some(dir);
+            }
             return;
         };
         match st.status.clone() {
@@ -244,6 +259,7 @@ fn not_installed(ui: &mut Ui, st: &mut CockpitUi, playing: bool, rt: &tokio::run
         format!("Elite Nexus downloads 3Dmigoto {} (4.7 MB) from its official GitHub release and checks it against a pinned checksum. 3Dmigoto is an open-source (GPL-3.0) graphics modding tool; Elite Nexus uses it to load its own fixes, nothing else.", dimmer::MIGOTO_VERSION),
         format!("It puts d3d11.dll, d3dcompiler_47.dll, {}, {} and a ShaderFixes folder next to EliteDangerous64.exe, in the folder below. Remove takes them out again.", dimmer::CONFIG, dimmer::MANIFEST),
         "Then you calibrate once: start the game, get into your cockpit, quit. Elite Nexus finds the light shader among the ones your game loaded and keeps a fix for exactly that one.".to_string(),
+        "While you play, F9, F10 and F11 (pressed without Shift, Ctrl or Alt) switch and set the dimmer. The game gets those presses too, so a key your controls use on its own does both; the tab names any it finds.".to_string(),
         "No game file is changed: 3Dmigoto swaps the light shader in memory while the game runs. Frontier tolerates 3Dmigoto mods (commanders have used them for years) but has never approved them.".to_string(),
     ];
     if cfg!(not(windows)) {
@@ -514,7 +530,10 @@ fn installed(ui: &mut Ui, st: &mut CockpitUi, folder: &Path, installs: &[GameIns
             ui.add(egui::Label::new(RichText::new(format!("{}  {key} is bound in your game controls too: {actions}. Pressing it does both, so give the game's action another key (Options › Controls in the game).", icon::WARNING)).size(size::FOOTNOTE).color(pal::WARN)).wrap());
         }
     }
-    footnote(ui, "The keys work while the game window is in front; what they set lasts until the game closes.");
+    if let Some(e) = &st.clash_error {
+        ui.add(egui::Label::new(RichText::new(format!("{}  Couldn't check these keys against the control presets the game uses ({e}).", icon::WARNING)).size(size::FOOTNOTE).color(pal::WARN)).wrap());
+    }
+    footnote(ui, "The keys work while the game window is in front, without Shift, Ctrl or Alt held; what they set lasts until the game closes. Elite Nexus can't keep a key from the game: the game gets every press too. It never changes your controls.");
 }
 
 fn explain(ui: &mut Ui) {
@@ -525,7 +544,7 @@ fn explain(ui: &mut Ui) {
             "Calibration: for one session the game records the shaders it loads; Elite Nexus finds the light shader among them by what its code looks like and keeps a fix for exactly that shader, by its fingerprint. In the game, 3Dmigoto only swaps that one shader: every other shader, including ones the game adds later (new ships, new carriers), is left alone.",
             "After a game update that changes the light shader, the fingerprint no longer matches: the dimmer simply stays off until you calibrate again, and Elite Nexus tells you when the game has been updated. The game is never affected.",
             "The fixes are made on your PC from your game and never leave it.",
-            "Settings saved here apply the next time the game starts; the keys change them while you play.",
+            "Settings saved here apply the next time the game starts; F9, F10 and F11 change them while you play, and the game gets those presses too.",
             "The same install is the graphics hook HUD colours needs to keep hostile red, friendly green and shield blue out of a theme. If you only want that, switch the dimmer off here.",
             "It can't run alongside EDHM or another 3Dmigoto mod: they all need the game's d3d11.dll.",
             "Frontier tolerates mods like this but has never approved them.",

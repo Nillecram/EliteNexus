@@ -1,18 +1,36 @@
 //! Settings, laid out like System Settings: grouped rows with the control on the right.
 
 use crate::core::{CoreStatus, Phase};
+use crate::folders::{self, FolderField};
+use crate::jobs::Job;
 use crate::settings::Settings;
 use crate::theme::{pal, size};
 use crate::widgets::{self, cards, footnote, group, section};
-use egui::{RichText, Ui};
+use egui::{Color32, RichText, Ui};
+use nexus_journal::paths::JournalFolderCheck;
+use std::path::PathBuf;
 
 pub struct SettingsCtx<'a> {
     pub settings: &'a mut Settings,
+    pub ui: &'a mut SettingsUi,
     pub status: &'a CoreStatus,
     pub data_dir: &'a std::path::Path,
     pub changed: bool,
     pub test_voice: bool,
     pub restart_core: bool,
+}
+
+/// What the Settings page keeps between frames: the folder fields and what checking a folder found.
+#[derive(Default)]
+pub struct SettingsUi {
+    journal: FolderField,
+    /// A journal folder just entered, being looked at off the UI thread (a network folder can be slow).
+    journal_check: Option<Job<(PathBuf, JournalFolderCheck)>>,
+    journal_msg: Option<(Color32, String)>,
+    game: FolderField,
+    /// The game folders in use, and the folder chosen when they were looked for (it may change on another page).
+    game_found: Option<(Option<PathBuf>, Vec<nexus_hud::install::GameInstall>)>,
+    game_msg: Option<(Color32, String)>,
 }
 
 /// A slider with its value shown on the right, sized for a settings row.
@@ -99,18 +117,7 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                 });
                 g.value("Live events this run", st.live_events.to_string());
                 g.content(|ui| {
-                    ui.label(RichText::new("Custom journal folder").size(size::FOOTNOTE).color(pal::DIM));
-                    let mut text = cx.settings.journal_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default();
-                    ui.horizontal(|ui| {
-                        let w = (ui.available_width() - 150.0).max(160.0);
-                        if ui.add(egui::TextEdit::singleline(&mut text).hint_text("Empty: found automatically").desired_width(w).margin(egui::Margin::symmetric(10, 6))).changed() {
-                            cx.settings.journal_dir = if text.trim().is_empty() { None } else { Some(text.trim().into()) };
-                            cx.changed = true;
-                        }
-                        if widgets::button(ui, "Reload journals").clicked() {
-                            cx.restart_core = true;
-                        }
-                    });
+                    journal_folder(ui, cx);
                     if cfg!(not(windows)) {
                         let hint = "Linux: Elite Nexus looks in the game's Proton prefix in every Steam library (steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous), then in Lutris's and Heroic's usual folders. For any other Wine prefix, enter its folder here: Bindings and HUD colours then use the Options folder in that same prefix.";
                         ui.add(egui::Label::new(RichText::new(hint).size(size::FOOTNOTE).color(pal::DIM)).wrap());
@@ -124,6 +131,8 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                     });
                 }
             });
+            section(ui, "Game");
+            game_folder(ui, cx);
             section(ui, "About");
             group(ui, |g| {
                 g.value("Version", format!("Elite Nexus {}", env!("CARGO_PKG_VERSION")));
@@ -137,6 +146,120 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
             footnote(ui, "Elite Nexus is free software under the GNU GPL, version 3 or later, and comes with no warranty. Source: github.com/uruskan/EliteNexus. Elite Dangerous is a trademark of Frontier Developments plc; Elite Nexus is an unofficial community tool.");
         });
     });
+}
+
+/// The custom journal folder: typed, pasted or picked; checked for journals when entered, and read from at once
+/// when it holds them.
+fn journal_folder(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
+    let st = &mut *cx.ui;
+    ui.label(RichText::new("Custom journal folder").size(size::FOOTNOTE).color(pal::DIM));
+    let current = cx.settings.journal_dir.clone();
+    let mut entered = st.journal.field(ui, "journal", &current, "Empty: found automatically");
+    ui.add_space(6.0);
+    ui.horizontal_wrapped(|ui| {
+        if let Some(dir) = st.journal.browse(ui, "Elite Dangerous's journal folder", &current) {
+            entered = Some(dir);
+        }
+        if widgets::button(ui, "Reload journals").on_hover_text("Reads every journal again, from the folder set here").clicked() {
+            cx.restart_core = true;
+            st.journal_msg = None;
+        }
+    });
+    if let Some(dir) = entered {
+        cx.settings.journal_dir = dir.clone();
+        cx.changed = true;
+        st.journal_msg = None;
+        match dir {
+            // Back to the folder found automatically: read it now.
+            None => {
+                cx.restart_core = true;
+                st.journal_check = None;
+                st.journal_msg = Some((pal::GOOD, "Back to the folder Elite Nexus finds by itself.".into()));
+            }
+            Some(dir) => st.journal_check = Some(Job::spawn(ui.ctx(), move || (dir.clone(), nexus_journal::paths::check_journal_folder(&dir)))),
+        }
+    }
+    if let Some((dir, check)) = st.journal_check.as_mut().and_then(Job::poll) {
+        st.journal_check = None;
+        // Only if the folder is still the one entered.
+        if cx.settings.journal_dir.as_ref() == Some(&dir) {
+            let reading = cx.status.journal_dir.as_ref().map(|d| d.display().to_string()).unwrap_or_else(|| "no folder".into());
+            st.journal_msg = Some(match check {
+                JournalFolderCheck::Journals { dir: found, files } => {
+                    cx.restart_core = true;
+                    let files = if files == 1 { "1 journal file".to_string() } else { format!("{files} journal files") };
+                    if found == dir {
+                        (pal::GOOD, format!("Reading {files} from this folder."))
+                    } else {
+                        let msg = format!("The journals are in {}, inside that folder: reading {files} from there.", found.display());
+                        cx.settings.journal_dir = Some(found);
+                        (pal::GOOD, msg)
+                    }
+                }
+                JournalFolderCheck::Empty => (pal::WARN, format!("No journal files (Journal.….log) in this folder, so Elite Nexus keeps reading {reading} for now. The folder is saved: Reload journals, or the next start, switches to it.")),
+                JournalFolderCheck::Unreadable(e) => (
+                    pal::BAD,
+                    format!("Elite Nexus can't open this folder ({e}), so it keeps reading {reading} for now. The folder is saved: Reload journals, or the next start, tries it again. A folder on another PC needs that PC on and the folder shared."),
+                ),
+            });
+        }
+    }
+    if st.journal_check.is_some() {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label(RichText::new("Looking for journals in that folder…").size(size::FOOTNOTE).color(pal::DIM));
+        });
+    }
+    if let Some((color, msg)) = &st.journal_msg {
+        ui.add(egui::Label::new(RichText::new(msg).size(size::FOOTNOTE).color(*color)).wrap());
+    }
+}
+
+/// The game folder: found automatically, or chosen here (HUD & cockpit and Bindings use it).
+fn game_folder(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
+    let st = &mut *cx.ui;
+    let chosen = nexus_hud::install::game_dir();
+    if st.game_found.as_ref().is_none_or(|(c, _)| *c != chosen) {
+        st.game_found = Some((chosen, nexus_hud::install::installs()));
+    }
+    let found = st.game_found.as_ref().map(|(_, f)| f.as_slice()).unwrap_or_default();
+    let in_use = folders::game_folder_text(found);
+    let mut entered = None;
+    group(ui, |g| {
+        g.row("Game folder", "", |ui| {
+            let text = in_use.clone().unwrap_or_else(|| "Not found".into());
+            ui.add(egui::Label::new(RichText::new(text.clone()).color(if in_use.is_some() { pal::DIM } else { pal::WARN })).truncate()).on_hover_text(text);
+        });
+        g.content(|ui| {
+            ui.label(RichText::new("Custom game folder").size(size::FOOTNOTE).color(pal::DIM));
+            let current = cx.settings.game_dir.clone();
+            entered = st.game.field(ui, "game", &current, "Empty: found automatically");
+            ui.add_space(6.0);
+            ui.horizontal_wrapped(|ui| {
+                if let Some(dir) = st.game.browse(ui, "Elite Dangerous's folder", &current) {
+                    entered = Some(dir);
+                }
+            });
+            if let Some((color, msg)) = &st.game_msg {
+                ui.add(egui::Label::new(RichText::new(msg).size(size::FOOTNOTE).color(*color)).wrap());
+            } else if current.is_some() && in_use.is_none() {
+                ui.add(egui::Label::new(RichText::new("No EliteDangerous64.exe in that folder or under it.").size(size::FOOTNOTE).color(pal::WARN)).wrap());
+            }
+        });
+    });
+    footnote(ui, &format!("HUD & cockpit and the game's built-in control presets (Bindings) need it. {}", folders::GAME_FOLDER_HINT));
+    if let Some(dir) = entered {
+        folders::set_game_dir(&mut cx.settings.game_dir, dir);
+        cx.changed = true;
+        let found = nexus_hud::install::installs();
+        st.game_msg = Some(match (folders::game_folder_text(&found), &cx.settings.game_dir) {
+            (Some(f), Some(_)) => (pal::GOOD, format!("Found the game: {f}.")),
+            (Some(f), None) => (pal::GOOD, format!("Back to the folder found automatically: {f}.")),
+            (None, Some(_)) => (pal::WARN, "No EliteDangerous64.exe in that folder or under it, so HUD & cockpit and Bindings have no game folder.".into()),
+            (None, None) => (pal::WARN, "Elite Nexus doesn't find the game by itself on this PC: choose its folder here.".into()),
+        });
+        st.game_found = Some((cx.settings.game_dir.clone(), found));
+    }
 }
 
 /// Linux: Elite Nexus in the desktop's app menu (desktop_entry.rs), written only on a click here.

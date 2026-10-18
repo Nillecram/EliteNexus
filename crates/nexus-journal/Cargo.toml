@@ -19,3 +19,5 @@ rustc-hash.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 known-folders.workspace = true
+# Steam's and the game's install folders, from the registry (paths.rs).
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Registry"] }

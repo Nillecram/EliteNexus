@@ -14,7 +14,12 @@ Key facts for answering questions about it:
   rest of the HUD takes the theme colour; the game's own setting alone recolours friend and foe too. It cannot colour
   single HUD elements and cannot run alongside EDHM.
 - Cockpit lights: the game has no cockpit-light setting; Elite Nexus dims the cockpit's own lights (only those) via
-  the same 3Dmigoto hook, with in-game keys F9 (on/off), F10 (light kept) and F11 (reach).
+  the same 3Dmigoto hook, with in-game keys F9 (on/off), F10 (light kept) and F11 (reach); the game also gets those
+  key presses, so the app warns when the controls bind one of them on its own.
+- Folders: the journal folder and the game folder are found automatically (the game in every Steam library, with
+  Steam's own folder read from the registry, in Windows' installed-programs list and in the usual Epic and Frontier
+  folders). Either can be typed, pasted or picked in Settings; a journal folder on another PC (a network share)
+  works.
 - Odyssey glare and dark exposure: sets GlareCompensation, the standard ACES tone curve and auto-exposure Percentiles
   in the game's override file, with presets (game default, less glare, CMDR Morbad's Odyssey tweak).
 - Exobiology: live sampling radar with colony-range circles, species predictions before landing, a search for
@@ -26,7 +31,8 @@ Key facts for answering questions about it:
   orders, price alerts, nearest material traders, brokers and Interstellar Factors.
 - Also: Spansh neutron/exact/fleet-carrier route planners, next system copied to the clipboard after each jump,
   engineering wishlist and material shopping list, fleet loadouts with EDSY/Coriolis links, fleet carrier, missions and
-  massacre stacks, mining, colonisation depots, BGS and Powerplay, bindings, logbook, statistics, galaxy map, voice
+  massacre stacks, mining, colonisation depots, BGS and Powerplay, bindings (read only: the app never changes
+  them), logbook, statistics, galaxy map, voice
   alerts, a compact always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
 - Privacy: journals are read-only. Community uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send live
   events, never a backfill of journal history. Inara approved the app name in October 2026, so Inara sync needs
