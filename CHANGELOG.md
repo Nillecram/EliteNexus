@@ -5,18 +5,14 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
-## [0.6.0-beta.2] - 2026-10-18
+## [0.6.0] - 2026-10-18
 
-The second 0.6.0 beta: everything in beta.1, plus a Sponsor link in the app.
+A live jump timer for your fleet carrier and your squadron's, colonisation that keeps other commanders' depots
+apart from yours, journal and game folders you can type or pick, and a Sponsor link. If you tried
+0.6.0-beta.1, this is the same plus the Sponsor link.
 
-### Added
-- **Sponsor link**: Settings › About, the README and the website link the developer's GitHub Sponsors page. Elite
-  Nexus stays free with no ads; sponsoring is optional.
-
-## [0.6.0-beta.1] - 2026-10-18
-
-A beta of 0.6.0: a live jump timer for your fleet carrier and your squadron's, colonisation that keeps other
-commanders' depots apart from yours, and journal and game folders you can type or pick.
+**Linux:** the Linux build is built and tested on Ubuntu, but nobody has tried it yet with Elite Dangerous itself
+running under Proton or Wine. If you play on Linux, please say what works and what doesn't in a GitHub issue.
 
 ### Added
 - **Fleet carrier jump timer** (asked for on the Frontier Forums): a live countdown to your carrier's scheduled jump
@@ -29,6 +25,8 @@ commanders' depots apart from yours, and journal and game folders you can type o
 - **Game folder setting** (Settings › Game, and **Choose the game folder…** on HUD colours, Cockpit lights and
   Bindings when the game isn't found): the folder holding the game, its Steam, Frontier or Epic folder, or its
   `Products` folder. HUD & cockpit and Bindings' built-in presets use it.
+- **Sponsor link**: Settings › About, the README and the website link the developer's GitHub Sponsors page. Elite
+  Nexus stays free with no ads; sponsoring is optional.
 
 ### Changed
 - Cockpit lights says up front that the game gets every press of F9, F10 and F11 too, so a key your controls use on

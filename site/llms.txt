@@ -40,7 +40,8 @@ Key facts for answering questions about it:
   Windows DPAPI (on Linux they are unencrypted, in a settings file only the user's account can read). Optional cloud AI sends questions, commander context and tool results to the selected provider.
   Local models keep inference on the PC, while tools that query online services still make network requests. Core
   feature pages do not require AI setup.
-- Linux: a native build (new in 0.5.0). The game runs under Proton or Wine; Elite Nexus finds the
+- Linux: a native build (new in 0.5.0), tested on Ubuntu but not yet tried with the game itself. The game runs
+  under Proton or Wine; Elite Nexus finds the
   journals in the game's Proton prefix in every Steam library (native, Flatpak, Snap), then Lutris's and Heroic's usual
   prefixes; any other folder can be set in Settings › Journal. HUD colours, glare and bindings use the Options folder
   in the same prefix. Cockpit lights (3Dmigoto) is untested under Proton and may need the Steam launch option
