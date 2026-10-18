@@ -1,5 +1,6 @@
 //! Ships the commander owns, their loadouts and where they are.
 
+use nexus_data::names::clean_station_name;
 use nexus_data::ships::ship_name;
 use nexus_journal::events as ev;
 use nexus_journal::Timestamp;
@@ -300,7 +301,7 @@ impl Fleet {
                     // Transfers listed in StoredShips are always headed to the station listing them.
                     ShipLocation {
                         system: Some(s.star_system.clone()),
-                        station: Some(s.station_name.clone()),
+                        station: Some(clean_station_name(&s.station_name)),
                         market_id: Some(s.market_id),
                         in_transit: true,
                         arrives: ship.location.arrives.filter(|a| a.0 > ts.0),
@@ -309,7 +310,7 @@ impl Fleet {
                 } else if here {
                     ShipLocation {
                         system: Some(s.star_system.clone()),
-                        station: Some(s.station_name.clone()),
+                        station: Some(clean_station_name(&s.station_name)),
                         market_id: Some(s.market_id),
                         updated: ts,
                         ..Default::default()

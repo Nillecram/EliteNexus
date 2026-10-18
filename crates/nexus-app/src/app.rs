@@ -446,7 +446,7 @@ impl NexusApp {
         let mut follow = None;
         let route = if page == Page::GalaxyMap { pages::navigation::active_route(gs, self.nav.planned.as_ref()) } else { Vec::new() };
         let mut body = |ui: &mut Ui| match page {
-            Page::Dashboard => pages::dashboard::show(ui, gs),
+            Page::Dashboard => pages::dashboard::show(ui, gs, &self.settings.colonisation.hidden),
             Page::Exploration => follow = pages::exploration::show(ui, gs, &mut self.explo, high_value, &self.spansh, self.rt.handle()),
             Page::Exobiology => match pages::exobio::show(ui, gs, &mut self.exo, &self.spansh, self.rt.handle(), self.market.db.as_ref()) {
                 Some(pages::exobio::ExoAction::PlotTo(s)) => map_action = Some(pages::galaxy_map::MapAction::PlotTo(s)),
@@ -455,7 +455,7 @@ impl NexusApp {
             },
             Page::GalaxyMap => map_action = pages::galaxy_map::show(ui, gs, &mut self.map, &route),
             Page::Mining => pages::mining::show(ui, gs),
-            Page::Colonisation => pages::colonisation::show(ui, gs, &self.market, &mut self.colo),
+            Page::Colonisation => settings_changed |= pages::colonisation::show(ui, gs, &self.market, &mut self.colo, &mut self.settings.colonisation),
             Page::Ask => match pages::ask::show(ui, &mut self.assistant, &mut self.ask_ui, &mut self.settings.ai) {
                 pages::ask::AskAction::Ask(question) => {
                     let tools = crate::ai_tools::NexusTools {

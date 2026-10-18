@@ -5,6 +5,16 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Fixed
+- **Colonisation: a depot you only docked at no longer becomes your construction for good** (a Frontier Forums
+  report: someone else's colonisation ship at 0 %, in a system the commander never claimed). A depot is now placed
+  only by the station you're docked at with its market ID, never by wherever you happen to be. Your constructions
+  (in a system you claimed, or that you delivered to) come first; depots you only docked at are kept apart, closed
+  by default. A depot not updated for four weeks is marked out of date (the game updates one only while you're
+  docked there), and the eye button hides any depot (Hidden, at the bottom of the page, brings it back).
+- Station names such as `$EXT_PANEL_ColonisationShip; Hind's Pride` show as "Hind's Pride" in the situation line,
+  the activity feed and the Colonisation page.
+
 ## [0.5.0] - 2026-10-17
 
 Elite Nexus now runs natively on Linux, next to Elite Dangerous under Proton or Wine.

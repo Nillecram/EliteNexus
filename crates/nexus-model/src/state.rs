@@ -14,7 +14,7 @@ use crate::location::{ArrivalKind, Location};
 use crate::mining::Mining;
 use crate::missions::{MissionOutcome, Missions};
 use crate::session::Session;
-use nexus_data::names::{compact_credits, group_digits};
+use nexus_data::names::{clean_station_name, compact_credits, group_digits};
 use nexus_journal::companion::{
     flags, Companion, FCMaterialsFile, MarketFile, ModulesInfoFile, OutfittingFile, RouteHop, ShipyardFile, Status,
 };
@@ -297,27 +297,26 @@ impl GameState {
             Event::SupercruiseExit(s) => self.location.on_supercruise_exit(s),
             Event::Docked(d) => {
                 self.location.on_docked(d);
+                let station = clean_station_name(&d.station_name);
                 self.history.docks.push(DockRecord {
                     ts,
-                    station: d.station_name.clone(),
+                    station: station.clone(),
                     station_type: d.station_type.clone(),
                     system: d.star_system.clone(),
                     market_id: d.market_id,
                 });
                 self.mining.end_session();
-                self.feed(ts, "Docked", format!("Docked at {} ({})", d.station_name, d.star_system));
+                self.feed(ts, "Docked", format!("Docked at {station} ({})", d.star_system));
             }
             Event::Undocked(u) => {
                 self.location.on_undocked();
-                self.feed(ts, "Undocked", format!("Undocked from {}", u.station_name));
+                self.feed(ts, "Undocked", format!("Undocked from {}", clean_station_name(&u.station_name)));
             }
             Event::DockingDenied(d) => {
                 let reason = d.reason.clone().unwrap_or_default();
-                self.feed(ts, "DockingDenied", format!("Docking denied at {}: {}", d.station_name, reason));
-                alerts.push_with(|| {
-                    Alert::new(ts, AlertKind::Navigation, Priority::Normal, "Docking denied")
-                        .detail(format!("{}: {}", d.station_name, reason))
-                });
+                let station = clean_station_name(&d.station_name);
+                self.feed(ts, "DockingDenied", format!("Docking denied at {station}: {reason}"));
+                alerts.push_with(|| Alert::new(ts, AlertKind::Navigation, Priority::Normal, "Docking denied").detail(format!("{station}: {reason}")));
             }
             Event::ApproachBody(b) => {
                 self.location.body = Some(b.body.clone());
@@ -794,9 +793,10 @@ impl GameState {
 
             // ---------------------------------------------------------------- colonisation
             Event::ColonisationConstructionDepot(d) => {
-                let (sys, addr) = (self.location.system.clone(), self.location.system_address);
-                let station = self.location.station.as_ref().map(|s| s.name.clone());
-                self.colonisation.on_depot(d, ts, &sys, addr, station.as_deref());
+                // Only the station you're docked at says where a depot is: a snapshot is never pinned on wherever
+                // you happen to be.
+                let docked_at = self.location.station.as_ref().filter(|_| self.location.docked);
+                self.colonisation.on_depot(d, ts, docked_at);
             }
             Event::ColonisationContribution(c) => {
                 self.colonisation.on_contribution(c);

@@ -1,6 +1,6 @@
 //! Where the commander is: system, body, station, and what they are sitting in.
 
-use nexus_data::names::localised_or;
+use nexus_data::names::{clean_station_name, is_colonisation_ship, localised_or};
 use nexus_journal::companion::{flags, flags2, Status, StatusDestination};
 use nexus_journal::events as ev;
 use nexus_journal::Timestamp;
@@ -75,7 +75,10 @@ impl SystemInfo {
 
 #[derive(Debug, Clone, Default)]
 pub struct StationInfo {
+    /// Display name: `$EXT_PANEL_ColonisationShip; Hind's Pride` is kept as `Hind's Pride`.
     pub name: String,
+    /// The name exactly as the journal wrote it, which uploads send.
+    pub journal_name: String,
     pub market_id: u64,
     pub station_type: String,
     pub faction: Option<String>,
@@ -93,6 +96,10 @@ pub struct StationInfo {
 impl StationInfo {
     pub fn is_fleet_carrier(&self) -> bool {
         self.station_type == "FleetCarrier"
+    }
+    /// A System Colonisation Ship (the game says so only through the name's symbol).
+    pub fn is_colonisation_ship(&self) -> bool {
+        is_colonisation_ship(&self.journal_name)
     }
     pub fn has_service(&self, s: &str) -> bool {
         self.services.iter().any(|x| x.eq_ignore_ascii_case(s))
@@ -172,7 +179,8 @@ impl Location {
                 self.supercruise = false;
                 if self.docked {
                     self.station = Some(StationInfo {
-                        name: a.station_name.clone().unwrap_or_default(),
+                        name: clean_station_name(a.station_name.as_deref().unwrap_or_default()),
+                        journal_name: a.station_name.clone().unwrap_or_default(),
                         market_id: a.market_id.unwrap_or_default(),
                         station_type: a.station_type.clone().unwrap_or_default(),
                         faction: a.station_faction.as_ref().map(|f| f.name.clone()),
@@ -209,7 +217,8 @@ impl Location {
             self.system_address = d.system_address;
         }
         self.station = Some(StationInfo {
-            name: d.station_name.clone(),
+            name: clean_station_name(&d.station_name),
+            journal_name: d.station_name.clone(),
             market_id: d.market_id,
             station_type: d.station_type.clone(),
             faction: d.station_faction.as_ref().map(|f| f.name.clone()),

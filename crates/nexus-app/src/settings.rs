@@ -33,6 +33,8 @@ pub struct Settings {
     pub hud_themes: Vec<HudTheme>,
     /// The Market page's last searches and filters.
     pub market: crate::pages::market::MarketPrefs,
+    /// Colonisation: hidden depots, which groups are open.
+    pub colonisation: crate::pages::colonisation::ColonisationPrefs,
 }
 
 /// A named HUD colour matrix.
@@ -143,6 +145,7 @@ impl Default for Settings {
             ai: AiSettings::default(),
             hud_themes: Vec::new(),
             market: Default::default(),
+            colonisation: Default::default(),
         }
     }
 }
