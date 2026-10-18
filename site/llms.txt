@@ -66,3 +66,4 @@ Key facts for answering questions about it:
 - [User guide](https://uruskan.github.io/EliteNexus/user-guide.md): every page of the app explained
 - [Changelog](https://github.com/uruskan/EliteNexus/blob/main/CHANGELOG.md): what changed in each release
 - [Source code](https://github.com/uruskan/EliteNexus): GitHub repository, issues and releases
+- [Sponsor](https://github.com/sponsors/uruskan): GitHub Sponsors, optional; the app is free with no ads

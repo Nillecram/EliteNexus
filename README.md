@@ -11,6 +11,7 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 `EliteNexus.exe` (Windows, 64-bit), or unpack the Linux `tar.gz` and run `./EliteNexus` (64-bit; it finds the journals
 in the game's Proton prefix, and Settings › About adds it to your app menu; see [Linux](docs/USER_GUIDE.md#linux)).
 There is no installer: everything it keeps lives in a `nexus-data` folder next to the program. Website: **[uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)**.
+Elite Nexus is free, with no ads. If it helps you, you can **[sponsor it on GitHub](https://github.com/sponsors/uruskan)**.
 
 ![Elite Nexus, an Elite Dangerous companion app: dashboard with commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
 

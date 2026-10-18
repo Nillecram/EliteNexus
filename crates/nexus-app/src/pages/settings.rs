@@ -7,8 +7,12 @@ use crate::settings::Settings;
 use crate::theme::{pal, size};
 use crate::widgets::{self, cards, footnote, group, section};
 use egui::{Color32, RichText, Ui};
+use egui_phosphor::regular as icon;
 use nexus_journal::paths::JournalFolderCheck;
 use std::path::PathBuf;
+
+/// The owner's GitHub Sponsors page (the README and the website link it too).
+const SPONSOR_URL: &str = "https://github.com/sponsors/uruskan";
 
 pub struct SettingsCtx<'a> {
     pub settings: &'a mut Settings,
@@ -136,6 +140,9 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
             section(ui, "About");
             group(ui, |g| {
                 g.value("Version", format!("Elite Nexus {}", env!("CARGO_PKG_VERSION")));
+                g.row("Support Elite Nexus", "It's free, with no ads. If it helps you, GitHub Sponsors keeps it going.", |ui| {
+                    ui.hyperlink_to(format!("{} Sponsor {}", icon::HEART, icon::ARROW_SQUARE_OUT), SPONSOR_URL).on_hover_text(SPONSOR_URL);
+                });
                 g.row("Data folder", "", |ui| {
                     let d = cx.data_dir.display().to_string();
                     ui.add(egui::Label::new(RichText::new(d.clone()).color(pal::DIM)).truncate()).on_hover_text(d);
