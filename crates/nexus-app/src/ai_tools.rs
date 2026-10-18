@@ -112,12 +112,19 @@ impl NexusTools {
         let loc = &gs.location;
         let ship = gs.fleet.current();
         let cargo: Vec<Value> = gs.inventory.cargo.items.iter().map(|c| json!({ "name": c.name, "tonnes": c.count, "stolen": c.stolen, "mission": c.mission_id.is_some() })).collect();
-        let carrier = gs.carrier.owned().then(|| {
-            json!({
-                "name": gs.carrier.name, "callsign": gs.carrier.callsign, "system": gs.carrier.system,
-                "tritium_t": gs.carrier.fuel, "cargo_t": gs.carrier.space.cargo, "capacity_t": gs.carrier.space.total_capacity,
+        // Their own carrier and their squadron's, while they still have them.
+        let now = nexus_journal::Timestamp::now();
+        let carrier_json = |c: &nexus_model::carrier::Carrier| {
+            c.active(now).then(|| {
+                json!({
+                    "name": c.name, "callsign": c.callsign, "system": c.system,
+                    "tritium_t": c.fuel, "cargo_t": c.space.cargo, "capacity_t": c.space.total_capacity,
+                    "decommission_scrap_time": c.decommission.map(|d| d.scrap_time.to_iso()),
+                })
             })
-        });
+        };
+        let carrier = carrier_json(&gs.carrier);
+        let squadron_carrier = carrier_json(&gs.squadron_carrier);
         Ok(json!({
             "commander": gs.cmdr.name,
             "credits": gs.cmdr.credits,
@@ -137,6 +144,7 @@ impl NexusTools {
             })),
             "cargo": cargo,
             "fleet_carrier": carrier,
+            "squadron_carrier": squadron_carrier,
             "ranks": nexus_data::ranks::RankKind::ALL.iter().map(|k| json!({ "rank": format!("{k:?}"), "name": gs.cmdr.rank_name(*k) })).collect::<Vec<_>>(),
             "unsold_exploration_data_cr": gs.exploration.unsold_value(),
             "unsold_exobiology_data_cr": gs.exobio.unsold_value(),
@@ -1426,7 +1434,7 @@ pub fn specs() -> Vec<ToolSpec> {
     vec![
         ToolSpec {
             name: "commander",
-            description: "The commander's current state: location, docked station, ship (type, landing pad, cargo capacity, jump range, fuel, rebuy), cargo hold, credits, fleet carrier, ranks, unsold exploration and exobiology data.",
+            description: "The commander's current state: location, docked station, ship (type, landing pad, cargo capacity, jump range, fuel, rebuy), cargo hold, credits, fleet carrier and squadron carrier, ranks, unsold exploration and exobiology data.",
             parameters: schema(json!({}), &[]),
         },
         ToolSpec {

@@ -476,6 +476,23 @@ EDD also synthesises its own `EDD*` events; ignore them.
 * `CarrierStats` is written when the owner opens carrier management and holds the full snapshot (finance, space, crew, packs).
 * `CarrierLocation` is written at startup and after each jump (community), so it's the cheapest way to know where your carrier is.
 * `CarrierJumpRequest` is written at request time with `DepartureTime` (ISO). `CarrierJumpCancelled` cancels it.
+* Jump timings the journal doesn't carry (checked 2026-10-18; used by `nexus_model::carrier::timing`):
+  * Countdown: 15 minutes from request to departure, and a **5-minute cooldown** after the jump. Source: Frontier's
+    update 1.43 patch notes (2020-06-09, carriers' launch): "Fleet Carriers take 15 minutes to prepare for a jump,
+    and have a 5 minute cool-down after" (quoted by mp1st.com from the Frontier forums). No later change found.
+    Busy servers set a later `DepartureTime` (players report 45-50 minutes at peak), so trust the event's time.
+  * Pre-flight lockdown (pads closed, services stopped) at **3 min 20 s** before departure, and cancelling allowed
+    until **10 minutes** before: community wiki (elite-dangerous.fandom.com, Drake-Class Carrier), not Frontier. One
+    player's post says the lockdown starts about 2 minutes before, so treat these as a guide.
+  * How long the jump itself takes isn't documented; `CarrierJump` (aboard) or `CarrierLocation` marks the arrival.
+* `CarrierDecommission{CarrierID, ScrapRefund, ScrapTime}`: `ScrapTime` is a Unix time in seconds (an integer, not
+  ISO), when the carrier is scrapped and the refund paid. `CarrierCancelDecommission{CarrierID}` calls it off. A
+  later `CarrierStats.PendingDecommission:false` also means it was cancelled. Past `ScrapTime` the carrier is gone;
+  the journal writes nothing more for it (Elite Nexus: `Carrier::decommissioned`).
+* Squadron carriers (checked 2026-10-18): Elite Nexus routes each event by `CarrierType`, and events without one
+  (journals from before Vanguards, a few events) by `CarrierID` (the squadron carrier's, else the personal one), as
+  EDDiscovery does. No carrier event says *who* acted: `CarrierJumpRequest`, `CarrierTradeOrder` and the rest are
+  written to the journal of the commander who did it, so other members' jumps and orders never appear in yours.
 * `CarrierJump` is written to a player **docked on (or on foot aboard) the carrier** during the jump. It's a `Location`-like event without distance or fuel.
 * `CarrierTradeOrder` covers buy/sell/cancel orders. `PurchaseOrder`/`SaleOrder` are quantities; `Price` is per unit.
 * `CarrierFinance` covers tax/reserve changes. `CarrierBankTransfer` covers credits in and out.

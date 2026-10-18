@@ -94,9 +94,11 @@ fn main() {
     for r in bio.unsold.iter().take(8) {
         println!("  {} on {} — {} Cr{}", r.species, r.body_name, group_digits(r.value), if r.bonus_expected { " (+bonus)" } else { "" });
     }
-    let cr = &gs.carrier;
-    if cr.owned() {
-        println!("CARRIER {} {} id {:?} fuel {} t, at {:?}, balance {} Cr, crew roles {}", cr.callsign, cr.name, cr.id, cr.fuel, cr.system, compact_credits(cr.finance.carrier_balance), cr.crew.len());
+    for (label, cr) in [("CARRIER", &gs.carrier), ("SQUADRON CARRIER", &gs.squadron_carrier)] {
+        if cr.owned() {
+            let scrap = cr.decommission.map(|d| format!(", decommission: scrapped {}", d.scrap_time.to_iso())).unwrap_or_default();
+            println!("{label} {} {} id {:?} fuel {} t, at {:?}, balance {} Cr, crew roles {}{scrap}", cr.callsign, cr.name, cr.id, cr.fuel, cr.system, compact_credits(cr.finance.carrier_balance), cr.crew.len());
+        }
     }
     for d in gs.colonisation.depots.values() {
         println!("COLONISATION depot {} in {}: {:.0}% ({} t remaining)", d.station.clone().unwrap_or_default(), d.system, d.progress * 100.0, d.remaining_tons());

@@ -4,6 +4,7 @@ use egui::{Grid, RichText, Ui};
 use egui_phosphor::regular as icon;
 use nexus_data::ranks::RankKind;
 use nexus_journal::Timestamp;
+use nexus_model::carrier::CarrierKind;
 use nexus_model::GameState;
 
 pub fn show(ui: &mut Ui, gs: &GameState) {
@@ -257,14 +258,20 @@ fn holdings(ui: &mut Ui, gs: &GameState) {
             kv(ui, "Ship locker", format!("{} items", gs.inventory.ship_locker.total()));
             kv(ui, "Active missions", gs.missions.active.len().to_string());
         });
-        let c = &gs.carrier;
-        if c.owned() {
+        // The commander's own carrier and their squadron's; a scrapped one isn't a holding any more.
+        let now = Timestamp::now();
+        for (kind, c) in gs.carriers(now) {
             ui.add_space(10.0);
-            ui.label(RichText::new(format!("{} {}", icon::ANCHOR, c.name)).font(display(size::HEADLINE)).color(pal::TEXT));
-            sub(ui, format!("{} · {} · {} t tritium · {}", c.callsign, c.system.clone().unwrap_or_else(|| "?".into()), c.fuel, short_credits(c.finance.carrier_balance)), pal::DIM);
-            if let Some(j) = &c.pending_jump {
-                let when = j.departure.map(|d| d.to_local_string("%H:%M")).unwrap_or_default();
-                sub(ui, format!("{} Jumping to {} at {}", icon::ARROW_FAT_RIGHT, j.system, when), pal::WARN);
+            let glyph = if kind == CarrierKind::Squadron { icon::USERS_THREE } else { icon::ANCHOR };
+            ui.label(RichText::new(format!("{glyph} {}", crate::pages::carrier::carrier_name(kind, c))).font(display(size::HEADLINE)).color(pal::TEXT));
+            let what = if kind == CarrierKind::Squadron { "Squadron carrier · " } else { "" };
+            sub(ui, format!("{what}{} · {} · {} t tritium · {}", c.callsign, c.system.clone().unwrap_or_else(|| "?".into()), c.fuel, short_credits(c.finance.carrier_balance)), pal::DIM);
+            if let Some(line) = crate::pages::carrier::decommission_line(c) {
+                sub(ui, line, pal::BAD);
+            }
+            if let Some((line, colr)) = crate::pages::carrier::jump_timer_line(c, now) {
+                sub(ui, line, colr);
+                ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
             }
         }
         for d in gs.colonisation.active_depots().take(2) {

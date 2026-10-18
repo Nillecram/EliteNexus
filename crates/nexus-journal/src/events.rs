@@ -2522,7 +2522,7 @@ pub struct CarrierJumpRequest {
     pub departure_time: Option<String>,
 }
 
-/// `CarrierLocation` (startup) — and the simple `CarrierJumpCancelled`.
+/// `CarrierLocation` (startup), and the simple `CarrierJumpCancelled` and `CarrierCancelDecommission`.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 pub struct CarrierLocation {
@@ -2538,11 +2538,28 @@ pub struct CarrierLocation {
     pub body_id: Option<u32>,
 }
 
+/// The owner asked to decommission the carrier: it's scrapped at `ScrapTime` (Unix seconds) unless
+/// they cancel before (`CarrierCancelDecommission`).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct CarrierDecommission {
+    #[serde(rename = "CarrierID")]
+    pub carrier_id: u64,
+    #[serde(rename = "CarrierType")]
+    pub carrier_type: Option<String>,
+    #[serde(rename = "ScrapRefund")]
+    pub scrap_refund: i64,
+    #[serde(rename = "ScrapTime")]
+    pub scrap_time: i64,
+}
+
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 pub struct CarrierFinance {
     #[serde(rename = "CarrierID")]
     pub carrier_id: u64,
+    #[serde(rename = "CarrierType")]
+    pub carrier_type: Option<String>,
     #[serde(rename = "TaxRate")]
     pub tax_rate: Option<f64>,
     #[serde(rename = "CarrierBalance")]
@@ -2560,6 +2577,8 @@ pub struct CarrierFinance {
 pub struct CarrierBankTransfer {
     #[serde(rename = "CarrierID")]
     pub carrier_id: u64,
+    #[serde(rename = "CarrierType")]
+    pub carrier_type: Option<String>,
     #[serde(rename = "Deposit")]
     pub deposit: Option<i64>,
     #[serde(rename = "Withdraw")]
@@ -2575,6 +2594,8 @@ pub struct CarrierBankTransfer {
 pub struct CarrierDepositFuel {
     #[serde(rename = "CarrierID")]
     pub carrier_id: u64,
+    #[serde(rename = "CarrierType")]
+    pub carrier_type: Option<String>,
     #[serde(rename = "Amount")]
     pub amount: i64,
     #[serde(rename = "Total")]
@@ -2586,6 +2607,8 @@ pub struct CarrierDepositFuel {
 pub struct CarrierTradeOrder {
     #[serde(rename = "CarrierID")]
     pub carrier_id: u64,
+    #[serde(rename = "CarrierType")]
+    pub carrier_type: Option<String>,
     #[serde(rename = "BlackMarket")]
     pub black_market: bool,
     #[serde(rename = "Commodity")]
@@ -2607,6 +2630,8 @@ pub struct CarrierTradeOrder {
 pub struct CarrierNameChange {
     #[serde(rename = "CarrierID")]
     pub carrier_id: u64,
+    #[serde(rename = "CarrierType")]
+    pub carrier_type: Option<String>,
     #[serde(rename = "Name")]
     pub name: String,
     #[serde(rename = "Callsign")]
@@ -2633,6 +2658,8 @@ pub struct CarrierCrewServices {
 pub struct CarrierBuy {
     #[serde(rename = "CarrierID")]
     pub carrier_id: u64,
+    #[serde(rename = "CarrierType")]
+    pub carrier_type: Option<String>,
     #[serde(rename = "BoughtAtMarket")]
     pub bought_at_market: u64,
     #[serde(rename = "Location")]
@@ -3011,6 +3038,8 @@ journal_events! {
     CarrierNameChange => CarrierNameChange,
     CarrierBuy => CarrierBuy,
     CarrierCrewServices => CarrierCrewServices,
+    CarrierDecommission => CarrierDecommission,
+    CarrierCancelDecommission => CarrierLocation,
     // colonisation
     ColonisationConstructionDepot => ColonisationConstructionDepot,
     ColonisationContribution => ColonisationContribution,
