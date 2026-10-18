@@ -35,7 +35,7 @@ def header(slug):
 <details class="nav-dropdown"><summary>Explore <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel">{link('exploration.html', 'Exploration &amp; navigation')}{link('exobiology.html', 'Exobiology')}</div></details>
 <details class="nav-dropdown"><summary>Commander <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel">{link('commander.html', 'Fleet &amp; engineering')}{link('companion.html', 'AI &amp; everyday tools')}{link('alternatives.html', 'Why Elite Nexus')}</div></details>
 <a class="nav-source" href="{REPO}">GitHub <span aria-hidden="true">↗</span></a>
-<a class="button button-small" href="{DOWNLOAD}">Download <span aria-hidden="true">↓</span></a>
+<a class="button button-small" href="{'#download' if slug == 'index' else 'index.html#download'}">Download <span aria-hidden="true">↓</span></a>
 </nav></div></header>'''
 
 def footer():
