@@ -214,6 +214,8 @@ ol.numbered-steps, .numbered-steps > ol { display: grid; grid-template-columns: 
 .download-section.container { padding: 70px 64px; border: 1px solid #443624; border-radius: var(--radius); }
 .download-section h2 { max-width: 540px; font-size: clamp(36px, 4.4vw, 58px); }
 .download-section p:not(.eyebrow) { color: var(--muted); }
+.download-section .support-actions { display: flex; flex-direction: column; gap: 8px; }
+.download-section .support-actions .button { justify-content: space-between; }
 .download-section .small-label { display: block; margin-top: 14px; font-size: 12px; }
 .download-section .text-link { margin-top: 20px; }
 ol.download-steps, .download-steps ol { margin: 0; padding: 0; list-style: none; counter-reset: download; }
