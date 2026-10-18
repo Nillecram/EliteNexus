@@ -5,6 +5,10 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Added
+- **Sponsor link**: Settings › About, the README and the website link the developer's GitHub Sponsors page. Elite
+  Nexus stays free with no ads; sponsoring is optional.
+
 ## [0.6.0-beta.1] - 2026-10-18
 
 A beta of 0.6.0: a live jump timer for your fleet carrier and your squadron's, colonisation that keeps other
@@ -21,8 +25,6 @@ commanders' depots apart from yours, and journal and game folders you can type o
 - **Game folder setting** (Settings › Game, and **Choose the game folder…** on HUD colours, Cockpit lights and
   Bindings when the game isn't found): the folder holding the game, its Steam, Frontier or Epic folder, or its
   `Products` folder. HUD & cockpit and Bindings' built-in presets use it.
-- **Sponsor link**: Settings › About, the README and the website link the developer's GitHub Sponsors page. Elite
-  Nexus stays free with no ads; sponsoring is optional.
 
 ### Changed
 - Cockpit lights says up front that the game gets every press of F9, F10 and F11 too, so a key your controls use on
