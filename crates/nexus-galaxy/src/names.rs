@@ -127,22 +127,8 @@ pub(crate) fn happiness(raw: &str) -> Option<String> {
     Some(out.to_string())
 }
 
-/// Station names that carry a localisation symbol: `$EXT_PANEL_ColonisationShip; Teshigahara Depot`
-/// -> `Teshigahara Depot`, a bare `$EXT_PANEL_ColonisationShip;` -> `Colonisation Ship`.
-pub fn clean_station_name(raw: &str) -> String {
-    let t = raw.trim();
-    if t.starts_with('$')
-        && let Some((sym, rest)) = t.split_once(';')
-    {
-        let rest = rest.trim();
-        if !rest.is_empty() {
-            return rest.to_string();
-        }
-        let s = sym.trim_start_matches('$');
-        return split_camel(s.rsplit('_').next().unwrap_or(s));
-    }
-    t.to_string()
-}
+/// Kept in `nexus-data`, where the commander model uses it too.
+pub use nexus_data::names::clean_station_name;
 
 /// Lower-case alphanumerics only: `Black Market` and `blackmarket` both become `blackmarket`.
 pub(crate) fn key(raw: &str) -> String {
@@ -217,15 +203,5 @@ mod tests {
             key("Interstellar Factors Contact"),
             "interstellarfactorscontact"
         );
-        assert_eq!(
-            clean_station_name("$EXT_PANEL_ColonisationShip; Teshigahara Depot"),
-            "Teshigahara Depot"
-        );
-        assert_eq!(
-            clean_station_name("$EXT_PANEL_ColonisationShip;"),
-            "Colonisation Ship"
-        );
-        assert_eq!(clean_station_name(" Jameson Memorial "), "Jameson Memorial");
-        assert_eq!(clean_station_name("K9H-55M"), "K9H-55M");
     }
 }

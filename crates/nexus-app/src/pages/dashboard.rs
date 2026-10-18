@@ -7,14 +7,15 @@ use nexus_journal::Timestamp;
 use nexus_model::carrier::CarrierKind;
 use nexus_model::GameState;
 
-pub fn show(ui: &mut Ui, gs: &GameState) {
+/// `hidden_depots`: construction depots hidden on the Colonisation page.
+pub fn show(ui: &mut Ui, gs: &GameState, hidden_depots: &[u64]) {
     cards(ui, 3, 300.0, |c| {
         c.add(|ui| commander(ui, gs));
         c.add(|ui| ship(ui, gs));
         c.add(|ui| location(ui, gs));
         c.add(|ui| session(ui, gs));
         c.add(|ui| system(ui, gs));
-        c.add(|ui| holdings(ui, gs));
+        c.add(|ui| holdings(ui, gs, hidden_depots));
     });
     ui.add_space(GAP);
     feed(ui, gs);
@@ -120,7 +121,7 @@ fn location(ui: &mut Ui, gs: &GameState) {
         sub(ui, l.situation(), pal::ACCENT_SOFT);
         if let Some(b) = &l.body
             && !b.is_empty()
-            && l.station.as_ref().is_none_or(|s| !l.docked || s.name != *b)
+            && l.station.as_ref().is_none_or(|s| !l.docked || (s.name != *b && s.journal_name != *b))
         {
             sub(ui, format!("{} {}", icon::PLANET, b), pal::DIM);
         }
@@ -240,7 +241,7 @@ fn system(ui: &mut Ui, gs: &GameState) {
     });
 }
 
-fn holdings(ui: &mut Ui, gs: &GameState) {
+fn holdings(ui: &mut Ui, gs: &GameState, hidden_depots: &[u64]) {
     card_tinted(ui, icon::VAULT, "Holdings", pal::GOLD, |ui| {
         Grid::new("holdgrid").max_col_width(ui.available_width()).num_columns(2).spacing([14.0, 6.0]).show(ui, |ui| {
             kv(ui, "Ships owned", format!("{} ({})", gs.fleet.ships.len(), short_credits(gs.fleet.total_value())));
@@ -274,7 +275,7 @@ fn holdings(ui: &mut Ui, gs: &GameState) {
                 ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
             }
         }
-        for d in gs.colonisation.active_depots().take(2) {
+        for d in gs.colonisation.active_depots(nexus_journal::Timestamp::now()).filter(|d| !hidden_depots.contains(&d.market_id)).take(2) {
             ui.add_space(6.0);
             sub(ui, format!("{} {} · {:.0}%", icon::BUILDINGS, d.station.clone().unwrap_or_else(|| d.system.clone()), d.progress * 100.0), pal::TEXT);
             bar(ui, d.progress as f32, pal::GOOD, 6.0, None);

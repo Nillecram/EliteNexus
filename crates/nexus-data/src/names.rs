@@ -34,6 +34,29 @@ pub fn split_camel(s: &str) -> String {
     out
 }
 
+/// Station names that carry a localisation symbol: `$EXT_PANEL_ColonisationShip; Teshigahara Depot`
+/// -> `Teshigahara Depot`, a bare `$EXT_PANEL_ColonisationShip;` -> `Colonisation Ship`.
+pub fn clean_station_name(raw: &str) -> String {
+    let t = raw.trim();
+    if t.starts_with('$')
+        && let Some((sym, rest)) = t.split_once(';')
+    {
+        let rest = rest.trim();
+        if !rest.is_empty() {
+            return rest.to_string();
+        }
+        let s = sym.trim_start_matches('$');
+        return split_camel(s.rsplit('_').next().unwrap_or(s));
+    }
+    t.to_string()
+}
+
+/// A System Colonisation Ship (`$EXT_PANEL_ColonisationShip; Hind's Pride`): the first construction in a newly
+/// claimed system, which the game names by this symbol rather than by its station type.
+pub fn is_colonisation_ship(raw_station_name: &str) -> bool {
+    raw_station_name.trim_start().starts_with("$EXT_PANEL_ColonisationShip")
+}
+
 /// Thousands-separated credits, e.g. `12 345 678 Cr` -> "12,345,678".
 pub fn group_digits(v: i64) -> String {
     let neg = v < 0;
@@ -75,5 +98,15 @@ mod tests {
         assert_eq!(group_digits(3_889_591_046), "3,889,591,046");
         assert_eq!(group_digits(-1200), "-1,200");
         assert_eq!(compact_credits(3_889_591_046), "3.89 B");
+    }
+
+    #[test]
+    fn station_names() {
+        assert_eq!(clean_station_name("$EXT_PANEL_ColonisationShip; Teshigahara Depot"), "Teshigahara Depot");
+        assert_eq!(clean_station_name("$EXT_PANEL_ColonisationShip;"), "Colonisation Ship");
+        assert_eq!(clean_station_name(" Jameson Memorial "), "Jameson Memorial");
+        assert_eq!(clean_station_name("K9H-55M"), "K9H-55M");
+        assert!(is_colonisation_ship("$EXT_PANEL_ColonisationShip; Hind's Pride"));
+        assert!(!is_colonisation_ship("Orbital Construction Site: Hind's Pride"));
     }
 }

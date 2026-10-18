@@ -85,7 +85,8 @@ impl EventContext {
             system_address: gs.location.system_address,
             star_pos: gs.location.star_pos,
             market_id: st.map(|s| s.market_id),
-            station_name: st.map(|s| s.name.clone()),
+            // The journal's own spelling: uploads send what the game wrote.
+            station_name: st.map(|s| s.journal_name.clone()),
             ship_id: gs.fleet.current_ship_id,
         }
     }

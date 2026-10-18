@@ -36,6 +36,8 @@ pub struct Settings {
     /// The carrier the Fleet carrier page and the carrier planner show, for commanders with both
     /// their own and a squadron carrier.
     pub carrier: nexus_model::carrier::CarrierKind,
+    /// Colonisation: hidden depots, which groups are open.
+    pub colonisation: crate::pages::colonisation::ColonisationPrefs,
 }
 
 /// A named HUD colour matrix.
@@ -147,6 +149,7 @@ impl Default for Settings {
             hud_themes: Vec::new(),
             market: Default::default(),
             carrier: Default::default(),
+            colonisation: Default::default(),
         }
     }
 }
