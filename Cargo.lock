@@ -2449,7 +2449,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-ai"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "reqwest",
  "serde",
@@ -2461,7 +2461,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-app"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "anyhow",
  "arboard",
@@ -2500,7 +2500,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-binds"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "nexus-journal",
  "roxmltree 0.21.1",
@@ -2513,7 +2513,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-data"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "csv",
  "rustc-hash 2.1.3",
@@ -2523,7 +2523,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-eddn"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "crossbeam-channel",
  "flate2",
@@ -2540,7 +2540,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-galaxy"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "crossbeam-channel",
  "flate2",
@@ -2559,7 +2559,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-hud"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "nexus-journal",
  "regex",
@@ -2574,7 +2574,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-journal"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "chrono",
  "crossbeam-channel",
@@ -2590,7 +2590,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-model"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "chrono",
  "crossbeam-channel",
@@ -2604,7 +2604,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-spansh"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "anyhow",
  "reqwest",
@@ -2619,7 +2619,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-uplink"
-version = "0.5.0"
+version = "0.6.0-beta.1"
 dependencies = [
  "chrono",
  "crossbeam-channel",

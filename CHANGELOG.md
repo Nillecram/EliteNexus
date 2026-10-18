@@ -5,6 +5,11 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.6.0-beta.1] - 2026-10-18
+
+A beta of 0.6.0: a live jump timer for your fleet carrier and your squadron's, colonisation that keeps other
+commanders' depots apart from yours, and journal and game folders you can type or pick.
+
 ### Added
 - **Fleet carrier jump timer** (asked for on the Frontier Forums): a live countdown to your carrier's scheduled jump
   (time left, destination, departure time, until when you can cancel, when the pre-flight lockdown starts), then the
