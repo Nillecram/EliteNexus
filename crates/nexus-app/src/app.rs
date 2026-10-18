@@ -373,7 +373,13 @@ impl NexusApp {
             });
             ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
                 ui.add_space(2.0);
-                if toolbar_button(ui, icon::PICTURE_IN_PICTURE, "Compact always-on-top HUD for a second screen").clicked() {
+                // Wayland doesn't let a window keep itself above the others; XWayland does.
+                let tip = if cfg!(target_os = "linux") && std::env::var_os("WAYLAND_DISPLAY").is_some() {
+                    "Compact HUD for a second screen. Wayland doesn't let apps stay on top: to keep it above the game, start Elite Nexus as WAYLAND_DISPLAY= ./EliteNexus (it then runs through XWayland)."
+                } else {
+                    "Compact always-on-top HUD for a second screen"
+                };
+                if toolbar_button(ui, icon::PICTURE_IN_PICTURE, tip).clicked() {
                     self.compact_request = true;
                     ui.ctx().request_repaint();
                 }

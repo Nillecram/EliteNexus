@@ -60,7 +60,8 @@ pub fn show(ui: &mut Ui, st: &mut BindsUi, data_dir: &std::path::Path) {
                 let path = data_dir.join("bindings-refcard.html");
                 match std::fs::write(&path, html) {
                     Ok(()) => {
-                        let url = format!("file:///{}", path.display().to_string().replace('\\', "/"));
+                        // file:///C:/... on Windows, file:///home/... on Linux (whose paths already start with /).
+                        let url = format!("file:///{}", path.display().to_string().replace('\\', "/").trim_start_matches('/'));
                         ui.ctx().open_url(egui::OpenUrl::new_tab(url));
                         st.last_export = Some(path.display().to_string());
                     }

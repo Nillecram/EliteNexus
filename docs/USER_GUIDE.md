@@ -90,4 +90,6 @@ tested on Ubuntu, but hasn't yet been tried by us with the game running under Pr
   game's launch options in Steam.
 * **Voice** uses `spd-say` (speech-dispatcher). **API keys** aren't encrypted (Linux has no DPAPI); the settings
   file that holds them is readable only by your user account.
-* The window draws with Vulkan or OpenGL, on X11 or Wayland.
+* The window draws with Vulkan or OpenGL, on X11 or Wayland. On Wayland the compact HUD can't keep itself above
+  other windows (Wayland doesn't let apps do that): start Elite Nexus as `WAYLAND_DISPLAY= ./EliteNexus` to run it
+  through XWayland, where it can.
