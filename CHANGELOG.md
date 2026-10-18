@@ -5,6 +5,10 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.6.0-beta.2] - 2026-10-18
+
+The second 0.6.0 beta: everything in beta.1, plus a Sponsor link in the app.
+
 ### Added
 - **Sponsor link**: Settings › About, the README and the website link the developer's GitHub Sponsors page. Elite
   Nexus stays free with no ads; sponsoring is optional.
