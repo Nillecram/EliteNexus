@@ -262,9 +262,9 @@ fn holdings(ui: &mut Ui, gs: &GameState) {
             ui.add_space(10.0);
             ui.label(RichText::new(format!("{} {}", icon::ANCHOR, c.name)).font(display(size::HEADLINE)).color(pal::TEXT));
             sub(ui, format!("{} · {} · {} t tritium · {}", c.callsign, c.system.clone().unwrap_or_else(|| "?".into()), c.fuel, short_credits(c.finance.carrier_balance)), pal::DIM);
-            if let Some(j) = &c.pending_jump {
-                let when = j.departure.map(|d| d.to_local_string("%H:%M")).unwrap_or_default();
-                sub(ui, format!("{} Jumping to {} at {}", icon::ARROW_FAT_RIGHT, j.system, when), pal::WARN);
+            if let Some((line, colr)) = crate::pages::carrier::jump_timer_line(c, nexus_journal::Timestamp::now()) {
+                sub(ui, line, colr);
+                ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
             }
         }
         for d in gs.colonisation.active_depots().take(2) {

@@ -11,6 +11,7 @@ use egui::{RichText, Ui};
 use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular as icon;
 use nexus_data::exploration::{is_scoopable, star_description};
+use nexus_journal::Timestamp;
 use nexus_model::location::distance;
 use nexus_model::GameState;
 use nexus_spansh::{CarrierRouteRequest, GalaxyAlgorithm, GalaxyRouteRequest, NeutronRouteRequest, RouteWaypoints, ShipProfile, Spansh};
@@ -123,6 +124,13 @@ impl Default for ExactOptions {
     }
 }
 
+impl NavUi {
+    /// `--tab carrier` opens the fleet carrier planner (for screenshots).
+    pub fn new(tab: Option<&str>) -> Self {
+        NavUi { planner: if tab == Some("carrier") { Planner::Carrier } else { Planner::InGame }, ..Default::default() }
+    }
+}
+
 impl Default for NavUi {
     fn default() -> Self {
         NavUi {
@@ -227,6 +235,11 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut NavUi, auto_copy: &mut bool, s
         planner_form(ui, gs, st, spansh, rt);
         ui.add_space(GAP);
     }
+    let carrier_route = st.planned.as_ref().is_some_and(|p| p.kind == "Carrier");
+    if gs.carrier.owned() && (st.planner == Planner::Carrier || carrier_route) {
+        carrier_timer(ui, gs, st);
+        ui.add_space(GAP);
+    }
     ui.horizontal_wrapped(|ui| {
         changed |= toggle(ui, auto_copy, "Copy the next system to the clipboard after every jump").changed();
         ui.add_space(12.0);
@@ -327,6 +340,40 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
         }
         ui.add_space(2.0);
         ui.label(RichText::new("Route data © Spansh (spansh.co.uk)").size(size::CAPTION).color(pal::FAINT));
+    });
+}
+
+/// The carrier's jump countdown or cooldown next to the fleet carrier planner; with a carrier route
+/// active, also the next leg and a rough time to the destination.
+fn carrier_timer(ui: &mut Ui, gs: &GameState, st: &NavUi) {
+    let c = &gs.carrier;
+    let route = st.planned.as_ref().filter(|p| p.kind == "Carrier").map(|p| p.remaining()).filter(|r| !r.is_empty());
+    cards(ui, if route.is_some() { 2 } else { 1 }, 300.0, |col| {
+        col.add(|ui| {
+            card_tinted(ui, icon::TIMER, "Carrier jump", pal::ACCENT, |ui| crate::pages::carrier::jump_timer(ui, c));
+        });
+        let Some(route) = route else { return };
+        col.add(|ui| {
+            card_tinted(ui, icon::PATH, "Carrier route", pal::BLUE, |ui| {
+                let jumps: u32 = route.iter().map(|w| w.jumps.max(1)).sum();
+                let eta = c.route_estimate(Timestamp::now(), jumps);
+                ui.label(RichText::new(format!("≈ {}", widgets::duration(eta))).font(display(size::TITLE)).color(pal::TEXT)).on_hover_text(
+                    "An estimate, and a minimum: the countdown or cooldown running now, then a 15-minute countdown for each jump and a 5-minute cooldown between jumps (Frontier's figures). Busy servers set later departures and each jump takes a little time, so the trip usually takes longer.",
+                );
+                ui.add(egui::Label::new(RichText::new(format!("to {} · {jumps} {} left", route.last().map(|w| w.system.as_str()).unwrap_or("?"), if jumps == 1 { "jump" } else { "jumps" })).size(size::FOOTNOTE).color(pal::DIM)).wrap());
+                ui.add_space(4.0);
+                let next = &route[0];
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("Next leg").color(pal::DIM));
+                    if ui.link(RichText::new(&next.system).color(pal::ACCENT)).on_hover_text("Click to copy").clicked() {
+                        ui.ctx().copy_text(next.system.clone());
+                    }
+                });
+                if let Some(p) = c.pending_jump.as_ref().filter(|p| !p.system.eq_ignore_ascii_case(&next.system)) {
+                    ui.add(egui::Label::new(RichText::new(format!("{} The scheduled jump goes to {}, not the route's next stop.", icon::WARNING, p.system)).size(size::FOOTNOTE).color(pal::WARN)).wrap());
+                }
+            });
+        });
     });
 }
 

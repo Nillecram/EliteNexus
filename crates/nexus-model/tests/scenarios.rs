@@ -127,6 +127,44 @@ fn carrier_transfer_is_not_spending() {
     assert_eq!(gs.cmdr.credits, 500_000);
 }
 
+/// The carrier jump timer through real journal lines: request, cancel, request again, arrive
+/// while docked aboard, cool down, ready.
+#[test]
+fn carrier_jump_countdown_then_cooldown() {
+    use nexus_journal::Timestamp;
+    use nexus_model::carrier::JumpTimer;
+    let t = |s: &str| Timestamp::parse(s).expect("time");
+    let mut m = Model::default();
+    feed(&mut m, LOGIN);
+    feed(
+        &mut m,
+        &[
+            r#"{ "timestamp":"2026-10-01T10:00:05Z", "event":"CarrierLocation", "CarrierType":"FleetCarrier", "CarrierID":3716323840, "StarSystem":"Alpha", "SystemAddress":100, "BodyID":0 }"#,
+            r#"{ "timestamp":"2026-10-01T10:10:00Z", "event":"CarrierJumpRequest", "CarrierType":"FleetCarrier", "CarrierID":3716323840, "SystemName":"Beta", "Body":"Beta A 1", "SystemAddress":200, "BodyID":3, "DepartureTime":"2026-10-01T10:25:10Z" }"#,
+        ],
+    );
+    let c = &m.active().unwrap().carrier;
+    let timer = c.jump_timer(t("2026-10-01T10:15:10Z")).expect("countdown");
+    assert!(matches!(&timer, JumpTimer::Countdown { to, .. } if to == "Beta"));
+    assert_eq!(timer.left(t("2026-10-01T10:15:10Z")), Some(600));
+
+    feed(&mut m, &[r#"{ "timestamp":"2026-10-01T10:12:00Z", "event":"CarrierJumpCancelled", "CarrierType":"FleetCarrier", "CarrierID":3716323840 }"#]);
+    assert_eq!(m.active().unwrap().carrier.jump_timer(t("2026-10-01T10:12:01Z")), None, "cancelled");
+
+    feed(
+        &mut m,
+        &[
+            r#"{ "timestamp":"2026-10-01T10:20:00Z", "event":"CarrierJumpRequest", "CarrierType":"FleetCarrier", "CarrierID":3716323840, "SystemName":"Beta", "SystemAddress":200, "BodyID":0, "DepartureTime":"2026-10-01T10:35:00Z" }"#,
+            r#"{ "timestamp":"2026-10-01T10:35:40Z", "event":"CarrierJump", "Docked":true, "StationName":"KFK-L3V", "StationType":"FleetCarrier", "MarketID":3716323840, "StarSystem":"Beta", "SystemAddress":200, "StarPos":[10.0,0.0,0.0], "Population":0, "Body":"Beta", "BodyID":0, "BodyType":"Star" }"#,
+        ],
+    );
+    let gs = m.active().unwrap();
+    assert_eq!(gs.carrier.system.as_deref(), Some("Beta"));
+    let timer = gs.carrier.jump_timer(t("2026-10-01T10:36:40Z")).expect("cooldown");
+    assert_eq!(timer, JumpTimer::Cooldown { at: "Beta".into(), body: Some("Beta".into()), ready: t("2026-10-01T10:40:40Z"), estimated: false });
+    assert_eq!(gs.carrier.jump_timer(t("2026-10-01T10:40:40Z")), None, "ready to jump again");
+}
+
 #[test]
 fn stored_ships_in_transit_show_destination() {
     let mut m = Model::default();

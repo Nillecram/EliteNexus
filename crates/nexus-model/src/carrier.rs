@@ -20,6 +20,56 @@ pub struct PendingJump {
     pub requested: Timestamp,
 }
 
+/// Fleet carrier jump timings the journal doesn't carry. The countdown itself comes from the
+/// journal (`CarrierJumpRequest.DepartureTime`, which already includes any wait for busy servers);
+/// these fill in the rest. Sources are in `docs/research/journal.md` (§5.4).
+pub mod timing {
+    /// After a jump the carrier can't jump again for 5 minutes. Frontier's patch notes for update
+    /// 1.43 (June 2020, when carriers launched): "Fleet Carriers take 15 minutes to prepare for a
+    /// jump, and have a 5 minute cool-down after." No later change found.
+    pub const COOLDOWN_SECS: i64 = 5 * 60;
+    /// The usual countdown from request to departure (same notes). Busy servers set a later
+    /// departure, so only route estimates use it, as a minimum.
+    pub const PREPARE_SECS: i64 = 15 * 60;
+    /// Pre-flight lockdown (pads close, services stop) starts 3 min 20 s before departure. From the
+    /// community wiki, not Frontier; one player reports about 2 minutes.
+    pub const LOCKDOWN_SECS: i64 = 3 * 60 + 20;
+    /// The owner can cancel a jump until 10 minutes before departure (community wiki).
+    pub const CANCEL_CUTOFF_SECS: i64 = 10 * 60;
+}
+
+/// The jump the carrier made last, kept for the cooldown that follows it.
+#[derive(Debug, Clone, Default)]
+pub struct LastJump {
+    pub system: String,
+    pub body: Option<String>,
+    /// When the journal saw the carrier arrive: `CarrierJump` (written to a commander aboard) or a
+    /// `CarrierLocation` in the new system. None when only the departure time is known.
+    pub arrived: Option<Timestamp>,
+    pub departed: Option<Timestamp>,
+}
+
+/// What the carrier's jump drive is doing at a given moment.
+#[derive(Debug, Clone, PartialEq)]
+pub enum JumpTimer {
+    /// A jump is scheduled. `departs` is None if the journal left the departure time out.
+    Countdown { to: String, body: Option<String>, departs: Option<Timestamp> },
+    /// The carrier jumped and can't jump again until `ready`. `estimated` when the journal didn't
+    /// record the arrival (the commander wasn't aboard): then it's counted from the departure,
+    /// and the real end comes a little later, by however long the jump itself took.
+    Cooldown { at: String, body: Option<String>, ready: Timestamp, estimated: bool },
+}
+
+impl JumpTimer {
+    /// Seconds until departure (countdown) or until the carrier can jump again (cooldown).
+    pub fn left(&self, now: Timestamp) -> Option<i64> {
+        match self {
+            JumpTimer::Countdown { departs, .. } => departs.map(|d| (d.0 - now.0).max(0)),
+            JumpTimer::Cooldown { ready, .. } => Some((ready.0 - now.0).max(0)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct TradeOrder {
     pub commodity: String,
@@ -49,6 +99,7 @@ pub struct Carrier {
     pub system_address: Option<u64>,
     pub body_id: Option<u32>,
     pub pending_jump: Option<PendingJump>,
+    pub last_jump: Option<LastJump>,
     pub jumps: Vec<CarrierJumpRecord>,
     pub trade_orders: BTreeMap<String, TradeOrder>,
     pub stats_updated: Timestamp,
@@ -130,10 +181,11 @@ impl Carrier {
         }
         self.system_address = l.system_address.or(self.system_address);
         self.body_id = l.body_id;
-        if let Some(p) = &self.pending_jump
-            && Some(p.system_address) == l.system_address {
-                self.pending_jump = None;
-            }
+        if self.pending_jump.as_ref().is_some_and(|p| Some(p.system_address) == l.system_address)
+            && let Some(p) = self.pending_jump.take()
+        {
+            self.last_jump = Some(LastJump { system: p.system, body: p.body, arrived: Some(ts), departed: p.departure });
+        }
     }
 
     /// The commander is docked on a carrier that jumped (CarrierJump event).
@@ -143,7 +195,8 @@ impl Carrier {
             self.system_address = Some(a.system_address);
             self.body_id = a.body_id;
             self.jumps.push(CarrierJumpRecord { ts, system: a.star_system.clone(), body: a.body.clone() });
-            self.pending_jump = None;
+            let departed = self.pending_jump.take().and_then(|p| p.departure);
+            self.last_jump = Some(LastJump { system: a.star_system.clone(), body: a.body.clone(), arrived: Some(ts), departed });
         }
     }
 
@@ -154,8 +207,47 @@ impl Carrier {
             && let Some(p) = self.pending_jump.take() {
                 self.system = Some(p.system.clone());
                 self.system_address = Some(p.system_address);
-                self.jumps.push(CarrierJumpRecord { ts: p.departure.unwrap_or(now), system: p.system, body: p.body });
+                self.jumps.push(CarrierJumpRecord { ts: p.departure.unwrap_or(now), system: p.system.clone(), body: p.body.clone() });
+                self.last_jump = Some(LastJump { system: p.system, body: p.body, arrived: None, departed: p.departure });
             }
+    }
+
+    /// The jump countdown or cooldown running at `now`; None when the carrier is free to jump.
+    /// Once the departure time has passed the cooldown starts, counted from the departure until
+    /// the journal shows the arrival.
+    pub fn jump_timer(&self, now: Timestamp) -> Option<JumpTimer> {
+        use timing::COOLDOWN_SECS;
+        if let Some(p) = &self.pending_jump {
+            return match p.departure {
+                Some(d) if now.0 >= d.0 => {
+                    let ready = Timestamp(d.0 + COOLDOWN_SECS);
+                    (now.0 < ready.0).then(|| JumpTimer::Cooldown { at: p.system.clone(), body: p.body.clone(), ready, estimated: true })
+                }
+                departs => Some(JumpTimer::Countdown { to: p.system.clone(), body: p.body.clone(), departs }),
+            };
+        }
+        let j = self.last_jump.as_ref()?;
+        let from = j.arrived.or(j.departed)?;
+        let ready = Timestamp(from.0 + COOLDOWN_SECS);
+        (now.0 < ready.0).then(|| JumpTimer::Cooldown { at: j.system.clone(), body: j.body.clone(), ready, estimated: j.arrived.is_none() })
+    }
+
+    /// A rough time, in seconds, until `jumps` more jumps have arrived: whatever countdown or
+    /// cooldown is running (a running countdown counts as the first of those jumps), then the
+    /// usual 15-minute countdown for each jump and a 5-minute cooldown between them. Busy servers
+    /// and the jumps themselves add time, so treat it as a minimum.
+    pub fn route_estimate(&self, now: Timestamp, jumps: u32) -> i64 {
+        use timing::{COOLDOWN_SECS, PREPARE_SECS};
+        let n = i64::from(jumps);
+        if n == 0 {
+            return 0;
+        }
+        let rest = |legs: i64| legs * PREPARE_SECS + (legs - 1).max(0) * COOLDOWN_SECS;
+        match self.jump_timer(now) {
+            Some(t @ JumpTimer::Countdown { departs: Some(_), .. }) => t.left(now).unwrap_or(0) + (n - 1) * (COOLDOWN_SECS + PREPARE_SECS),
+            Some(t @ JumpTimer::Cooldown { .. }) => t.left(now).unwrap_or(0) + rest(n),
+            _ => rest(n),
+        }
     }
 
     pub fn on_finance(&mut self, f: &ev::CarrierFinance) {
@@ -246,5 +338,114 @@ impl Carrier {
     /// for a laden carrier is a common rule of thumb, so stay conservative).
     pub fn rough_jumps_on_fuel(&self) -> i64 {
         if self.fuel <= 0 { 0 } else { self.fuel / 90 }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::timing::{COOLDOWN_SECS, PREPARE_SECS};
+    use super::*;
+
+    const ID: u64 = 3_716_323_840;
+    const T0: i64 = 1_790_000_000;
+
+    fn at(secs: i64) -> Timestamp {
+        Timestamp(T0 + secs)
+    }
+
+    fn own() -> Carrier {
+        Carrier { id: Some(ID), system: Some("Alpha".into()), system_address: Some(100), ..Default::default() }
+    }
+
+    /// The owner schedules a jump to Beta at `t`, departing 15 minutes later.
+    fn request(c: &mut Carrier, t: i64) {
+        let departs = Timestamp(T0 + t + PREPARE_SECS).to_iso();
+        let r = ev::CarrierJumpRequest {
+            carrier_type: Some("FleetCarrier".into()),
+            carrier_id: ID,
+            system_name: "Beta".into(),
+            body: Some("Beta A 1".into()),
+            system_address: 200,
+            body_id: Some(3),
+            departure_time: Some(departs),
+        };
+        c.on_jump_request(&r, at(t));
+    }
+
+    #[test]
+    fn request_then_cancel_clears_the_countdown() {
+        let mut c = own();
+        assert_eq!(c.jump_timer(at(0)), None, "no jump scheduled");
+        request(&mut c, 0);
+        let t = c.jump_timer(at(60)).expect("countdown");
+        assert!(matches!(&t, JumpTimer::Countdown { to, departs: Some(d), .. } if to == "Beta" && *d == at(PREPARE_SECS)));
+        assert_eq!(t.left(at(60)), Some(PREPARE_SECS - 60));
+        c.on_jump_cancelled(&ev::CarrierLocation { carrier_id: ID, ..Default::default() });
+        assert_eq!(c.jump_timer(at(61)), None, "a cancelled jump leaves nothing to count");
+        assert!(c.last_jump.is_none());
+    }
+
+    #[test]
+    fn request_jump_cooldown_ready() {
+        let mut c = own();
+        request(&mut c, 0);
+        // Docked aboard: the journal writes CarrierJump on arrival, 40 s after departure.
+        let arrival = PREPARE_SECS + 40;
+        let a = ev::SystemArrival { star_system: "Beta".into(), system_address: 200, body: Some("Beta A 1".into()), market_id: Some(ID), ..Default::default() };
+        c.on_carrier_jump(&a, at(arrival));
+        assert!(c.pending_jump.is_none());
+        assert_eq!(c.system.as_deref(), Some("Beta"));
+        let t = c.jump_timer(at(arrival + 10)).expect("cooldown");
+        assert_eq!(t, JumpTimer::Cooldown { at: "Beta".into(), body: Some("Beta A 1".into()), ready: at(arrival + COOLDOWN_SECS), estimated: false });
+        assert_eq!(t.left(at(arrival + 10)), Some(COOLDOWN_SECS - 10));
+        assert_eq!(c.jump_timer(at(arrival + COOLDOWN_SECS)), None, "ready to jump again");
+    }
+
+    #[test]
+    fn departure_passed_without_arrival_starts_an_estimated_cooldown() {
+        let mut c = own();
+        request(&mut c, 0);
+        // Not aboard: no CarrierJump. Past the departure time the cooldown runs from it.
+        let t = c.jump_timer(at(PREPARE_SECS + 30)).expect("cooldown");
+        assert_eq!(t, JumpTimer::Cooldown { at: "Beta".into(), body: Some("Beta A 1".into()), ready: at(PREPARE_SECS + COOLDOWN_SECS), estimated: true });
+        // A later journal event settles the jump; the estimate stays the same.
+        c.settle_pending(at(PREPARE_SECS + COOLDOWN_SECS + 1));
+        assert_eq!(c.system.as_deref(), Some("Beta"));
+        assert_eq!(c.jump_timer(at(PREPARE_SECS + COOLDOWN_SECS - 1)).and_then(|t| t.left(at(PREPARE_SECS + COOLDOWN_SECS - 1))), Some(1));
+        assert_eq!(c.jump_timer(at(PREPARE_SECS + COOLDOWN_SECS)), None);
+    }
+
+    #[test]
+    fn carrier_location_in_the_new_system_marks_the_arrival() {
+        let mut c = own();
+        request(&mut c, 0);
+        let arrival = PREPARE_SECS + 50;
+        c.on_location(&ev::CarrierLocation { carrier_type: Some("FleetCarrier".into()), carrier_id: ID, star_system: Some("Beta".into()), system_address: Some(200), body_id: Some(3) }, at(arrival));
+        let t = c.jump_timer(at(arrival)).expect("cooldown");
+        assert!(matches!(t, JumpTimer::Cooldown { ready, estimated: false, .. } if ready == at(arrival + COOLDOWN_SECS)));
+    }
+
+    #[test]
+    fn someone_elses_carrier_is_ignored() {
+        let mut c = own();
+        let r = ev::CarrierJumpRequest { carrier_id: ID + 1, system_name: "Gamma".into(), system_address: 300, departure_time: Some("2026-10-18T12:00:00Z".into()), ..Default::default() };
+        c.on_jump_request(&r, at(0));
+        assert_eq!(c.jump_timer(at(1)), None);
+    }
+
+    #[test]
+    fn route_estimate_counts_the_running_timer_first() {
+        let cycle = PREPARE_SECS + COOLDOWN_SECS;
+        let mut c = own();
+        assert_eq!(c.route_estimate(at(0), 0), 0);
+        // Idle: three countdowns and the two cooldowns between them.
+        assert_eq!(c.route_estimate(at(0), 3), 3 * PREPARE_SECS + 2 * COOLDOWN_SECS);
+        // Counting down to the first of three jumps.
+        request(&mut c, 0);
+        assert_eq!(c.route_estimate(at(100), 3), PREPARE_SECS - 100 + 2 * cycle);
+        // Cooling down after it: two jumps left.
+        let a = ev::SystemArrival { star_system: "Beta".into(), system_address: 200, market_id: Some(ID), ..Default::default() };
+        c.on_carrier_jump(&a, at(PREPARE_SECS));
+        assert_eq!(c.route_estimate(at(PREPARE_SECS + 60), 2), COOLDOWN_SECS - 60 + 2 * PREPARE_SECS + COOLDOWN_SECS);
     }
 }

@@ -5,6 +5,15 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Added
+- **Fleet carrier jump timer** (asked for on the Frontier Forums): a live countdown to your carrier's scheduled jump
+  (time left, destination, departure time, until when you can cancel, when the pre-flight lockdown starts), then the
+  cooldown until it can jump again. It's on the Fleet carrier page, next to the Navigation › Fleet carrier planner and
+  on the Dashboard. With a carrier route active, Navigation also shows the next leg and an estimate of the time to the
+  destination, and the route ticks off its stops as the carrier arrives, wherever you are. The departure time comes
+  from the journal; the 5-minute cooldown is Frontier's figure, and the timer's tooltip says where each number comes
+  from and what it can't know.
+
 ## [0.5.0] - 2026-10-17
 
 Elite Nexus now runs natively on Linux, next to Elite Dangerous under Proton or Wine.

@@ -9,6 +9,8 @@
 #        to start the HUD colours tab from; add ,options (empireblue,options) to open the
 #        protection's options. Set ELITE_NEXUS_GAME_DIR to show the page for a test copy of the
 #        game folder instead of the real one (AGENTS.md says how to fake the installed hook).
+#        With -Page Navigation: carrier opens the fleet carrier planner (and its jump timer).
+# -JournalDir: read a test journal folder instead of the real one (test runs never upload).
 # -Demo: a sample Ask conversation and an alert banner. -Exe: another build (e.g. an agent's own
 #        CARGO_TARGET_DIR). The data folder is the build's own (target\debug\nexus-data).
 param(
@@ -19,6 +21,7 @@ param(
     [switch]$Demo,
     [double]$Delay = 0,
     [string]$Exe = "",
+    [string]$JournalDir = "",
     [int]$TimeoutSec = 120
 )
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -35,6 +38,7 @@ $cmd = "--page `"$Page`" --screenshot `"$png`" --mute"
 if ($Size -ne "") { $cmd += " --size $Size" }
 if ($Tab -ne "") { $cmd += " --tab $Tab" }
 if ($Demo) { $cmd += " --demo" }
+if ($JournalDir -ne "") { $cmd += " --journal-dir `"$JournalDir`"" }
 if ($Delay -gt 0) { $cmd += " --shot-delay $Delay" }
 $p = Start-Process -FilePath $Exe -ArgumentList $cmd -PassThru -WindowStyle Hidden
 $null = $p.Handle

@@ -149,7 +149,7 @@ impl NexusApp {
             binds: Default::default(),
             hud: pages::hud::HudUi::new(ov.tab.as_deref()),
             bgs: Default::default(),
-            nav: Default::default(),
+            nav: pages::navigation::NavUi::new(ov.tab.as_deref()),
             rt,
             spansh: nexus_spansh::Spansh::new(),
             accounts: Default::default(),
@@ -174,9 +174,10 @@ impl NexusApp {
         let next = {
             let model = self.core.model.read();
             let Some(gs) = model.active() else { return };
-            // Arrivals tick off planned waypoints.
+            // Arrivals tick off planned waypoints; a carrier route follows the carrier, wherever the commander is.
             if let Some(p) = self.nav.planned.as_mut() {
-                p.advance(&gs.location.system);
+                let carrier = gs.carrier.system.as_deref().filter(|_| p.kind == "Carrier");
+                p.advance(carrier.unwrap_or(&gs.location.system));
             }
             let jumps = gs.history.jumps.len();
             let prev = self.last_jump_count.replace(jumps);
