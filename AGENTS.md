@@ -164,6 +164,12 @@ egui 0.36 layout lessons learned here:
 7. Check it without credentials (the repo is public):
    `https://api.github.com/repos/uruskan/EliteNexus/releases/latest`.
 
+**Betas** follow the same steps with a hyphenated version: `0.6.0-beta.1` in `Cargo.toml`, `## [0.6.0-beta.1] -
+YYYY-MM-DD` in the changelog, tag `v0.6.0-beta.1`. The workflow publishes it as a pre-release, which GitHub never marks
+"Latest": the website and README keep offering the last stable version, and testers get the pre-release's own page
+(check it at `.../releases/tags/v0.6.0-beta.1`). Fixes go under "Unreleased" as usual and ship as `beta.2`. For the
+stable release, merge the beta sections into one `## [x.y.z]` section. Betas don't go to winget.
+
 The owner's own copy: `tools\build-release.ps1` (run it at BelowNormal priority with `CARGO_BUILD_JOBS=4`) installs
 into `dist\EliteNexus`, or stages `EliteNexus.new.exe` while the app runs (`Update-EliteNexus.cmd` swaps it in),
 and writes `dist\EliteNexus-vx.y.z-windows-x64.zip`. It never touches `nexus-data`.
