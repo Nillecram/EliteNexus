@@ -16,9 +16,10 @@ Elite Nexus now runs natively on Linux, next to Elite Dangerous under Proton or 
   Custom journal folder: Bindings and HUD colours then use the Options folder in that same prefix. Voice alerts use
   speech-dispatcher's `spd-say`. API keys aren't encrypted on Linux (no DPAPI), and the app says so: the settings
   file is readable only by your user account. Cockpit lights under Proton is untested; the tab names the Steam
-  launch option it may need. On Wayland the compact HUD can't stay on top (Wayland doesn't allow it); its button
-  says how to run through XWayland instead. Built and tested on Ubuntu; not yet tried with the game itself under
-  Proton.
+  launch option it may need. Settings › About › App menu (or `./EliteNexus --install-desktop`) adds Elite Nexus and
+  its icon to your desktop's app menu, in your own folders. On Wayland the compact HUD can't stay on top (Wayland
+  doesn't allow it); its button says how to run through XWayland instead. Built and tested on Ubuntu; not yet tried
+  with the game itself under Proton.
 
 ### Changed
 - Bindings finds the game's built-in control presets in every Steam library and the Epic and Frontier folders,

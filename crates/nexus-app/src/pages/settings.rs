@@ -131,8 +131,56 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                     let d = cx.data_dir.display().to_string();
                     ui.add(egui::Label::new(RichText::new(d.clone()).color(pal::DIM)).truncate()).on_hover_text(d);
                 });
+                #[cfg(target_os = "linux")]
+                app_menu(g);
             });
             footnote(ui, "Elite Nexus is free software under the GNU GPL, version 3 or later, and comes with no warranty. Source: github.com/uruskan/EliteNexus. Elite Dangerous is a trademark of Frontier Developments plc; Elite Nexus is an unofficial community tool.");
         });
     });
+}
+
+/// Linux: Elite Nexus in the desktop's app menu (desktop_entry.rs), written only on a click here.
+#[cfg(target_os = "linux")]
+fn app_menu(g: &mut widgets::Group) {
+    use crate::desktop_entry::{self, State};
+    let (Some(home), Ok(exe)) = (crate::settings::user_data_base(), std::env::current_exe()) else { return };
+    let (state_id, msg_id) = (egui::Id::new("settings-app-menu"), egui::Id::new("settings-app-menu-msg"));
+    let ctx = g.ui.ctx().clone();
+    let state = match ctx.data(|d| d.get_temp::<State>(state_id)) {
+        Some(s) => s,
+        None => {
+            let s = desktop_entry::state(&home, &exe);
+            ctx.data_mut(|d| d.insert_temp(state_id, s.clone()));
+            s
+        }
+    };
+    let (detail, action) = match &state {
+        State::Missing => (format!("Adds Elite Nexus and its icon to your desktop's app menu ({}).", desktop_entry::entry_path(&home).display()), Some("Add")),
+        State::Current => ("Elite Nexus is in your desktop's app menu, with its icon.".to_string(), None),
+        State::Elsewhere(p) => (format!("Your app menu starts {p}, not this copy."), Some("Point it here")),
+    };
+    // Some(true): add or update; Some(false): remove.
+    let clicked = g.row("App menu", &detail, |ui| {
+        let mut act = None;
+        if let Some(label) = action
+            && widgets::button(ui, label).clicked()
+        {
+            act = Some(true);
+        }
+        if state != State::Missing && widgets::button(ui, "Remove").clicked() {
+            act = Some(false);
+        }
+        act
+    });
+    if let Some(add) = clicked {
+        let done = if add { desktop_entry::install(&home, &exe) } else { desktop_entry::uninstall(&home) };
+        let msg = done.err().map(|e| format!("Couldn't change the app menu: {e}"));
+        ctx.data_mut(|d| {
+            d.insert_temp(state_id, desktop_entry::state(&home, &exe));
+            d.insert_temp(msg_id, msg);
+        });
+    }
+    if let Some(Some(msg)) = ctx.data(|d| d.get_temp::<Option<String>>(msg_id)) {
+        g.content(|ui| ui.add(egui::Label::new(RichText::new(msg).size(size::FOOTNOTE).color(pal::BAD)).wrap()));
+    }
 }

@@ -3,8 +3,15 @@
 
 use std::path::PathBuf;
 
+// The icon's design and renderer, shared with the app.
+#[allow(dead_code)]
+#[path = "src/icon.rs"]
+mod icon;
+use icon::pixel;
+
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/icon.rs");
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
@@ -48,48 +55,6 @@ END
     let rc_path = out.join("app.rc");
     std::fs::write(&rc_path, rc).expect("write app.rc");
     embed_resource::compile(&rc_path, embed_resource::NONE).manifest_optional().expect("embed Windows resources");
-}
-
-/// The window icon's design on a 64-unit grid: orange diamond, light rim, dark square.
-fn design(u: f32, v: f32) -> [f32; 4] {
-    let c = 31.5;
-    let (dx, dy) = ((u - c).abs(), (v - c).abs());
-    let d = dx + dy;
-    if d < 20.0 {
-        [255.0, 140.0, 26.0, 1.0]
-    } else if d < 23.0 {
-        [255.0, 190.0, 110.0, 1.0]
-    } else if dx.max(dy) < 30.0 {
-        [12.0, 17.0, 24.0, 1.0]
-    } else {
-        [0.0, 0.0, 0.0, 0.0]
-    }
-}
-
-/// One pixel of an `n`×`n` rendering, 4×4 supersampled (RGBA).
-fn pixel(n: u32, x: u32, y: u32) -> [u8; 4] {
-    const S: u32 = 4;
-    let scale = 64.0 / n as f32;
-    let mut acc = [0.0f32; 4];
-    for sy in 0..S {
-        for sx in 0..S {
-            let u = (x as f32 + (sx as f32 + 0.5) / S as f32) * scale;
-            let v = (y as f32 + (sy as f32 + 0.5) / S as f32) * scale;
-            let [r, g, b, a] = design(u, v);
-            acc[0] += r * a;
-            acc[1] += g * a;
-            acc[2] += b * a;
-            acc[3] += a;
-        }
-    }
-    let k = (S * S) as f32;
-    let alpha = acc[3] / k;
-    if alpha <= 0.0 {
-        return [0, 0, 0, 0];
-    }
-    // Un-premultiply.
-    let ch = |i: usize| (acc[i] / acc[3]).round().clamp(0.0, 255.0) as u8;
-    [ch(0), ch(1), ch(2), (alpha * 255.0).round() as u8]
 }
 
 /// A 32-bit DIB as stored in .ico files: header with doubled height, BGRA rows bottom-up, AND mask.

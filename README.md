@@ -9,8 +9,8 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 
 **[Download the latest release](https://github.com/uruskan/EliteNexus/releases/latest)**, unzip it anywhere and run
 `EliteNexus.exe` (Windows, 64-bit), or unpack the Linux `tar.gz` and run `./EliteNexus` (64-bit; it finds the journals
-in the game's Proton prefix; see [Linux](docs/USER_GUIDE.md#linux)). There is no installer: everything it keeps lives in
-a `nexus-data` folder next to the program. Website: **[uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)**.
+in the game's Proton prefix, and Settings › About adds it to your app menu; see [Linux](docs/USER_GUIDE.md#linux)).
+There is no installer: everything it keeps lives in a `nexus-data` folder next to the program. Website: **[uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)**.
 
 ![Elite Nexus, an Elite Dangerous companion app: dashboard with commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
 
@@ -142,7 +142,8 @@ On the original dev machine the toolchain is not on PATH: run `. .\tools\env.ps1
 makes GitHub Actions build the Windows exe and the Linux binary and publish a Release
 (`.github/workflows/release.yml`), with that version's `CHANGELOG.md` section as the notes. Working on the code, as a person or an AI agent? Read `AGENTS.md` first.
 
-Command-line options: `--page <name>`, `--tab <name>`, `--journal-dir <dir>`, `--mute`,
+Command-line options: `--page <name>`, `--tab <name>`, `--journal-dir <dir>`, `--mute`, on Linux
+`--install-desktop` / `--uninstall-desktop` (the app-menu entry),
 `--screenshot <png> [--shot-delay <s>] [--size <w>x<h>] [--demo]`. A screenshot run renders off-screen, saves the PNG
 and exits; it never uploads. The images in `docs/screenshots/` were made this way, e.g.
 `EliteNexus.exe --page market --tab abnormal --screenshot docs\screenshots\market.png --shot-delay 8 --mute`.

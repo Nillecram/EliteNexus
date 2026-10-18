@@ -194,12 +194,13 @@ pub fn data_dir() -> PathBuf {
 }
 
 #[cfg(windows)]
-fn user_data_base() -> Option<PathBuf> {
+pub(crate) fn user_data_base() -> Option<PathBuf> {
     std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
 }
 
+/// `$XDG_DATA_HOME`, else `~/.local/share`.
 #[cfg(not(windows))]
-fn user_data_base() -> Option<PathBuf> {
+pub(crate) fn user_data_base() -> Option<PathBuf> {
     let xdg = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).filter(|p| p.is_absolute());
     xdg.or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share")))
 }

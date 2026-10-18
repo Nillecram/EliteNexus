@@ -6,8 +6,11 @@ mod ai_tools;
 mod app;
 mod assistant;
 mod core;
+#[cfg(target_os = "linux")]
+mod desktop_entry;
 mod export;
 mod finder;
+mod icon;
 mod jobs;
 mod market;
 mod pages;
@@ -24,29 +27,7 @@ mod untouched;
 mod widgets;
 
 fn app_icon() -> egui::IconData {
-    // A 64×64 orange diamond on a dark rounded square, drawn procedurally (no asset files).
-    let n = 64usize;
-    let mut rgba = vec![0u8; n * n * 4];
-    let c = (n as f32 - 1.0) / 2.0;
-    for y in 0..n {
-        for x in 0..n {
-            let (dx, dy) = ((x as f32 - c).abs(), (y as f32 - c).abs());
-            let i = (y * n + x) * 4;
-            let in_square = dx.max(dy) < 30.0;
-            let d = dx + dy;
-            let (r, g, b, a) = if d < 20.0 {
-                (255, 140, 26, 255)
-            } else if d < 23.0 {
-                (255, 190, 110, 255)
-            } else if in_square {
-                (12, 17, 24, 255)
-            } else {
-                (0, 0, 0, 0)
-            };
-            rgba[i..i + 4].copy_from_slice(&[r, g, b, a]);
-        }
-    }
-    egui::IconData { rgba, width: n as u32, height: n as u32 }
+    egui::IconData { rgba: icon::rgba(64), width: 64, height: 64 }
 }
 
 /// Holds an exclusive lock on instance.lock for the life of the process. A second instance would
@@ -82,7 +63,40 @@ fn already_running_message() {
     eprintln!("Elite Nexus is already running.");
 }
 
+/// Linux: `--install-desktop` / `--uninstall-desktop` put Elite Nexus in the app menu, or take it out, from a
+/// terminal. Returns the exit code when one of them was given.
+#[cfg(target_os = "linux")]
+fn desktop_entry_cli() -> Option<i32> {
+    let (install, uninstall) = (std::env::args().any(|a| a == "--install-desktop"), std::env::args().any(|a| a == "--uninstall-desktop"));
+    if !install && !uninstall {
+        return None;
+    }
+    let Some(home) = settings::user_data_base() else {
+        eprintln!("HOME is not set, so the app menu's folder can't be found.");
+        return Some(1);
+    };
+    let done = if install {
+        std::env::current_exe().and_then(|exe| desktop_entry::install(&home, &exe)).map(|()| format!("Added Elite Nexus to the app menu: {}", desktop_entry::entry_path(&home).display()))
+    } else {
+        desktop_entry::uninstall(&home).map(|()| "Removed Elite Nexus from the app menu.".to_string())
+    };
+    match done {
+        Ok(msg) => {
+            println!("{msg}");
+            Some(0)
+        }
+        Err(e) => {
+            eprintln!("Couldn't change the app menu: {e}");
+            Some(1)
+        }
+    }
+}
+
 fn main() -> eframe::Result {
+    #[cfg(target_os = "linux")]
+    if let Some(code) = desktop_entry_cli() {
+        std::process::exit(code);
+    }
     let data_dir = settings::data_dir();
     let screenshot_run = std::env::args().any(|a| a == "--screenshot");
     let _instance = match single_instance(&data_dir) {
