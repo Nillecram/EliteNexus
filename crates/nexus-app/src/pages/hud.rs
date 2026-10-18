@@ -66,6 +66,11 @@ pub struct HudUi {
     protect: Protect,
     protect_options: bool,
     protect_status: Option<(bool, String)>,
+    /// The game folder chosen in Settings when the game folders were last looked for.
+    game_dir_seen: Option<PathBuf>,
+    /// Choosing the game folder when it wasn't found, and the folder chosen (for the settings).
+    picker: crate::folders::Picker,
+    game_dir_picked: Option<Option<PathBuf>>,
 }
 
 impl Default for HudUi {
@@ -92,6 +97,9 @@ impl Default for HudUi {
             protect: Protect::default(),
             protect_options: false,
             protect_status: None,
+            game_dir_seen: None,
+            picker: Default::default(),
+            game_dir_picked: None,
         }
     }
 }
@@ -177,20 +185,20 @@ impl HudUi {
         };
         self.start_from(self.current.clone().ok().flatten().unwrap_or(HudMatrix::IDENTITY));
         self.file = Some(file);
-        // ELITE_NEXUS_GAME_DIR: another game folder (one holding EliteDangerous64.exe), e.g. a test copy.
-        self.installs = match std::env::var_os("ELITE_NEXUS_GAME_DIR") {
-            Some(dir) => {
-                let folder = std::path::PathBuf::from(dir);
-                vec![GameInstall { shader_mod: nexus_hud::install::shader_mod(&folder), folder, store: "custom" }]
-            }
-            None => nexus_hud::install::find_installs(),
-        };
-        self.read_hook();
-        self.glare.reload(self.file.as_ref(), &self.installs);
+        self.find_game();
         let wanted = self.start_preset.take().map(|t| t.replace([' ', '-', '_'], "").to_ascii_lowercase());
         if let Some(p) = wanted.and_then(|t| presets::ALL.iter().find(|p| p.name.replace(' ', "").eq_ignore_ascii_case(&t))) {
             self.start_from(p.matrix);
         }
+    }
+
+    /// Looks for the game folders (the one chosen in Settings, else every one found) and what's in them.
+    fn find_game(&mut self) {
+        self.game_dir_seen = nexus_hud::install::game_dir();
+        self.installs = nexus_hud::install::installs();
+        self.read_hook();
+        self.glare.reload(self.file.as_ref(), &self.installs);
+        self.cockpit.reload();
     }
 
     fn apply(&mut self) {
@@ -213,10 +221,13 @@ impl HudUi {
     }
 }
 
-/// Returns true when the saved themes changed (settings to save).
-pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bool, game: super::cockpit::GameBuild, rt: &tokio::runtime::Handle) -> bool {
+/// Returns true when the saved themes or the game folder changed (settings to save).
+pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, game_dir: &mut Option<PathBuf>, playing: bool, game: super::cockpit::GameBuild, rt: &tokio::runtime::Handle) -> bool {
     if st.file.is_none() {
         st.load();
+    } else if st.game_dir_seen != nexus_hud::install::game_dir() {
+        // Chosen in Settings or on one of these tabs.
+        st.find_game();
     }
     if let Some(t) = widgets::tabs(ui, st.tab, &[(Tab::Colours, "HUD colours"), (Tab::Glare, "Glare and exposure"), (Tab::Cockpit, "Cockpit lights")]) {
         if t != st.tab {
@@ -227,7 +238,7 @@ pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bo
         st.tab = t;
     }
     ui.add_space(widgets::GAP);
-    match st.tab {
+    let mut changed = match st.tab {
         Tab::Colours => colours(ui, st, themes, playing),
         Tab::Glare => {
             super::glare::show(ui, &mut st.glare, &mut st.file, playing);
@@ -237,7 +248,12 @@ pub fn show(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bo
             super::cockpit::show(ui, &mut st.cockpit, &st.installs, playing, game, rt);
             false
         }
+    };
+    for picked in [st.game_dir_picked.take(), st.cockpit.game_dir_picked.take()].into_iter().flatten() {
+        *game_dir = picked;
+        changed = true;
     }
+    changed
 }
 
 fn colours(ui: &mut Ui, st: &mut HudUi, themes: &mut Vec<HudTheme>, playing: bool) -> bool {
@@ -503,11 +519,19 @@ fn protect_controls(ui: &mut Ui, st: &mut HudUi) {
         Some(Status::Unmanaged { .. }) => why_not(g, TITLE, "Needs Elite Nexus to manage the graphics hook in the game folder: Cockpit lights › Let Elite Nexus manage it.", true),
         Some(Status::Foreign { edhm: true }) => why_not(g, TITLE, "Can't be used with EDHM: it needs Elite Nexus's graphics hook, and EDHM already holds the game's d3d11.dll.", false),
         Some(Status::Foreign { edhm: false }) => why_not(g, TITLE, "Can't be used with the other 3Dmigoto mod in the game folder: it needs Elite Nexus's graphics hook, and the two can't share the game's d3d11.dll.", false),
-        None => why_not(g, TITLE, "Needs Elite Dangerous's folder, which wasn't found in the usual Steam, Epic or Frontier places.", false),
+        None if nexus_hud::install::game_dir().is_some() => why_not(g, TITLE, "Needs Elite Dangerous's folder.", false),
+        None => why_not(g, TITLE, &format!("Needs Elite Dangerous's folder. {}", crate::folders::game_not_found()), false),
     });
     if open_cockpit {
         st.tab = Tab::Cockpit;
         st.cockpit.reload();
+    }
+    if st.hook.is_none() {
+        let mut dir = nexus_hud::install::game_dir();
+        if crate::folders::choose_game_folder(ui, &mut st.picker, &mut dir) {
+            st.game_dir_picked = Some(dir);
+        }
+        return;
     }
     if !matches!(st.hook, Some(Status::Installed { .. })) {
         return;

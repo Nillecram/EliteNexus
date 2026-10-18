@@ -13,6 +13,13 @@ release time that section becomes the new version and the release workflow publi
   destination, and the route ticks off its stops as the carrier arrives, wherever you are. The departure time comes
   from the journal; the 5-minute cooldown is Frontier's figure, and the timer's tooltip says where each number comes
   from and what it can't know.
+- **Game folder setting** (Settings › Game, and **Choose the game folder…** on HUD colours, Cockpit lights and
+  Bindings when the game isn't found): the folder holding the game, its Steam, Frontier or Epic folder, or its
+  `Products` folder. HUD & cockpit and Bindings' built-in presets use it.
+
+### Changed
+- Cockpit lights says up front that the game gets every press of F9, F10 and F11 too, so a key your controls use on
+  its own does both.
 
 ### Fixed
 - **Squadron carriers and decommissioned carriers** (reported on Reddit): a commander who had decommissioned their
@@ -34,6 +41,22 @@ release time that section becomes the new version and the release workflow publi
   docked there), and the eye button hides any depot (Hidden, at the bottom of the page, brings it back).
 - Station names such as `$EXT_PANEL_ColonisationShip; Hind's Pride` show as "Hind's Pride" in the situation line,
   the activity feed and the Colonisation page.
+- **Settings › Journal › Custom journal folder can be typed in again.** Spaces vanished as you typed, so only a
+  pasted folder worked (every journal folder has spaces: "Saved Games"). The text now stays as typed and is read when
+  you press Enter or leave the field; quotes from Explorer's "Copy as path" are removed. A **Browse…** button picks
+  the folder. Elite Nexus then looks for journals in it and reads them at once (using the game's folder inside if
+  you picked one above it); a folder without journals is saved, and the page says the old folder stays in use until
+  Reload journals. Network folders (`\PC\…`) work as before.
+- **HUD colours, Cockpit lights and Bindings find the game when Steam is installed on another drive.** Elite Nexus
+  read Steam's library list only from Program Files; it now also asks the registry where Steam is, and looks at
+  Windows' list of installed programs (Steam's and the Frontier launcher's entries for the game). Steam's pre-2021
+  library list is read too.
+- **Bindings says when it isn't showing the bindings your game uses.** When a preset the game uses couldn't be read
+  (typically a built-in preset such as KeyboardMouseOnly while the game's folder wasn't found), the page quietly
+  showed another preset, which looked as if your bindings had changed. A warning now names the presets the game
+  uses, why one couldn't be read and which preset is shown instead. The page also says that Elite Nexus never changes
+  your bindings. Cockpit lights' check of F9, F10 and F11 against your controls uses only the presets the game uses,
+  and says when it can't read them.
 
 ## [0.5.0] - 2026-10-17
 

@@ -41,6 +41,9 @@ image.workspace = true
 rustc-hash.workspace = true
 tokio.workspace = true
 reqwest.workspace = true
+# Folder pickers. Linux: the desktop's file-chooser portal, with libdbus loaded at run time (zenity if there's no
+# portal), so the binary links no system library for it.
+rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 
 [target.'cfg(windows)'.dependencies]
 # Linux speaks through speech-dispatcher's spd-say instead (src/tts.rs): no system library to link.

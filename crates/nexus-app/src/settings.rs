@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 pub struct Settings {
     /// Override for the journal folder (None = auto-detect Saved Games).
     pub journal_dir: Option<PathBuf>,
+    /// The game's folder (None = found automatically): HUD & cockpit and Bindings' built-in presets use it.
+    pub game_dir: Option<PathBuf>,
     /// Speak alerts out loud.
     pub tts_enabled: bool,
     /// 0 = low .. 3 = critical: minimum priority that gets spoken.
@@ -133,6 +135,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             journal_dir: None,
+            game_dir: None,
             tts_enabled: true,
             tts_min_priority: 1,
             tts_rate: 1.0,

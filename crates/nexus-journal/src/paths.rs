@@ -98,7 +98,8 @@ pub fn default_bindings_dir() -> Option<PathBuf> {
 }
 
 /// Every Steam library folder on this PC (each holds `steamapps`), from Steam's `libraryfolders.vdf`.
-/// Windows: Steam in Program Files. Linux: native Steam, Flatpak Steam and Snap Steam.
+/// Windows: Steam in Program Files, or wherever the registry says it is. Linux: native Steam, Flatpak Steam and
+/// Snap Steam.
 pub fn steam_libraries() -> Vec<PathBuf> {
     let mut out: Vec<(PathBuf, PathBuf)> = Vec::new();
     for root in steam_roots() {
@@ -117,20 +118,157 @@ pub fn steam_libraries() -> Vec<PathBuf> {
     out.into_iter().map(|(_, lib)| lib).collect()
 }
 
-/// The library folders listed in Steam's `libraryfolders.vdf` (`"path"  "D:\\SteamLibrary"`).
+/// The library folders listed in Steam's `libraryfolders.vdf`: `"path"  "D:\\SteamLibrary"` since 2021, and
+/// `"1"  "D:\\SteamLibrary"` in the older format (whose numbered values are the libraries).
 pub fn parse_library_folders(vdf: &str) -> Vec<PathBuf> {
     vdf.lines()
         .filter_map(|l| {
-            let rest = l.trim().strip_prefix("\"path\"")?.trim();
-            let v = rest.strip_prefix('"')?.strip_suffix('"')?;
-            Some(PathBuf::from(v.replace("\\\\", "\\")))
+            let mut quoted = l.split('"').skip(1).step_by(2);
+            let (key, value) = (quoted.next()?, quoted.next()?);
+            // An app's size in a library's "apps" block is numbered too ("359320"  "71241906176"): not a path.
+            let old_format = !key.is_empty() && key.bytes().all(|b| b.is_ascii_digit()) && value.contains(['\\', '/']);
+            (key == "path" || old_format).then(|| PathBuf::from(value.replace("\\\\", "\\")))
         })
         .collect()
 }
 
+/// Windows: Steam in Program Files, then wherever the registry says Steam is (Steam installed on another drive).
 #[cfg(windows)]
 fn steam_roots() -> Vec<PathBuf> {
-    ["ProgramFiles(x86)", "ProgramFiles"].iter().filter_map(std::env::var_os).map(|pf| PathBuf::from(pf).join("Steam")).collect()
+    let mut roots: Vec<PathBuf> = ["ProgramFiles(x86)", "ProgramFiles"].iter().filter_map(std::env::var_os).map(|pf| PathBuf::from(pf).join("Steam")).collect();
+    roots.extend(registry::steam_paths());
+    roots
+}
+
+/// Folders where Windows' list of installed programs says Elite Dangerous is: Steam's "Steam App 359320" entry
+/// (`…\steamapps\common\Elite Dangerous`) and the Frontier launcher's. Each holds the game's `Products` folder.
+/// Linux: none (the game's Wine prefix is searched instead).
+pub fn registered_game_dirs() -> Vec<PathBuf> {
+    #[cfg(windows)]
+    {
+        registry::game_dirs()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// A folder as the registry holds it: Steam writes `d:/program files (x86)/steam`, installers sometimes quote it
+/// or end it with a backslash. `None` for an empty value.
+pub fn clean_registry_path(value: &str) -> Option<PathBuf> {
+    let v = value.trim().trim_matches('"').trim();
+    if v.is_empty() {
+        return None;
+    }
+    let mut v = if cfg!(windows) { v.replace('/', "\\") } else { v.to_string() };
+    // Keep the root of a drive ("D:\") whole.
+    while v.len() > 3 && v.ends_with(['\\', '/']) {
+        v.pop();
+    }
+    Some(PathBuf::from(v))
+}
+
+/// Whether an entry of Windows' list of installed programs (a subkey of `…\CurrentVersion\Uninstall`) may be the
+/// game: Steam's `Steam App 359320`, or any whose name starts "Elite Dangerous" (the Frontier launcher's). Other
+/// programs with the game in their name (Elite Dangerous Market Connector) lead to folders without the game, which
+/// the callers skip.
+pub fn is_game_entry(key: &str, display_name: &str) -> bool {
+    key.eq_ignore_ascii_case(&format!("Steam App {STEAM_APP_ID}")) || display_name.trim().to_ascii_lowercase().starts_with("elite dangerous")
+}
+
+/// Reading Steam's and the game's install folders from the registry.
+#[cfg(windows)]
+mod registry {
+    use std::path::PathBuf;
+    use windows_sys::Win32::Foundation::{ERROR_SUCCESS, FILETIME};
+    use windows_sys::Win32::System::Registry::{
+        HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_32KEY, KEY_WOW64_64KEY, RRF_RT_REG_SZ, RRF_SUBKEY_WOW6432KEY, RRF_SUBKEY_WOW6464KEY, RegCloseKey, RegEnumKeyExW,
+        RegGetValueW, RegOpenKeyExW,
+    };
+
+    const UNINSTALL: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+
+    fn wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    /// A text value (`REG_SZ`, or `REG_EXPAND_SZ` expanded); `wow` picks the 32- or 64-bit view of HKLM.
+    fn read_string(root: HKEY, subkey: &str, name: &str, wow: u32) -> Option<String> {
+        let (subkey, name) = (wide(subkey), wide(name));
+        let mut bytes: u32 = 0;
+        // SAFETY: null-terminated UTF-16 names; the first call only asks for the size.
+        let size = unsafe { RegGetValueW(root, subkey.as_ptr(), name.as_ptr(), RRF_RT_REG_SZ | wow, std::ptr::null_mut(), std::ptr::null_mut(), &mut bytes) };
+        if size != ERROR_SUCCESS || bytes < 2 {
+            return None;
+        }
+        let mut buf = vec![0u16; (bytes as usize).div_ceil(2)];
+        // SAFETY: `buf` holds `bytes` bytes, as the call is told.
+        let read = unsafe { RegGetValueW(root, subkey.as_ptr(), name.as_ptr(), RRF_RT_REG_SZ | wow, std::ptr::null_mut(), buf.as_mut_ptr().cast(), &mut bytes) };
+        if read != ERROR_SUCCESS {
+            return None;
+        }
+        let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        Some(String::from_utf16_lossy(&buf[..len]))
+    }
+
+    /// The names of a key's subkeys.
+    fn subkeys(root: HKEY, path: &str, view: u32) -> Vec<String> {
+        let path = wide(path);
+        let mut key: HKEY = std::ptr::null_mut();
+        // SAFETY: a null-terminated name and a place for the handle, closed below.
+        if unsafe { RegOpenKeyExW(root, path.as_ptr(), 0, KEY_READ | view, &mut key) } != ERROR_SUCCESS {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        let mut name = [0u16; 256];
+        for index in 0.. {
+            let mut len = name.len() as u32;
+            let mut written = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+            // SAFETY: `name` holds `len` characters; the optional class arguments are null.
+            let r = unsafe { RegEnumKeyExW(key, index, name.as_mut_ptr(), &mut len, std::ptr::null(), std::ptr::null_mut(), std::ptr::null_mut(), &mut written) };
+            if r != ERROR_SUCCESS {
+                // ERROR_NO_MORE_ITEMS at the end; a name longer than 255 characters isn't a registry key name.
+                break;
+            }
+            out.push(String::from_utf16_lossy(&name[..len as usize]));
+        }
+        // SAFETY: opened above.
+        unsafe { RegCloseKey(key) };
+        out
+    }
+
+    /// Steam's own folder: `SteamPath`, which Steam writes each time it runs, and its installer's `InstallPath`.
+    pub fn steam_paths() -> Vec<PathBuf> {
+        [
+            read_string(HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath", 0),
+            read_string(HKEY_LOCAL_MACHINE, r"SOFTWARE\Valve\Steam", "InstallPath", RRF_SUBKEY_WOW6432KEY),
+            read_string(HKEY_LOCAL_MACHINE, r"SOFTWARE\Valve\Steam", "InstallPath", RRF_SUBKEY_WOW6464KEY),
+        ]
+        .into_iter()
+        .flatten()
+        .filter_map(|v| super::clean_registry_path(&v))
+        .collect()
+    }
+
+    /// The game's folders in the list of installed programs, both registry views of HKLM and the user's own.
+    pub fn game_dirs() -> Vec<PathBuf> {
+        let mut out: Vec<PathBuf> = Vec::new();
+        for (root, view, wow) in [(HKEY_LOCAL_MACHINE, KEY_WOW64_64KEY, RRF_SUBKEY_WOW6464KEY), (HKEY_LOCAL_MACHINE, KEY_WOW64_32KEY, RRF_SUBKEY_WOW6432KEY), (HKEY_CURRENT_USER, 0, 0)] {
+            for key in subkeys(root, UNINSTALL, view) {
+                let entry = format!(r"{UNINSTALL}\{key}");
+                let name = read_string(root, &entry, "DisplayName", wow).unwrap_or_default();
+                if !super::is_game_entry(&key, &name) {
+                    continue;
+                }
+                let Some(dir) = read_string(root, &entry, "InstallLocation", wow).and_then(|loc| super::clean_registry_path(&loc)) else { continue };
+                if !out.iter().any(|d| super::same_path(d, &dir)) {
+                    out.push(dir);
+                }
+            }
+        }
+        out
+    }
 }
 
 #[cfg(not(windows))]
@@ -211,6 +349,39 @@ pub fn parse_journal_file_name(name: &str) -> Option<(Timestamp, u32)> {
     Some((ts, part))
 }
 
+/// What a folder chosen as the journal folder holds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JournalFolderCheck {
+    /// `files` journals in `dir`: the folder itself, or the game's folder under it when a folder above it was chosen
+    /// (`Saved Games`, `Frontier Developments` or the Windows user folder).
+    Journals { dir: PathBuf, files: usize },
+    /// It opens, but holds no `Journal.*.log` file.
+    Empty,
+    /// It can't be opened: missing, an offline network share, no permission.
+    Unreadable(String),
+}
+
+/// Looks for journals in `dir`, then in the game's journal folder under it.
+pub fn check_journal_folder(dir: &Path) -> JournalFolderCheck {
+    let files = match list_journal_files(dir) {
+        Ok(f) => f.len(),
+        Err(e) => return JournalFolderCheck::Unreadable(e.to_string()),
+    };
+    if files > 0 {
+        return JournalFolderCheck::Journals { dir: dir.to_path_buf(), files };
+    }
+    // Picked one level too high: <user>, <user>\Saved Games or ...\Frontier Developments.
+    for depth in (1..=JOURNAL_IN_PROFILE.len()).rev() {
+        let below = JOURNAL_IN_PROFILE[JOURNAL_IN_PROFILE.len() - depth..].iter().fold(dir.to_path_buf(), |p, c| p.join(c));
+        if let Ok(f) = list_journal_files(&below)
+            && !f.is_empty()
+        {
+            return JournalFolderCheck::Journals { dir: below, files: f.len() };
+        }
+    }
+    JournalFolderCheck::Empty
+}
+
 /// All `Journal.*.log` files in `dir`, oldest first.
 pub fn list_journal_files(dir: &Path) -> std::io::Result<Vec<JournalFile>> {
     let mut out = Vec::new();
@@ -246,6 +417,60 @@ mod tests {
         assert_eq!(parse_library_folders(vdf), vec![PathBuf::from(r"C:\Program Files (x86)\Steam"), PathBuf::from(r"D:\SteamLibrary")]);
         let linux = "\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t\"/home/cmdr/.local/share/Steam\"\n\t}\n\t\"1\"\n\t{\n\t\t\"path\"\t\t\"/mnt/games/SteamLibrary\"\n\t}\n}";
         assert_eq!(parse_library_folders(linux), vec![PathBuf::from("/home/cmdr/.local/share/Steam"), PathBuf::from("/mnt/games/SteamLibrary")]);
+        // A library's apps and their sizes are numbered too, but aren't folders.
+        let apps = "\t\"1\"\n\t{\n\t\t\"path\"\t\t\"E:\\\\Games\\\\Steam\"\n\t\t\"apps\"\n\t\t{\n\t\t\t\"359320\"\t\t\"71241906176\"\n\t\t}\n\t}";
+        assert_eq!(parse_library_folders(apps), vec![PathBuf::from(r"E:\Games\Steam")]);
+        // Before 2021: numbered values directly under LibraryFolders.
+        let old = "\"LibraryFolders\"\n{\n\t\"TimeNextStatsReport\"\t\t\"1634567890\"\n\t\"ContentStatsID\"\t\t\"-4485329811450862347\"\n\t\"1\"\t\t\"D:\\\\SteamLibrary\"\n\t\"2\"\t\t\"E:\\\\Steam Games\"\n}";
+        assert_eq!(parse_library_folders(old), vec![PathBuf::from(r"D:\SteamLibrary"), PathBuf::from(r"E:\Steam Games")]);
+    }
+
+    #[test]
+    fn cleans_registry_folders() {
+        assert_eq!(clean_registry_path("  \"D:\\SteamLibrary\\steamapps\\common\\Elite Dangerous\\\" "), Some(PathBuf::from(r"D:\SteamLibrary\steamapps\common\Elite Dangerous")));
+        assert_eq!(clean_registry_path(r"D:\"), Some(PathBuf::from(r"D:\")));
+        assert_eq!(clean_registry_path(r"\\MAINPC\Games\Elite Dangerous\"), Some(PathBuf::from(r"\\MAINPC\Games\Elite Dangerous")));
+        assert_eq!(clean_registry_path(" \"\" "), None);
+        // Steam writes its own folder with forward slashes.
+        #[cfg(windows)]
+        assert_eq!(clean_registry_path("d:/program files (x86)/steam"), Some(PathBuf::from(r"d:\program files (x86)\steam")));
+    }
+
+    #[test]
+    fn spots_the_game_in_installed_programs() {
+        assert!(is_game_entry("Steam App 359320", ""));
+        assert!(is_game_entry("steam app 359320", "Whatever Steam calls it"));
+        assert!(is_game_entry("{696F8871-C91D-4CB1-825D-36BE18065575}_is1", "Elite Dangerous"));
+        assert!(!is_game_entry("Steam App 570", "Dota 2"));
+        assert!(!is_game_entry("EDDiscovery", "EDDiscovery"));
+    }
+
+    /// The registry is read without trouble (what it holds depends on the PC).
+    #[cfg(windows)]
+    #[test]
+    fn reads_the_registry() {
+        for dir in registry::steam_paths().into_iter().chain(registry::game_dirs()) {
+            assert!(!dir.as_os_str().is_empty());
+        }
+    }
+
+    #[test]
+    fn checks_a_chosen_journal_folder() {
+        let root = std::env::temp_dir().join(format!("nexus-journal-check-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let journals = JOURNAL_IN_PROFILE.iter().fold(root.clone(), |p, c| p.join(c));
+        std::fs::create_dir_all(&journals).unwrap();
+        assert_eq!(check_journal_folder(&journals), JournalFolderCheck::Empty);
+        assert!(matches!(check_journal_folder(&root.join("missing")), JournalFolderCheck::Unreadable(_)));
+        std::fs::write(journals.join("Journal.2026-10-12T073031.01.log"), "").unwrap();
+        std::fs::write(journals.join("Status.json"), "").unwrap();
+        let found = JournalFolderCheck::Journals { dir: journals.clone(), files: 1 };
+        assert_eq!(check_journal_folder(&journals), found);
+        // A folder above it was picked: the user folder, Saved Games, Frontier Developments.
+        assert_eq!(check_journal_folder(&root), found);
+        assert_eq!(check_journal_folder(&root.join("Saved Games")), found);
+        assert_eq!(check_journal_folder(&root.join("Saved Games").join("Frontier Developments")), found);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
