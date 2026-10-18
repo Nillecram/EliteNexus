@@ -30,6 +30,18 @@ canonicals, and screenshot links without full-size viewing or meaningful alt tex
 cover mobile navigation, all product-tour tabs, lightbox zoom/next/previous/Escape and keyboard focus restoration.
 Images remain ordinary full-size links and all product-tour panels remain visible when JavaScript is disabled.
 
+## Quote collage
+
+The homepage's "What commanders are saying" section and `docs/testimonials.png` (in the repository README, and for
+posting elsewhere) carry the same quotes from the launch threads. Keep them in step: the section lives in
+`content/index.html`, the image's source in `testimonials.html`. Quotes stay word for word, with "…" where one is
+shortened, and without usernames or avatars: the commanders wrote on a forum, not for an advert.
+
+To redraw the image, run `python tools/site/testimonials.py` and open the URL it prints in a Chromium-based browser
+(`--open` uses your default browser). The page draws itself at 2× through the browser's own renderer and posts the
+PNG back; the script saves it to `docs/testimonials.png` (2800 × 2200) and exits. Headless `--screenshot` would be
+simpler, but it can't start inside an agent's command sandbox.
+
 ## Artwork
 
 `galaxy-hero.webp` is original artwork made with the built-in image generation tool for this site. It is conceptual

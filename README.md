@@ -14,6 +14,10 @@ There is no installer: everything it keeps lives in a `nexus-data` folder next t
 
 ![Elite Nexus, an Elite Dangerous companion app: dashboard with commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
 
+## What commanders are saying
+
+![Quotes from the Elite Nexus launch threads on the Frontier Forums and Reddit, October 2026. "The engineering section is excellent as is the colonisation section and also the carrier route planning. This app does most of what I need from EDDiscovery in a fraction of memory usage. Keep going." "That abnormal price filtering is a great idea." "I like the HUD and cockpit light controls." "First looks are highly positive." "OP, this looks super impressive."](docs/testimonials.png)
+
 ## Make the cockpit yours: HUD colours, cockpit lights, glare
 
 ![Elite Dangerous HUD colour editor: an Empire blue theme in the live cockpit preview, with hostile contacts still red and friendly ones still green](docs/screenshots/hud-colours.png)

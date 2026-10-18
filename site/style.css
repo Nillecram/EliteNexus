@@ -194,6 +194,21 @@ ol.numbered-steps, .numbered-steps > ol { display: grid; grid-template-columns: 
 .trust-symbol { display: block; margin-bottom: 22px; color: var(--amber); font-size: 10px; font-weight: 600; letter-spacing: .12em; }
 .trust-grid h3 { font-size: 20px; }
 .trust-grid p { color: var(--muted); font-size: 14px; }
+/* Commanders' own words, set as text rather than screenshots so their names and avatars stay out. */
+.section-quotes { border-top: 1px solid var(--line); }
+.quotes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr); align-items: start; gap: 20px; }
+.quote-stack { columns: 2; column-gap: 20px; }
+.quote { display: flex; flex-direction: column; gap: 16px; padding: 26px 28px; border: 1px solid var(--line); border-radius: var(--radius); background: #111419; }
+.quote-stack .quote { margin-bottom: 20px; break-inside: avoid; }
+.quote blockquote { margin: 0; color: #d9dde3; font-size: 15px; line-height: 1.65; }
+.quote blockquote::before { content: '“'; display: block; height: 26px; color: var(--amber); font: 700 48px/1 Georgia, 'Times New Roman', serif; }
+.quote blockquote p { margin-bottom: 10px; }
+.quote blockquote p:last-child { margin-bottom: 0; }
+.quote figcaption { color: var(--subtle); font-size: 12px; }
+.quote-lead { gap: 22px; padding: 34px 36px; border-color: #4b3b25; background: radial-gradient(ellipse at 0 0, #ffad2b10, transparent 70%), #111419; }
+.quote-lead blockquote { color: var(--text); font-size: 20px; line-height: 1.55; letter-spacing: -.015em; }
+.quote-lead blockquote::before { height: 34px; font-size: 64px; }
+.quote-lead blockquote p { margin-bottom: 14px; }
 .download-section { padding-block: 90px; border-block: 1px solid #443624; background: radial-gradient(ellipse at 0 50%, #ffad2b0d, transparent 75%), #101215; }
 .download-section.container, .download-section > .container { display: grid; grid-template-columns: 1.1fr .9fr; align-items: center; gap: 90px; }
 .download-section.container { padding: 70px 64px; border: 1px solid #443624; border-radius: var(--radius); }
@@ -311,6 +326,7 @@ body.lightbox-open { overflow: hidden; }
   .download-section.container, .download-section > .container { gap: 45px; }
   .download-section.container { padding: 45px 35px; }
   .trust-grid { gap: 28px; }
+  .quotes { grid-template-columns: 1fr; }
   .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 42px; }
   .lightbox-toolbar { flex-wrap: wrap; gap: 14px; }
   .lightbox-toolbar p { max-width: none; }
@@ -368,6 +384,11 @@ body.lightbox-open { overflow: hidden; }
   .trust-grid { gap: 30px; }
   .section-rule { padding-block: 35px 55px; }
   .trust-symbol { margin-bottom: 17px; }
+  .quotes { gap: 14px; }
+  .quote-stack { columns: 1; }
+  .quote-stack .quote { margin-bottom: 14px; }
+  .quote, .quote-lead { padding: 22px 22px 24px; }
+  .quote-lead blockquote { font-size: 17px; }
   ol.numbered-steps, .numbered-steps > ol, .split ol.numbered-steps, .split .numbered-steps > ol { grid-template-columns: 1fr; gap: 28px; }
   .numbered-steps li, .split .numbered-steps li { padding-top: 48px; }
   .numbered-steps h3 { margin-bottom: 9px; }
