@@ -1,8 +1,52 @@
-//! The commander's own fleet carrier.
+//! The commander's fleet carriers: their own, and their squadron's.
 
 use nexus_journal::events as ev;
 use nexus_journal::Timestamp;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+
+/// Which of the commander's carriers something is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CarrierKind {
+    /// Their own fleet carrier (`CarrierType` "FleetCarrier").
+    #[default]
+    Personal,
+    /// Their squadron's carrier (`CarrierType` "SquadronCarrier", since Vanguards in August 2025).
+    Squadron,
+}
+
+impl CarrierKind {
+    /// The carrier a journal event is about, from its `CarrierType` and `CarrierID`. Since Vanguards
+    /// every carrier event names its type. Events without one come from older journals, when only
+    /// personal carriers existed, unless the id is the squadron carrier's. None for a type we don't
+    /// know.
+    pub fn of(carrier_type: Option<&str>, id: u64, squadron_id: Option<u64>) -> Option<CarrierKind> {
+        match carrier_type {
+            Some("FleetCarrier") => Some(CarrierKind::Personal),
+            Some("SquadronCarrier") => Some(CarrierKind::Squadron),
+            Some(_) => None,
+            None if squadron_id == Some(id) => Some(CarrierKind::Squadron),
+            None => Some(CarrierKind::Personal),
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            CarrierKind::Personal => "Fleet carrier",
+            CarrierKind::Squadron => "Squadron carrier",
+        }
+    }
+}
+
+/// A decommission the owner asked for (`CarrierDecommission`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Decommission {
+    pub requested: Timestamp,
+    /// When the carrier is scrapped and the refund paid.
+    pub scrap_time: Timestamp,
+    pub refund: i64,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct CarrierJumpRecord {
@@ -91,7 +135,10 @@ pub struct Carrier {
     pub jump_range_max: f64,
     pub docking_access: String,
     pub allow_notorious: bool,
+    /// The last `CarrierStats` said a decommission is pending.
     pub pending_decommission: bool,
+    /// From `CarrierDecommission`, until it's cancelled. Past its scrap time the carrier is gone.
+    pub decommission: Option<Decommission>,
     pub space: ev::CarrierSpaceUsage,
     pub finance: ev::CarrierFinanceInfo,
     pub crew: Vec<ev::CarrierCrewMember>,
@@ -106,8 +153,19 @@ pub struct Carrier {
 }
 
 impl Carrier {
+    /// The journal has shown this carrier (it may since have been decommissioned: see [`Carrier::active`]).
     pub fn owned(&self) -> bool {
         self.id.is_some()
+    }
+
+    /// The carrier was scrapped: its decommission's scrap time has passed.
+    pub fn decommissioned(&self, now: Timestamp) -> bool {
+        self.decommission.is_some_and(|d| now.0 >= d.scrap_time.0)
+    }
+
+    /// Known and still there at `now`.
+    pub fn active(&self, now: Timestamp) -> bool {
+        self.owned() && !self.decommissioned(now)
     }
 
     fn mine(&self, id: u64) -> bool {
@@ -115,9 +173,9 @@ impl Carrier {
     }
 
     pub fn on_stats(&mut self, s: &ev::CarrierStats, ts: Timestamp) {
-        // Only squadron carriers can share the event shape; keep the personal one.
-        if s.carrier_type.as_deref().is_some_and(|t| t != "FleetCarrier") && self.id.is_some() {
-            return;
+        // Another carrier of this kind: the old one was scrapped, or the commander changed squadrons.
+        if self.id.is_some_and(|id| id != s.carrier_id) {
+            *self = Carrier::default();
         }
         self.id = Some(s.carrier_id);
         self.carrier_type = s.carrier_type.clone();
@@ -129,18 +187,42 @@ impl Carrier {
         self.docking_access = s.docking_access.clone();
         self.allow_notorious = s.allow_notorious;
         self.pending_decommission = s.pending_decommission;
+        if !s.pending_decommission {
+            self.decommission = None;
+        }
         self.space = s.space_usage.clone();
         self.finance = s.finance.clone();
         self.crew = s.crew.clone();
         self.stats_updated = ts;
     }
 
+    /// A new carrier: nothing of an earlier one carries over.
     pub fn on_buy(&mut self, b: &ev::CarrierBuy, ts: Timestamp) {
-        self.id = Some(b.carrier_id);
-        self.callsign = b.callsign.clone();
-        self.system = Some(b.location.clone());
-        self.system_address = Some(b.system_address);
-        self.stats_updated = ts;
+        *self = Carrier {
+            id: Some(b.carrier_id),
+            carrier_type: b.carrier_type.clone(),
+            callsign: b.callsign.clone(),
+            system: Some(b.location.clone()),
+            system_address: Some(b.system_address),
+            stats_updated: ts,
+            ..Carrier::default()
+        };
+    }
+
+    pub fn on_decommission(&mut self, d: &ev::CarrierDecommission, ts: Timestamp) {
+        if !self.mine(d.carrier_id) {
+            return;
+        }
+        self.id.get_or_insert(d.carrier_id);
+        self.pending_decommission = true;
+        self.decommission = Some(Decommission { requested: ts, scrap_time: Timestamp(d.scrap_time), refund: d.scrap_refund });
+    }
+
+    pub fn on_cancel_decommission(&mut self, c: &ev::CarrierLocation) {
+        if self.mine(c.carrier_id) {
+            self.pending_decommission = false;
+            self.decommission = None;
+        }
     }
 
     pub fn on_jump_request(&mut self, r: &ev::CarrierJumpRequest, ts: Timestamp) {
@@ -164,9 +246,6 @@ impl Carrier {
     }
 
     pub fn on_location(&mut self, l: &ev::CarrierLocation, ts: Timestamp) {
-        if l.carrier_type.as_deref().is_some_and(|t| t != "FleetCarrier") {
-            return;
-        }
         if !self.mine(l.carrier_id) {
             return;
         }
@@ -304,9 +383,6 @@ impl Carrier {
     }
 
     pub fn on_crew_services(&mut self, c: &ev::CarrierCrewServices) {
-        if c.carrier_type.as_deref().is_some_and(|t| t != "FleetCarrier") {
-            return;
-        }
         if !self.mine(c.carrier_id) {
             return;
         }
@@ -431,6 +507,59 @@ mod tests {
         let r = ev::CarrierJumpRequest { carrier_id: ID + 1, system_name: "Gamma".into(), system_address: 300, departure_time: Some("2026-10-18T12:00:00Z".into()), ..Default::default() };
         c.on_jump_request(&r, at(0));
         assert_eq!(c.jump_timer(at(1)), None);
+    }
+
+    #[test]
+    fn carrier_type_picks_the_carrier() {
+        use CarrierKind::*;
+        assert_eq!(CarrierKind::of(Some("FleetCarrier"), 1, Some(1)), Some(Personal), "the type wins over the id");
+        assert_eq!(CarrierKind::of(Some("SquadronCarrier"), 1, None), Some(Squadron));
+        assert_eq!(CarrierKind::of(None, 1, None), Some(Personal), "older journals only had personal carriers");
+        assert_eq!(CarrierKind::of(None, 2, Some(2)), Some(Squadron));
+        assert_eq!(CarrierKind::of(Some("SomethingNew"), 1, None), None);
+    }
+
+    fn decommission(c: &mut Carrier, t: i64, scrap: i64) {
+        c.on_decommission(&ev::CarrierDecommission { carrier_id: ID, carrier_type: Some("FleetCarrier".into()), scrap_refund: 4_500_000_000, scrap_time: T0 + scrap }, at(t));
+    }
+
+    #[test]
+    fn decommission_completes_at_the_scrap_time() {
+        const WEEK: i64 = 7 * 24 * 3600;
+        let mut c = own();
+        decommission(&mut c, 0, WEEK);
+        assert!(c.pending_decommission);
+        assert!(c.active(at(WEEK - 1)), "still there until the scrap time");
+        assert!(c.decommissioned(at(WEEK)));
+        assert!(!c.active(at(WEEK)) && c.owned(), "gone, but remembered");
+        assert_eq!(c.decommission.map(|d| d.refund), Some(4_500_000_000));
+    }
+
+    #[test]
+    fn cancelled_decommission_keeps_the_carrier() {
+        let mut c = own();
+        decommission(&mut c, 0, 100);
+        c.on_cancel_decommission(&ev::CarrierLocation { carrier_type: Some("FleetCarrier".into()), carrier_id: ID, ..Default::default() });
+        assert!(c.active(at(1_000)) && !c.pending_decommission);
+        // Carrier management showing no decommission cancels one we missed, too.
+        decommission(&mut c, 0, 100);
+        c.on_stats(&ev::CarrierStats { carrier_id: ID, ..Default::default() }, at(50));
+        assert!(c.active(at(1_000)));
+    }
+
+    #[test]
+    fn a_new_carrier_starts_clean() {
+        let mut c = own();
+        request(&mut c, 0);
+        decommission(&mut c, 0, 100);
+        c.jumps.push(CarrierJumpRecord { ts: at(0), system: "Alpha".into(), body: None });
+        // The old one is scrapped; carrier management now shows another carrier.
+        c.on_stats(&ev::CarrierStats { carrier_id: ID + 1, callsign: "NEW-001".into(), fuel_level: 800, ..Default::default() }, at(200));
+        assert_eq!((c.id, c.callsign.as_str(), c.fuel), (Some(ID + 1), "NEW-001", 800));
+        assert!(c.active(at(300)) && c.jumps.is_empty() && c.pending_jump.is_none() && c.decommission.is_none());
+        // Same after a purchase.
+        c.on_buy(&ev::CarrierBuy { carrier_id: ID + 2, callsign: "NEW-002".into(), location: "Gamma".into(), system_address: 300, ..Default::default() }, at(400));
+        assert_eq!((c.id, c.fuel, c.system.as_deref()), (Some(ID + 2), 0, Some("Gamma")));
     }
 
     #[test]

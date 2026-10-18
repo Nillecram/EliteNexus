@@ -485,6 +485,14 @@ EDD also synthesises its own `EDD*` events; ignore them.
     until **10 minutes** before: community wiki (elite-dangerous.fandom.com, Drake-Class Carrier), not Frontier. One
     player's post says the lockdown starts about 2 minutes before, so treat these as a guide.
   * How long the jump itself takes isn't documented; `CarrierJump` (aboard) or `CarrierLocation` marks the arrival.
+* `CarrierDecommission{CarrierID, ScrapRefund, ScrapTime}`: `ScrapTime` is a Unix time in seconds (an integer, not
+  ISO), when the carrier is scrapped and the refund paid. `CarrierCancelDecommission{CarrierID}` calls it off. A
+  later `CarrierStats.PendingDecommission:false` also means it was cancelled. Past `ScrapTime` the carrier is gone;
+  the journal writes nothing more for it (Elite Nexus: `Carrier::decommissioned`).
+* Squadron carriers (checked 2026-10-18): Elite Nexus routes each event by `CarrierType`, and events without one
+  (journals from before Vanguards, a few events) by `CarrierID` (the squadron carrier's, else the personal one), as
+  EDDiscovery does. No carrier event says *who* acted: `CarrierJumpRequest`, `CarrierTradeOrder` and the rest are
+  written to the journal of the commander who did it, so other members' jumps and orders never appear in yours.
 * `CarrierJump` is written to a player **docked on (or on foot aboard) the carrier** during the jump. It's a `Location`-like event without distance or fuel.
 * `CarrierTradeOrder` covers buy/sell/cancel orders. `PurchaseOrder`/`SaleOrder` are quantities; `Price` is per unit.
 * `CarrierFinance` covers tax/reserve changes. `CarrierBankTransfer` covers credits in and out.

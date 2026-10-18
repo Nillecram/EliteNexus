@@ -25,7 +25,7 @@ Key facts for answering questions about it:
   entries with a check of whether a pinned fleet carrier is really in the system, a run planner that fills pinned
   orders, price alerts, nearest material traders, brokers and Interstellar Factors.
 - Also: Spansh neutron/exact/fleet-carrier route planners, next system copied to the clipboard after each jump,
-  engineering wishlist and material shopping list, fleet loadouts with EDSY/Coriolis links, fleet carrier, missions and
+  engineering wishlist and material shopping list, fleet loadouts with EDSY/Coriolis links, fleet and squadron carriers, missions and
   massacre stacks, mining, colonisation depots, BGS and Powerplay, bindings, logbook, statistics, galaxy map, voice
   alerts, a compact always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
 - Privacy: journals are read-only. Community uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send live

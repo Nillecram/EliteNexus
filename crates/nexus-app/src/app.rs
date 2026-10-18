@@ -174,9 +174,9 @@ impl NexusApp {
         let next = {
             let model = self.core.model.read();
             let Some(gs) = model.active() else { return };
-            // Arrivals tick off planned waypoints; a carrier route follows the carrier, wherever the commander is.
+            // Arrivals tick off planned waypoints; a carrier route follows its carrier, wherever the commander is.
             if let Some(p) = self.nav.planned.as_mut() {
-                let carrier = gs.carrier.system.as_deref().filter(|_| p.kind == "Carrier");
+                let carrier = p.carrier().and_then(|k| gs.carrier_of(k).system.as_deref());
                 p.advance(carrier.unwrap_or(&gs.location.system));
             }
             let jumps = gs.history.jumps.len();
@@ -473,7 +473,7 @@ impl NexusApp {
                 pages::ask::AskAction::SettingsChanged => settings_changed = true,
                 pages::ask::AskAction::None => {}
             },
-            Page::Carrier => pages::carrier::show(ui, gs),
+            Page::Carrier => settings_changed |= pages::carrier::show(ui, gs, &mut self.settings.carrier),
             Page::Engineering => settings_changed |= pages::engineering::show(ui, gs, &mut self.eng, &mut self.settings.wishlist),
             Page::Fleet => pages::fleet::show(ui, gs, &mut self.fleet),
             Page::Missions => pages::missions::show(ui, gs),
@@ -495,7 +495,7 @@ impl NexusApp {
                 restart = cx.restart_core;
             }
             Page::Navigation => {
-                settings_changed |= pages::navigation::show(ui, gs, &mut self.nav, &mut self.settings.auto_copy_next_system, &self.spansh, self.rt.handle())
+                settings_changed |= pages::navigation::show(ui, gs, &mut self.nav, &mut self.settings.auto_copy_next_system, &mut self.settings.carrier, &self.spansh, self.rt.handle())
             }
             Page::Bindings => pages::bindings::show(ui, &mut self.binds, &self.data_dir),
             Page::Hud => settings_changed |= pages::hud::show(ui, &mut self.hud, &mut self.settings.hud_themes, !gs.game_closed, (&gs.cmdr.game_version, &gs.cmdr.game_build), self.rt.handle()),

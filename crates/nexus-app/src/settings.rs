@@ -33,6 +33,9 @@ pub struct Settings {
     pub hud_themes: Vec<HudTheme>,
     /// The Market page's last searches and filters.
     pub market: crate::pages::market::MarketPrefs,
+    /// The carrier the Fleet carrier page and the carrier planner show, for commanders with both
+    /// their own and a squadron carrier.
+    pub carrier: nexus_model::carrier::CarrierKind,
 }
 
 /// A named HUD colour matrix.
@@ -143,6 +146,7 @@ impl Default for Settings {
             ai: AiSettings::default(),
             hud_themes: Vec::new(),
             market: Default::default(),
+            carrier: Default::default(),
         }
     }
 }

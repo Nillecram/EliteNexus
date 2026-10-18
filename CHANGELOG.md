@@ -14,6 +14,17 @@ release time that section becomes the new version and the release workflow publi
   from the journal; the 5-minute cooldown is Frontier's figure, and the timer's tooltip says where each number comes
   from and what it can't know.
 
+### Fixed
+- **Squadron carriers and decommissioned carriers** (reported on Reddit): a commander who had decommissioned their
+  own carrier and now uses their squadron's saw the old carrier marked "DECOMMISSIONING" forever, and never the
+  squadron carrier, even as its owner. Elite Nexus now reads decommissions from the journal: a carrier is shown as
+  decommissioning with its scrap date and refund, and as gone once that date has passed. The squadron carrier is
+  tracked on its own (stats, position, jump timer, orders, jumps) and shown on the Fleet carrier page (a switch picks
+  which carrier when you have both), on the Dashboard, on the Galaxy map and in Navigation's fleet carrier planner,
+  which plans with the picked carrier's tritium and cargo and Spansh's squadron carrier mass. The journal records only
+  the jumps and orders you make yourself, and the pages say so for squadron carriers. Credits you give a squadron
+  carrier now count as spending (they're the squadron's), unlike transfers to your own carrier.
+
 ## [0.5.0] - 2026-10-17
 
 Elite Nexus now runs natively on Linux, next to Elite Dangerous under Proton or Wine.

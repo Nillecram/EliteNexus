@@ -1,5 +1,5 @@
 //! Galaxy map: a pannable, zoomable map of the Milky Way, oriented like the in-game map (galactic
-//! centre up), with your travels, the active route, your carrier and ships, and landmarks.
+//! centre up), with your travels, the active route, your carriers and ships, and landmarks.
 //! Drag to pan, scroll or pinch to zoom, double-click to zoom in, click a system for details.
 //!
 //! The galaxy itself is painted procedurally (a barred spiral fitted to Elite's coordinates), so no
@@ -145,14 +145,17 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut MapUi, route: &[Waypoint]) -> 
             picks.push(Pick { name: (*name).to_string(), detail: format!("Route stop {}", i + 1), pos: *p, kind: PickKind::Route });
         }
     }
-    let mut carrier = None;
+    // The commander's carriers (their own and their squadron's) with a marker colour and name.
+    let mut carriers: Vec<([f64; 2], Color32, String)> = Vec::new();
     let mut ships: Vec<([f64; 2], Vec<String>)> = Vec::new();
     if st.show_assets {
-        if gs.carrier.owned()
-            && let Some(p) = gs.carrier.system.as_deref().and_then(pos_of)
-        {
-            carrier = Some(p);
-            picks.push(Pick { name: format!("{} {}", gs.carrier.name, gs.carrier.callsign), detail: gs.carrier.system.clone().unwrap_or_default(), pos: p, kind: PickKind::Carrier });
+        for (kind, c) in gs.carriers(nexus_journal::Timestamp::now()) {
+            let Some(p) = c.system.as_deref().and_then(pos_of) else { continue };
+            let name = crate::pages::carrier::carrier_name(kind, c);
+            let colr = if kind == nexus_model::carrier::CarrierKind::Squadron { pal::PURPLE } else { pal::GOOD };
+            let label = if c.callsign.is_empty() || c.callsign == name { name.clone() } else { format!("{name} {}", c.callsign) };
+            picks.push(Pick { name: label, detail: format!("{} · {}", c.system.clone().unwrap_or_default(), kind.label()), pos: p, kind: PickKind::Carrier });
+            carriers.push((p, colr, name));
         }
         for s in gs.fleet.ships.values() {
             if Some(s.id) == gs.fleet.current_ship_id {
@@ -289,8 +292,8 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut MapUi, route: &[Waypoint]) -> 
         labels.push(Rect::from_center_size(h, Vec2::splat(22.0)));
     }
     let mut pins: Vec<(Pos2, &str, Color32, String)> = Vec::new();
-    if let Some(c) = carrier {
-        pins.push((cam.to_screen(c), icon::ANCHOR, pal::GOOD, gs.carrier.name.clone()));
+    for (p, colr, name) in &carriers {
+        pins.push((cam.to_screen(*p), icon::ANCHOR, *colr, name.clone()));
     }
     if st.show_route
         && let Some((_, last, name)) = route_pts.last()

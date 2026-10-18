@@ -2,7 +2,7 @@
 
 use crate::alerts::{Alert, AlertKind, Alerts, Priority};
 use crate::bgs::{Bgs, BgsKind, Here};
-use crate::carrier::Carrier;
+use crate::carrier::{Carrier, CarrierKind};
 use crate::colonisation::Colonisation;
 use crate::commander::{Commander, PowerplayStatus, Squadron};
 use crate::exobio::{ExoBio, ScanOutcome};
@@ -45,7 +45,10 @@ pub struct GameState {
     pub exploration: Exploration,
     pub exobio: ExoBio,
     pub mining: Mining,
+    /// The commander's own fleet carrier.
     pub carrier: Carrier,
+    /// Their squadron's carrier, tracked apart from their own.
+    pub squadron_carrier: Carrier,
     pub colonisation: Colonisation,
     pub history: History,
     pub bgs: Bgs,
@@ -96,6 +99,26 @@ impl GameState {
         self.cmdr.credits += amount;
         if cat != LedgerCategory::Transfer {
             self.session.record_money(amount);
+        }
+    }
+
+    pub fn carrier_of(&self, kind: CarrierKind) -> &Carrier {
+        match kind {
+            CarrierKind::Personal => &self.carrier,
+            CarrierKind::Squadron => &self.squadron_carrier,
+        }
+    }
+
+    /// The carriers the commander has at `now`, their own first: known and not decommissioned.
+    pub fn carriers(&self, now: Timestamp) -> Vec<(CarrierKind, &Carrier)> {
+        [CarrierKind::Personal, CarrierKind::Squadron].into_iter().map(|k| (k, self.carrier_of(k))).filter(|(_, c)| c.active(now)).collect()
+    }
+
+    /// The carrier a journal event is about (see [`CarrierKind::of`]).
+    fn carrier_for(&mut self, carrier_type: Option<&str>, id: u64) -> Option<&mut Carrier> {
+        match CarrierKind::of(carrier_type, id, self.squadron_carrier.id)? {
+            CarrierKind::Personal => Some(&mut self.carrier),
+            CarrierKind::Squadron => Some(&mut self.squadron_carrier),
         }
     }
 
@@ -205,7 +228,11 @@ impl GameState {
                 self.cmdr.squadron = Some(Squadron { name: s.squadron_name.clone(), id: s.squadron_id, ..Default::default() });
                 self.cmdr.squadron_applications.clear();
             }
-            Event::LeftSquadron(_) | Event::KickedFromSquadron(_) | Event::DisbandedSquadron(_) => self.cmdr.squadron = None,
+            Event::LeftSquadron(_) | Event::KickedFromSquadron(_) | Event::DisbandedSquadron(_) => {
+                self.cmdr.squadron = None;
+                // Its carrier isn't the commander's any more.
+                self.squadron_carrier = Carrier::default();
+            }
             Event::AppliedToSquadron(s) => {
                 if !self.cmdr.squadron_applications.contains(&s.squadron_name) {
                     self.cmdr.squadron_applications.push(s.squadron_name.clone());
@@ -274,6 +301,7 @@ impl GameState {
                 self.exobio.on_system(a.system_address);
                 self.exploration.enter_system(a.system_address, &a.star_system, a.star_pos, ts);
                 self.carrier.on_carrier_jump(a, ts);
+                self.squadron_carrier.on_carrier_jump(a, ts);
                 self.feed(ts, "CarrierJump", format!("Carrier jumped to {}", a.star_system));
             }
             Event::StartJump(s) => {
@@ -765,32 +793,97 @@ impl GameState {
             }
 
             // ---------------------------------------------------------------- carrier
-            Event::CarrierStats(s) => self.carrier.on_stats(s, ts),
+            Event::CarrierStats(s) => {
+                if let Some(c) = self.carrier_for(s.carrier_type.as_deref(), s.carrier_id) {
+                    c.on_stats(s, ts);
+                }
+            }
             Event::CarrierBuy(b) => {
-                self.carrier.on_buy(b, ts);
-                self.money(ts, LedgerCategory::Carrier, -b.price, "Fleet carrier purchased");
+                let squadron = b.carrier_type.as_deref() == Some("SquadronCarrier");
+                if let Some(c) = self.carrier_for(b.carrier_type.as_deref(), b.carrier_id) {
+                    c.on_buy(b, ts);
+                }
+                self.money(ts, LedgerCategory::Carrier, -b.price, if squadron { "Squadron carrier purchased" } else { "Fleet carrier purchased" });
             }
             Event::CarrierJumpRequest(r) => {
-                self.carrier.on_jump_request(r, ts);
+                let squadron = CarrierKind::of(r.carrier_type.as_deref(), r.carrier_id, self.squadron_carrier.id) == Some(CarrierKind::Squadron);
+                if let Some(c) = self.carrier_for(r.carrier_type.as_deref(), r.carrier_id) {
+                    c.on_jump_request(r, ts);
+                }
+                let what = if squadron { "Squadron carrier" } else { "Carrier" };
                 let when = r.departure_time.as_deref().and_then(Timestamp::parse).map(|t| t.to_local_string("%H:%M")).unwrap_or_default();
-                self.feed(ts, "CarrierJumpRequest", format!("Carrier jump to {} at {}", r.system_name, when));
+                self.feed(ts, "CarrierJumpRequest", format!("{what} jump to {} at {}", r.system_name, when));
                 alerts.push_with(|| {
-                    Alert::new(ts, AlertKind::Carrier, Priority::Normal, "Carrier jump scheduled")
+                    Alert::new(ts, AlertKind::Carrier, Priority::Normal, format!("{what} jump scheduled"))
                         .detail(format!("{} — departs {}", r.system_name, when))
                 });
             }
-            Event::CarrierJumpCancelled(c) => self.carrier.on_jump_cancelled(c),
-            Event::CarrierLocation(l) => self.carrier.on_location(l, ts),
-            Event::CarrierFinance(f) => self.carrier.on_finance(f),
-            Event::CarrierBankTransfer(t) => {
-                self.carrier.on_bank_transfer(t);
-                let amount = t.withdraw.unwrap_or(0) - t.deposit.unwrap_or(0);
-                self.money(ts, LedgerCategory::Transfer, amount, if amount < 0 { "Deposited to carrier" } else { "Withdrew from carrier" });
+            Event::CarrierJumpCancelled(c) => {
+                if let Some(k) = self.carrier_for(c.carrier_type.as_deref(), c.carrier_id) {
+                    k.on_jump_cancelled(c);
+                }
             }
-            Event::CarrierDepositFuel(d) => self.carrier.on_deposit_fuel(d),
-            Event::CarrierTradeOrder(o) => self.carrier.on_trade_order(o, ts),
-            Event::CarrierNameChange(n) => self.carrier.on_name_change(n),
-            Event::CarrierCrewServices(c) => self.carrier.on_crew_services(c),
+            Event::CarrierLocation(l) => {
+                if let Some(c) = self.carrier_for(l.carrier_type.as_deref(), l.carrier_id) {
+                    c.on_location(l, ts);
+                }
+            }
+            Event::CarrierFinance(f) => {
+                if let Some(c) = self.carrier_for(f.carrier_type.as_deref(), f.carrier_id) {
+                    c.on_finance(f);
+                }
+            }
+            Event::CarrierBankTransfer(t) => {
+                let squadron = CarrierKind::of(t.carrier_type.as_deref(), t.carrier_id, self.squadron_carrier.id) == Some(CarrierKind::Squadron);
+                if let Some(c) = self.carrier_for(t.carrier_type.as_deref(), t.carrier_id) {
+                    c.on_bank_transfer(t);
+                }
+                // Credits on the commander's own carrier stay theirs; a squadron carrier's are the squadron's.
+                let amount = t.withdraw.unwrap_or(0) - t.deposit.unwrap_or(0);
+                let (cat, note) = match (squadron, amount < 0) {
+                    (false, true) => (LedgerCategory::Transfer, "Deposited to carrier"),
+                    (false, false) => (LedgerCategory::Transfer, "Withdrew from carrier"),
+                    (true, true) => (LedgerCategory::Carrier, "Deposited to the squadron carrier"),
+                    (true, false) => (LedgerCategory::Carrier, "Withdrew from the squadron carrier"),
+                };
+                self.money(ts, cat, amount, note);
+            }
+            Event::CarrierDepositFuel(d) => {
+                if let Some(c) = self.carrier_for(d.carrier_type.as_deref(), d.carrier_id) {
+                    c.on_deposit_fuel(d);
+                }
+            }
+            Event::CarrierTradeOrder(o) => {
+                if let Some(c) = self.carrier_for(o.carrier_type.as_deref(), o.carrier_id) {
+                    c.on_trade_order(o, ts);
+                }
+            }
+            Event::CarrierNameChange(n) => {
+                if let Some(c) = self.carrier_for(n.carrier_type.as_deref(), n.carrier_id) {
+                    c.on_name_change(n);
+                }
+            }
+            Event::CarrierCrewServices(s) => {
+                if let Some(c) = self.carrier_for(s.carrier_type.as_deref(), s.carrier_id) {
+                    c.on_crew_services(s);
+                }
+            }
+            Event::CarrierDecommission(d) => {
+                let name = self.carrier_for(d.carrier_type.as_deref(), d.carrier_id).map(|c| {
+                    c.on_decommission(d, ts);
+                    if c.name.is_empty() { c.callsign.clone() } else { c.name.clone() }
+                });
+                if let Some(name) = name {
+                    let when = Timestamp(d.scrap_time).to_local_string("%d %b %H:%M");
+                    self.feed(ts, "CarrierDecommission", format!("Decommissioning {name}: scrapped {when}, refund {} Cr", group_digits(d.scrap_refund)));
+                }
+            }
+            Event::CarrierCancelDecommission(d) => {
+                if let Some(c) = self.carrier_for(d.carrier_type.as_deref(), d.carrier_id) {
+                    c.on_cancel_decommission(d);
+                }
+                self.feed(ts, "CarrierCancelDecommission", "Carrier decommission cancelled".into());
+            }
 
             // ---------------------------------------------------------------- colonisation
             Event::ColonisationConstructionDepot(d) => {
@@ -816,6 +909,7 @@ impl GameState {
             _ => {}
         }
         self.carrier.settle_pending(ts);
+        self.squadron_carrier.settle_pending(ts);
     }
 
     fn star_class_alert(&mut self, ts: Timestamp, system: &str, class: &str, alerts: &mut Alerts) {

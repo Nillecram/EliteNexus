@@ -9,5 +9,9 @@ A carrier jumps up to 500 ly per jump after a 15-minute countdown (longer when t
 ## Trading with a carrier
 Carriers have a market: the owner sets buy orders (the carrier buys commodities) and sell orders. Haulers fill buy orders for profit; owners use carriers to move large cargo or to collect mining output. Some carriers post very high buy prices for rare salvage (for example Thargoid parts). Carrier prices can change at any moment and carriers move, so fresh data matters.
 
+## Squadron carriers and decommissioning
+Since Vanguards (August 2025) a squadron can own a squadron carrier: bigger (60,000 t capacity), shared by the squadron, and members with the right rank can manage it and schedule its jumps. Elite Nexus tracks it apart from the commander's own carrier and shows both on the Fleet carrier page (a switch picks one), the Dashboard, the Galaxy map and the Navigation fleet carrier planner. The journal only records what the commander does themselves: jumps other members schedule and orders they set aren't in it, so the squadron carrier's position updates when the game next reports it, and its stats when the commander next opens its carrier management screen.
+Decommissioning a carrier takes a while: the game sets a scrap time, and until then the owner can cancel in carrier management. At the scrap time the carrier is gone and the refund is paid. Elite Nexus shows the scrap date and refund while it's pending, and afterwards says the carrier was decommissioned instead of showing it as live.
+
 ## Services and access
 Services can include refuel, repair, rearm, shipyard, outfitting, Universal Cartographics, Vista Genomics, a bartender, redemption office and secure storage. Docking access can be open to all, friends, squadron members or nobody.

@@ -12,6 +12,7 @@ use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular as icon;
 use nexus_data::exploration::{is_scoopable, star_description};
 use nexus_journal::Timestamp;
+use nexus_model::carrier::CarrierKind;
 use nexus_model::location::distance;
 use nexus_model::GameState;
 use nexus_spansh::{CarrierRouteRequest, GalaxyAlgorithm, GalaxyRouteRequest, NeutronRouteRequest, RouteWaypoints, ShipProfile, Spansh};
@@ -63,6 +64,15 @@ impl PlannedRoute {
     /// Waypoints still ahead.
     pub fn remaining(&self) -> &[Waypoint] {
         &self.waypoints[self.done.min(self.waypoints.len())..]
+    }
+
+    /// The carrier a fleet carrier route was planned for.
+    pub fn carrier(&self) -> Option<CarrierKind> {
+        match self.kind {
+            "Carrier" => Some(CarrierKind::Personal),
+            "Squadron carrier" => Some(CarrierKind::Squadron),
+            _ => None,
+        }
     }
 }
 
@@ -201,8 +211,9 @@ pub fn active_route(gs: &GameState, planned: Option<&PlannedRoute>) -> Vec<Waypo
         .collect()
 }
 
-/// Returns true if a setting changed.
-pub fn show(ui: &mut Ui, gs: &GameState, st: &mut NavUi, auto_copy: &mut bool, spansh: &Spansh, rt: &tokio::runtime::Handle) -> bool {
+/// Returns true if a setting changed. `carrier` is the carrier the fleet carrier planner uses, for
+/// commanders with their own and a squadron carrier.
+pub fn show(ui: &mut Ui, gs: &GameState, st: &mut NavUi, auto_copy: &mut bool, carrier: &mut CarrierKind, spansh: &Spansh, rt: &tokio::runtime::Handle) -> bool {
     let mut changed = false;
     if st.job.tick()
         && let Some(Ok(route)) = &st.job.last {
@@ -232,12 +243,14 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut NavUi, auto_copy: &mut bool, s
     });
     ui.add_space(GAP);
     if st.planner != Planner::InGame {
-        planner_form(ui, gs, st, spansh, rt);
+        changed |= planner_form(ui, gs, st, carrier, spansh, rt);
         ui.add_space(GAP);
     }
-    let carrier_route = st.planned.as_ref().is_some_and(|p| p.kind == "Carrier");
-    if gs.carrier.owned() && (st.planner == Planner::Carrier || carrier_route) {
-        carrier_timer(ui, gs, st);
+    // The timer follows the carrier picked for the planner, else the one a carrier route is for.
+    let now = Timestamp::now();
+    let timed = if st.planner == Planner::Carrier { crate::pages::carrier::pick(gs, *carrier, now) } else { st.planned.as_ref().and_then(|p| p.carrier()) };
+    if let Some(kind) = timed.filter(|k| gs.carrier_of(*k).active(now)) {
+        carrier_timer(ui, gs, kind, st);
         ui.add_space(GAP);
     }
     ui.horizontal_wrapped(|ui| {
@@ -258,7 +271,10 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut NavUi, auto_copy: &mut bool, s
     changed
 }
 
-fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt: &tokio::runtime::Handle) {
+/// Returns true when the carrier picked for the carrier planner changed.
+fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, carrier: &mut CarrierKind, spansh: &Spansh, rt: &tokio::runtime::Handle) -> bool {
+    let mut changed = false;
+    let now = Timestamp::now();
     let ship_name = gs.fleet.current().map(|s| s.display_name());
     // Smart defaults: start here, with the current ship's jump range.
     if st.range <= 0.0 {
@@ -278,7 +294,7 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
             let busy = st.job.busy();
             let label = if busy { format!("{} Plotting…", icon::HOURGLASS) } else { "Plot route".to_string() };
             if ui.add_enabled_ui(!busy, |ui| widgets::primary_button(ui, &label)).inner.clicked() {
-                match make_request(gs, st, spansh) {
+                match make_request(gs, st, crate::pages::carrier::pick(gs, *carrier, now), spansh) {
                     Some(fut) => st.job.run_async(ui.ctx(), rt, fut),
                     None => st.job.last = Some(Err("This planner needs your ship's loadout (fly it once) and a destination.".into())),
                 }
@@ -287,10 +303,21 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
                 ui.spinner();
             }
         });
+        if st.planner == Planner::Carrier && gs.carriers(now).len() > 1 {
+            ui.add_space(4.0);
+            changed |= crate::pages::carrier::carrier_switch(ui, gs, carrier, now);
+        }
         let hint = match st.planner {
             Planner::Exact => ship_name.clone().map(|n| format!("Plans every jump for {n}: its real FSD, mass, fuel and cargo, scooping stops and neutron boosts.")),
             Planner::Neutron => Some(format!("Follows neutron stars with a {:.1} ly jump range.", st.range)),
-            Planner::Carrier => Some(format!("Tritium in the tank {} t · cargo {} t.", gs.carrier.fuel, gs.carrier.space.cargo)),
+            Planner::Carrier => Some(match crate::pages::carrier::pick(gs, *carrier, now) {
+                Some(k) => {
+                    let c = gs.carrier_of(k);
+                    let squadron = if k == CarrierKind::Squadron { " Planned as a squadron carrier: 60,000 t capacity and 15,000 t mass, Spansh's figures." } else { "" };
+                    format!("{}: tritium in the tank {} t · cargo {} t.{squadron}", crate::pages::carrier::carrier_name(k, c), c.fuel, c.space.cargo)
+                }
+                None => "No carrier of yours in the journal: Spansh works out the tritium an empty fleet carrier needs.".into(),
+            }),
             Planner::InGame => None,
         };
         if let Some(h) = hint {
@@ -341,16 +368,18 @@ fn planner_form(ui: &mut Ui, gs: &GameState, st: &mut NavUi, spansh: &Spansh, rt
         ui.add_space(2.0);
         ui.label(RichText::new("Route data © Spansh (spansh.co.uk)").size(size::CAPTION).color(pal::FAINT));
     });
+    changed
 }
 
-/// The carrier's jump countdown or cooldown next to the fleet carrier planner; with a carrier route
-/// active, also the next leg and a rough time to the destination.
-fn carrier_timer(ui: &mut Ui, gs: &GameState, st: &NavUi) {
-    let c = &gs.carrier;
-    let route = st.planned.as_ref().filter(|p| p.kind == "Carrier").map(|p| p.remaining()).filter(|r| !r.is_empty());
+/// The carrier's jump countdown or cooldown next to the fleet carrier planner; with a route for
+/// that carrier active, also the next leg and a rough time to the destination.
+fn carrier_timer(ui: &mut Ui, gs: &GameState, kind: CarrierKind, st: &NavUi) {
+    let c = gs.carrier_of(kind);
+    let route = st.planned.as_ref().filter(|p| p.carrier() == Some(kind)).map(|p| p.remaining()).filter(|r| !r.is_empty());
+    let title = format!("{} jump", kind.label());
     cards(ui, if route.is_some() { 2 } else { 1 }, 300.0, |col| {
         col.add(|ui| {
-            card_tinted(ui, icon::TIMER, "Carrier jump", pal::ACCENT, |ui| crate::pages::carrier::jump_timer(ui, c));
+            card_tinted(ui, icon::TIMER, &title, pal::ACCENT, |ui| crate::pages::carrier::jump_timer(ui, kind, c));
         });
         let Some(route) = route else { return };
         col.add(|ui| {
@@ -388,7 +417,8 @@ fn field(ui: &mut Ui, label: &str, text: &mut String, hint: &str) {
 
 type PlanFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Result<PlannedRoute, String>> + Send>>;
 
-fn make_request(gs: &GameState, st: &NavUi, spansh: &Spansh) -> Option<PlanFuture> {
+/// `carrier` is the carrier the fleet carrier planner plans for, if the commander has one.
+fn make_request(gs: &GameState, st: &NavUi, carrier: Option<CarrierKind>, spansh: &Spansh) -> Option<PlanFuture> {
     let sp = spansh.clone();
     let from = match st.from.trim() {
         "" => gs.location.system.clone(),
@@ -447,13 +477,21 @@ fn make_request(gs: &GameState, st: &NavUi, spansh: &Spansh) -> Option<PlanFutur
             if to.is_empty() {
                 return None;
             }
-            let c = &gs.carrier;
-            let req = CarrierRouteRequest::new(from.as_str(), [to.as_str()]).capacity_used(c.space.cargo.max(0) as u32).fuel_loaded(c.fuel.max(0) as u32, 0);
+            // With the picked carrier's tritium and cargo; without a carrier, Spansh works out the tritium needed.
+            let req = match carrier {
+                Some(k) => {
+                    let c = gs.carrier_of(k);
+                    let req = if k == CarrierKind::Squadron { CarrierRouteRequest::squadron(from.as_str(), [to.as_str()]) } else { CarrierRouteRequest::new(from.as_str(), [to.as_str()]) };
+                    req.capacity_used(c.space.cargo.max(0) as u32).fuel_loaded(c.fuel.max(0) as u32, 0)
+                }
+                None => CarrierRouteRequest::new(from.as_str(), [to.as_str()]),
+            };
+            let kind = if carrier == Some(CarrierKind::Squadron) { "Squadron carrier" } else { "Carrier" };
             Some(Box::pin(async move {
                 let p = sp.carrier_route(&req).await.map_err(|e| e.to_string())?;
                 let wps: Vec<Waypoint> = p.route.waypoints().iter().map(from_spansh).collect();
                 let summary = format!("{} carrier jumps · {:.0} ly · {} t tritium", p.route.jump_count(), p.route.distance(), p.route.tritium_used());
-                Ok(PlannedRoute::new("Carrier", summary, p.web_url, wps))
+                Ok(PlannedRoute::new(kind, summary, p.web_url, wps))
             }))
         }
     }
