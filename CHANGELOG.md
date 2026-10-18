@@ -5,6 +5,10 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Fixed
+- The Windows download's checksum file (`….zip.sha256`) ends its line the Unix way, so `sha256sum -c` checks it on
+  Linux too; it used to report the file as unreadable although the checksum matched.
+
 ## [0.5.0] - 2026-10-17
 
 Elite Nexus now runs natively on Linux, next to Elite Dangerous under Proton or Wine.

@@ -28,9 +28,10 @@ jobs:
           # The bundled Inter font's licence (SIL OFL) travels with the program.
           Copy-Item data\fonts\inter\LICENSE.txt "out\$name\Inter-LICENSE.txt"
           Compress-Archive -Path "out\$name\*" -DestinationPath "out\$name.zip"
-          # A checksum file next to the zip, so a download can be checked (Get-FileHash <zip>).
+          # A checksum file next to the zip, so a download can be checked (Get-FileHash <zip>, or sha256sum -c
+          # <file>.sha256). A plain \n line end: with Set-Content's \r\n, sha256sum reads the file name with a \r.
           $hash = (Get-FileHash -Algorithm SHA256 "out\$name.zip").Hash.ToLower()
-          "$hash  $name.zip" | Set-Content "out\$name.zip.sha256" -Encoding ascii
+          [IO.File]::WriteAllText("$PWD\out\$name.zip.sha256", "$hash  $name.zip`n")
       - uses: actions/upload-artifact@v4
         with:
           name: windows
