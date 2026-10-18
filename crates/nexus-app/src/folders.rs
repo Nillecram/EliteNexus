@@ -1,5 +1,6 @@
 //! Folders the commander points Elite Nexus at (the journal folder, the game folder): typed or pasted into a field,
-//! or picked with the system's folder picker (Windows' own; on Linux the desktop's file-chooser portal, else zenity).
+//! or picked with the system's folder picker (Windows' own; on Linux the desktop's file-chooser portal, else zenity;
+//! on macOS the system's open panel).
 
 use crate::jobs::Job;
 use crate::theme::{pal, size};

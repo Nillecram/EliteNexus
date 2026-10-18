@@ -44,7 +44,7 @@ impl BindsUi {
         self.game_dir_seen = nexus_hud::install::game_dir();
         let mut needs_game_folder = false;
         let result = (|| -> Result<Loaded, String> {
-            let dir_path = nexus_binds::default_bindings_dir().ok_or("The game's Options folder wasn't found (on Linux: set the journal folder in Settings to the one in the game's Wine prefix)")?;
+            let dir_path = nexus_binds::default_bindings_dir().ok_or("The game's Options folder wasn't found (on Linux or macOS: set the journal folder in Settings to the one in the game's Wine prefix)")?;
             let dir = find_presets(&dir_path).map_err(|e| e.to_string())?;
             let builtin = builtin_dirs();
             let builtin_refs: Vec<&std::path::Path> = builtin.iter().map(|p| p.as_path()).collect();
