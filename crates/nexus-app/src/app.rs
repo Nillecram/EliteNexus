@@ -155,7 +155,7 @@ impl NexusApp {
             explo: pages::exploration::ExplorationUi::new(ov.tab.as_deref(), shot.is_some()),
             exo: pages::exobio::ExobioUi::new(ov.tab.as_deref(), shot.is_some()),
             fleet: Default::default(),
-            eng: Default::default(),
+            eng: pages::engineering::EngineeringUi::new(ov.tab.as_deref()),
             log: Default::default(),
             map,
             binds: Default::default(),

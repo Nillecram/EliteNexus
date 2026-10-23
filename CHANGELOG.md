@@ -32,6 +32,8 @@ release time that section becomes the new version and the release workflow publi
   clicked, so the first visit showed nothing, and the list stayed where you were when you clicked. It now searches when
   it opens, when you pick a service or pad, and after every jump, and says so when no known station has the service.
   It has its own landing pad filter; before, it quietly used the pad picked on other Market tabs.
+- **Engineering › Synthesis: the Basic grade of every recipe no longer draws over itself** (GitHub issue #4, with a
+  screenshot). Basic grades have no effect text, and the empty line sent the materials back over the recipe's name.
 
 ## [0.6.0] - 2026-10-18
 

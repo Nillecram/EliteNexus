@@ -36,6 +36,20 @@ pub struct EngineeringUi {
     pub cross_category: bool,
 }
 
+impl EngineeringUi {
+    /// `--tab` for screenshot runs: materials, engineers, suits or synthesis.
+    pub fn new(tab: Option<&str>) -> Self {
+        let tab = match tab {
+            Some("materials") => Tab::Materials,
+            Some("engineers") => Tab::Engineers,
+            Some("suits") => Tab::Odyssey,
+            Some("synthesis") => Tab::Synthesis,
+            _ => Tab::Planner,
+        };
+        EngineeringUi { tab, ..Default::default() }
+    }
+}
+
 impl Default for EngineeringUi {
     fn default() -> Self {
         EngineeringUi {
@@ -500,7 +514,11 @@ fn synthesis(ui: &mut Ui, gs: &GameState) {
                 let can = r.cost.iter().all(|i| *inv.get(&i.symbol.to_ascii_lowercase()).unwrap_or(&0) >= i64::from(i.count));
                 ui.horizontal_wrapped(|ui| {
                     badge(ui, &r.name, if can { pal::GOOD } else { pal::DIM });
-                    ui.label(RichText::new(&r.effect).small().color(pal::DIM));
+                    // Basic grades have no effect text, and an empty label in a wrapping row sends the rest of the
+                    // row back over the badge.
+                    if !r.effect.is_empty() {
+                        ui.label(RichText::new(&r.effect).small().color(pal::DIM));
+                    }
                     for ing in &r.cost {
                         ingredient_line(ui, ing, *inv.get(&ing.symbol.to_ascii_lowercase()).unwrap_or(&0));
                     }

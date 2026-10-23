@@ -95,7 +95,7 @@ open the PNG to look at it. Check a narrow (1000 px) and a wide size when a layo
 
 * `-Page`: a sidebar page (`Dashboard`, `Exploration`, `Exobiology`, `Navigation`, `Market`, `Settings`, ...).
 * `-Tab`: `abnormal`, `database`, ... (Market), `galaxy` (whole-galaxy map), `find`, `history`, `unsold`
-  (Exploration), `untouched`, `known` (Exobiology > Find planets), `glare`, `cockpit` or a preset name such as `mocha`
+  (Exploration), `untouched`, `known` (Exobiology > Find planets), `materials`, `engineers`, `suits`, `synthesis` (Engineering), `glare`, `cockpit` or a preset name such as `mocha`
   (Hud: that tab, or HUD colours starting from that theme; add `,options` to open the protection's options; nothing
   is written). `find`, `untouched` and `known` start their search on the first frame: add `-Delay 15` to
   `-Delay 25` for Spansh to answer.
