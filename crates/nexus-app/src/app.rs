@@ -79,7 +79,6 @@ pub struct NexusApp {
     binds: pages::bindings::BindsUi,
     hud: pages::hud::HudUi,
     settings_ui: pages::settings::SettingsUi,
-    bgs: pages::bgs::BgsUi,
     nav: pages::navigation::NavUi,
     /// Shared async runtime for network services (Spansh, EDDN, uploads).
     rt: tokio::runtime::Runtime,
@@ -173,7 +172,6 @@ impl NexusApp {
             binds: Default::default(),
             hud: pages::hud::HudUi::new(ov.tab.as_deref()),
             settings_ui: Default::default(),
-            bgs: Default::default(),
             nav: pages::navigation::NavUi::new(ov.tab.as_deref()),
             rt,
             spansh: nexus_spansh::Spansh::new(),
@@ -532,7 +530,7 @@ impl NexusApp {
             Page::Engineering => settings_changed |= pages::engineering::show(ui, gs, &mut self.eng, &mut self.settings.wishlist),
             Page::Fleet => pages::fleet::show(ui, gs, &mut self.fleet),
             Page::Missions => pages::missions::show(ui, gs),
-            Page::Bgs => pages::bgs::show(ui, gs, &mut self.bgs),
+            Page::Bgs => settings_changed |= pages::bgs::show(ui, gs, &mut self.settings.bgs),
             Page::Logbook => pages::logbook::show(ui, gs, &mut self.log, &self.core.index),
             Page::Statistics => pages::stats::show(ui, gs),
             Page::Settings => {

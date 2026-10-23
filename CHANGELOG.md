@@ -5,6 +5,10 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Fixed
+- **BGS & Powerplay** remembers the tick hour you set and the period you picked; the tick hour used to go back to
+  13:00 UTC at every start. Thanks to NetworX on the Frontier Forums for the report.
+
 ## [0.7.0] - 2026-10-23
 
 Elite Nexus for Mac, and fixes for what commanders reported after 0.6.0: a settings file that can't be read no

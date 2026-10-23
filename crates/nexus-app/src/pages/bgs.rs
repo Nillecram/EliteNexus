@@ -8,8 +8,9 @@ use egui_plot::{Bar, BarChart, Plot};
 use nexus_journal::Timestamp;
 use nexus_model::bgs::{last_tick, BgsKind};
 use nexus_model::GameState;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Period {
     #[default]
     SinceTick,
@@ -18,14 +19,18 @@ pub enum Period {
     All,
 }
 
-pub struct BgsUi {
+/// The BGS page's choices, kept in settings.json.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BgsPrefs {
     pub period: Period,
+    /// The hour (UTC) of the commander's BGS tick, for "Since last tick".
     pub tick_hour_utc: u32,
 }
 
-impl Default for BgsUi {
+impl Default for BgsPrefs {
     fn default() -> Self {
-        BgsUi { period: Period::SinceTick, tick_hour_utc: 13 }
+        BgsPrefs { period: Period::SinceTick, tick_hour_utc: 13 }
     }
 }
 
@@ -41,7 +46,9 @@ const COLUMNS: [BgsKind; 9] = [
     BgsKind::Murder,
 ];
 
-pub fn show(ui: &mut Ui, gs: &GameState, st: &mut BgsUi) {
+/// Returns true when `st` changed (to be saved).
+pub fn show(ui: &mut Ui, gs: &GameState, st: &mut BgsPrefs) -> bool {
+    let before = *st;
     let now = Timestamp::now();
     ui.horizontal(|ui| {
         crate::widgets::segmented(ui, &mut st.period, &[(Period::SinceTick, "Since last tick"), (Period::Day, "Last 24 h"), (Period::Week, "7 days"), (Period::All, "All time")]);
@@ -50,6 +57,7 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut BgsUi) {
             ui.add(egui::DragValue::new(&mut st.tick_hour_utc).range(0..=23).suffix(":00 UTC"));
         }
     });
+    let changed = *st != before;
     let since = match st.period {
         Period::SinceTick => last_tick(now, st.tick_hour_utc),
         Period::Day => Timestamp(now.0 - 86_400),
@@ -65,7 +73,7 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut BgsUi) {
     let summary = gs.bgs.summary(since);
     if summary.is_empty() {
         empty(ui, icon::SCALES, "No BGS activity in this period", "Missions, bounties, bonds, trade and data sales are attributed to the factions they affect.");
-        return;
+        return changed;
     }
     for sys in &summary {
         card(ui, &sys.system, |ui| {
@@ -99,6 +107,7 @@ pub fn show(ui: &mut Ui, gs: &GameState, st: &mut BgsUi) {
         });
         ui.add_space(6.0);
     }
+    changed
 }
 
 fn powerplay(ui: &mut Ui, gs: &GameState, since: Timestamp) {

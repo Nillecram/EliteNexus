@@ -40,6 +40,8 @@ pub struct Settings {
     pub carrier: nexus_model::carrier::CarrierKind,
     /// Colonisation: hidden depots, which groups are open.
     pub colonisation: crate::pages::colonisation::ColonisationPrefs,
+    /// BGS & Powerplay: the period shown and the tick hour.
+    pub bgs: crate::pages::bgs::BgsPrefs,
 }
 
 /// A named HUD colour matrix.
@@ -153,6 +155,7 @@ impl Default for Settings {
             market: Default::default(),
             carrier: Default::default(),
             colonisation: Default::default(),
+            bgs: Default::default(),
         }
     }
 }
@@ -602,6 +605,19 @@ mod tests {
         assert_eq!(back.tts_rate, 1.25);
         assert_eq!(back.accounts.inara_api_key, "dpapi:AAAA");
         assert!(kept_copies(&d).is_empty());
+    }
+
+    /// The BGS tick hour survives a restart (it used to go back to 13:00 UTC); older files without it get the default.
+    #[test]
+    fn bgs_tick_hour_is_kept() {
+        let d = Dir::new("bgs");
+        let s = Settings { bgs: crate::pages::bgs::BgsPrefs { period: crate::pages::bgs::Period::Week, tick_hour_utc: 16 }, ..Default::default() };
+        s.save(&d.0);
+        let (back, problem) = Settings::load(&d.0);
+        assert!(problem.is_none());
+        assert_eq!(back.bgs, s.bgs);
+        std::fs::write(d.0.join("settings.json"), r#"{ "tts_rate": 1.2 }"#).expect("write");
+        assert_eq!(Settings::load(&d.0).0.bgs, crate::pages::bgs::BgsPrefs::default());
     }
 
     #[test]
