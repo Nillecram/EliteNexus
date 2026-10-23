@@ -91,6 +91,8 @@ jobs:
 
   publish:
     needs: [windows, linux, macos]
+    # Windows and Linux must build; a failed macOS build only leaves the Mac zip out of the release.
+    if: ${{ !cancelled() && needs.windows.result == 'success' && needs.linux.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

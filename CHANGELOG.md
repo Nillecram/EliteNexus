@@ -6,8 +6,10 @@ release time that section becomes the new version and the release workflow publi
 ## Unreleased
 
 ### Added
-- **macOS** (Apple Silicon and Intel): `tools/macos/build-app.sh --install` builds `Elite Nexus.app` on your Mac
-  (Metal rendering, its own icon, an ad-hoc signature) and puts it in Applications. The game runs under NotProton
+- **macOS**: a native `Elite Nexus.app` (Metal rendering, its own icon). Each release now has an Apple Silicon zip:
+  unzip it and drag the app to Applications. It isn't notarized, so macOS asks you to allow it once (System Settings ›
+  Privacy & Security › Open Anyway). On an Intel Mac, `tools/macos/build-app.sh --install` builds it from the source
+  and puts it in Applications. Thanks to leodesca01 for the port. The game runs under NotProton
   (Steam Play for the macOS Steam client), CrossOver or Whisky; Elite Nexus finds its journals in the game's prefix
   in every Steam library (NotProton keeps Proton's `compatdata` layout), then in CrossOver's bottles and `~/.wine`,
   and in Whisky's bottles only when none of those has one (macOS asks before an app looks into Whisky's container).

@@ -3,7 +3,8 @@
 Start `Start-EliteNexus.cmd` (or `dist\EliteNexus\EliteNexus.exe`). It finds your journal folder automatically
 (Saved Games\Frontier Developments\Elite Dangerous), reads your whole history in well under a second, then follows
 the game live. Run it before or after the game — order doesn't matter. On Linux, run `./EliteNexus`: it finds the
-journals in the game's Proton prefix (see [Linux](#linux)).
+journals in the game's Proton prefix (see [Linux](#linux)). On a Mac, open `Elite Nexus.app`: it finds them in the
+game's NotProton, CrossOver or Whisky prefix (see [macOS](#macos)).
 
 ## The window
 
@@ -103,10 +104,12 @@ tested on Ubuntu, but hasn't yet been tried by us with the game running under Pr
 ## macOS
 
 Elite Nexus runs natively on macOS (Apple Silicon and Intel) as `Elite Nexus.app`, next to Elite Dangerous running
-under NotProton (Steam Play for the macOS Steam client), CrossOver or Whisky. There is no download for it yet: build
-it on your Mac from the source with `tools/macos/build-app.sh --install` (it needs Xcode's Command Line Tools and
-Rust), which puts the app in Applications. The macOS build is new and hasn't been tried by us with every way of
-running the game.
+under NotProton (Steam Play for the macOS Steam client), CrossOver or Whisky. On a Mac with Apple Silicon, download
+`EliteNexus-…-macos-arm64.zip` from the latest release, unzip it and drag `Elite Nexus.app` to Applications. The app
+isn't notarized by Apple (that needs a paid developer account), so the first time you open it macOS refuses: open
+System Settings › Privacy & Security and click **Open Anyway** next to Elite Nexus, once. On an Intel Mac, build it
+from the source with `tools/macos/build-app.sh --install` (it needs Xcode's Command Line Tools and Rust), which puts
+the app in Applications. The macOS build is new and hasn't been tried by us with every way of running the game.
 
 * **Journal folder**: found automatically in the game's prefix in every Steam library, which is where NotProton keeps
   it, the same layout as Proton's: `~/Library/Application Support/Steam/steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous`.

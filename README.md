@@ -11,9 +11,11 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 `EliteNexus.exe` (Windows, 64-bit), or unpack the Linux `tar.gz` and run `./EliteNexus` (64-bit; it finds the journals
 in the game's Proton prefix, and Settings › About adds it to your app menu; see [Linux](docs/USER_GUIDE.md#linux)).
 The Linux build is tested on Ubuntu but hasn't been tried yet with the game itself running under Proton or Wine.
-On a Mac, build `Elite Nexus.app` from the source with `tools/macos/build-app.sh --install` (it finds the journals in
-NotProton's, CrossOver's or Whisky's prefix; see [macOS](docs/USER_GUIDE.md#macos)).
-There is no installer: everything it keeps lives in a `nexus-data` folder next to the program. Website: **[uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)**.
+On a Mac (Apple Silicon), unzip the macOS zip and drag `Elite Nexus.app` to Applications; the first time, allow it
+once under System Settings › Privacy & Security › Open Anyway (it isn't notarized). It finds the journals in
+NotProton's, CrossOver's or Whisky's prefix; see [macOS](docs/USER_GUIDE.md#macos).
+There is no installer: everything it keeps lives in a `nexus-data` folder next to the program (on a Mac, in
+`~/Library/Application Support/EliteNexus`). Website: **[uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)**.
 Elite Nexus is free, with no ads. If it helps you, you can **[sponsor it on GitHub](https://github.com/sponsors/uruskan)**.
 
 ![Elite Nexus, an Elite Dangerous companion app: dashboard with commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
@@ -138,6 +140,8 @@ approved them.
 
 Download the latest `EliteNexus-…-windows-x64.zip` from the GitHub Releases page, unzip anywhere, run `EliteNexus.exe`.
 On Linux: `EliteNexus-…-linux-x64.tar.gz`, unpack anywhere, run `./EliteNexus`.
+On a Mac with Apple Silicon: `EliteNexus-…-macos-arm64.zip`, unzip, drag `Elite Nexus.app` to Applications (an Intel
+Mac builds it from the source, below).
 
 To build it yourself (Windows, Linux or macOS, [Rust](https://rustup.rs) stable):
 
@@ -150,7 +154,7 @@ On macOS (with Xcode's Command Line Tools), `tools/macos/build-app.sh` builds an
 and a zip of it; `--install` also copies the app to Applications.
 
 On the original dev machine the toolchain is not on PATH: run `. .\tools\env.ps1` first. Pushing a tag such as `v0.1.0`
-makes GitHub Actions build the Windows exe and the Linux binary and publish a Release
+makes GitHub Actions build the Windows exe, the Linux binary and the Apple Silicon Mac app and publish a Release
 (`.github/workflows/release.yml`), with that version's `CHANGELOG.md` section as the notes. Working on the code, as a person or an AI agent? Read `AGENTS.md` first.
 
 Command-line options: `--page <name>`, `--tab <name>`, `--journal-dir <dir>`, `--mute`, on Linux
