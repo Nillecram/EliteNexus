@@ -20,7 +20,8 @@ pub enum VoiceStatus {
     Untried,
     /// Spoke through this engine.
     Spoke(&'static str),
-    /// No speech program was found (Linux).
+    /// No speech program was found (Linux; macOS always has `say`, and Windows reports its speech failing instead).
+    #[cfg_attr(windows, allow(dead_code))]
     Missing,
     /// This engine failed, with what it said.
     Failed(&'static str, String),
