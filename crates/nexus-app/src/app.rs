@@ -59,6 +59,10 @@ fn save_png(path: &std::path::Path, img: &egui::ColorImage) {
 pub struct NexusApp {
     core: Core,
     settings: Settings,
+    /// What was wrong with settings.json at start, shown above every page until closed.
+    settings_problem: Option<crate::settings::LoadProblem>,
+    /// settings.json couldn't be read (or copied aside), so it isn't saved over this run.
+    settings_read_only: bool,
     data_dir: PathBuf,
     page: Page,
     toasts: Vec<Toast>,
@@ -104,7 +108,8 @@ pub struct NexusApp {
 impl NexusApp {
     pub fn new(cc: &eframe::CreationContext<'_>, data_dir: PathBuf, start_page: Option<Page>, shot: Option<ScreenshotJob>, ov: Overrides) -> Self {
         crate::theme::install(&cc.egui_ctx);
-        let settings = Settings::load(&data_dir);
+        let (settings, settings_problem) = Settings::load(&data_dir);
+        let settings_read_only = settings_problem.as_ref().is_some_and(|p| !p.can_save);
         nexus_hud::install::set_game_dir(settings.game_dir.as_deref());
         let page = start_page.or_else(|| cc.storage.and_then(|s| eframe::get_value(s, "page"))).unwrap_or(Page::Dashboard);
         let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).thread_name("nexus-net").enable_all().build().expect("tokio runtime");
@@ -126,6 +131,8 @@ impl NexusApp {
         NexusApp {
             core,
             settings,
+            settings_problem,
+            settings_read_only,
             data_dir,
             page,
             // `--demo` screenshots show one banner so its design can be checked.
@@ -407,7 +414,37 @@ impl NexusApp {
         }
     }
 
+    /// Writes settings.json, unless it couldn't be read at start (then the file stays as the commander left it).
+    fn save_settings(&self) {
+        if !self.settings_read_only {
+            self.settings.save(&self.data_dir);
+        }
+    }
+
+    /// What went wrong reading settings.json at start, above every page until closed.
+    fn settings_banner(&mut self, ui: &mut Ui) {
+        let Some(p) = &self.settings_problem else { return };
+        let mut close = false;
+        widgets::card_tinted(ui, icon::WARNING, "Your settings file couldn't be read as it was", pal::WARN, |ui| {
+            ui.add(egui::Label::new(RichText::new(&p.what).color(pal::TEXT)).wrap());
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                if widgets::button(ui, "Open data folder").on_hover_text(self.data_dir.display().to_string()).clicked() {
+                    crate::folders::reveal(&self.data_dir);
+                }
+                if widgets::button(ui, "Close").clicked() {
+                    close = true;
+                }
+            });
+        });
+        ui.add_space(12.0);
+        if close {
+            self.settings_problem = None;
+        }
+    }
+
     fn content(&mut self, ui: &mut Ui) {
+        self.settings_banner(ui);
         let status = self.core.status.read().clone();
         match &status.phase {
             Phase::Loading { done, total } => {
@@ -895,7 +932,7 @@ impl eframe::App for NexusApp {
         }
         if let Some(t) = self.settings_dirty
             && t.elapsed() > Duration::from_millis(600) {
-                self.settings.save(&self.data_dir);
+                self.save_settings();
                 self.settings_dirty = None;
             }
         // Keep clocks/countdowns ticking even without journal activity.
@@ -950,7 +987,7 @@ impl eframe::App for NexusApp {
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, "page", &self.page);
-        self.settings.save(&self.data_dir);
+        self.save_settings();
     }
 
     fn on_exit(&mut self) {

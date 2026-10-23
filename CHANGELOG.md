@@ -5,6 +5,16 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Fixed
+- **A settings file that can't be read no longer costs you your settings** (a Frontier Forums report). When
+  `settings.json` couldn't be read (typically after editing a folder into it by hand with single backslashes, which
+  JSON doesn't allow), Elite Nexus started with the default settings and saved them over the file within half a
+  minute: API keys, the journal folder and everything else were gone, without a word. Now the file is kept as it was
+  (`settings-unreadable-<date>.json` in the data folder), every setting that still reads is kept (from a file that
+  isn't JSON at all, the EDSM, Inara and Ask keys; uploads stay off until you switch them on again), and a banner
+  above every page says what happened and how JSON writes a folder. A file that can't be opened at all isn't saved
+  over until the next start.
+
 ## [0.6.0] - 2026-10-18
 
 A live jump timer for your fleet carrier and your squadron's, colonisation that keeps other commanders' depots

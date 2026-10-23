@@ -70,6 +70,13 @@ cargo), following each service's published rules.
 On Linux, when the folder next to the program can't be written to, data goes to `~/.local/share/EliteNexus` (or
 `$XDG_DATA_HOME/EliteNexus`).
 
+Your settings are in `settings.json` there. If that file can't be read (typically after editing it by hand: JSON
+writes every backslash twice, so a network folder is `"\\\\MAINPC\\Elite Dangerous"`), Elite Nexus never starts over
+silently. It keeps the file as it was (`settings-unreadable-<date>.json`, next to it), keeps every setting that
+still reads (from a file that isn't JSON at all, the EDSM, Inara and Ask keys; uploads stay off until you switch them
+on again) and says so in a banner above every page. A file it can't open at all, say one another program is holding,
+isn't saved over until the next start. Settings › Journal › **Browse…** sets folders without editing the file.
+
 ## Linux
 
 Elite Nexus runs natively on 64-bit Linux: unpack `EliteNexus-…-linux-x64.tar.gz` anywhere and run `./EliteNexus`.

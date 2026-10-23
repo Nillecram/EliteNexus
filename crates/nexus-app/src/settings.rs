@@ -157,28 +157,181 @@ impl Default for Settings {
     }
 }
 
+/// What was wrong with settings.json at start (see [`Settings::load`]), for the banner that says so.
+#[derive(Debug, Clone, Default)]
+pub struct LoadProblem {
+    /// What went wrong and what was kept, in plain words.
+    pub what: String,
+    /// Off when the file couldn't be read, or couldn't be copied aside: nothing is saved this run, so the file stays
+    /// as it is.
+    pub can_save: bool,
+}
+
 impl Settings {
-    pub fn load(dir: &Path) -> Self {
-        std::fs::read_to_string(dir.join("settings.json"))
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+    /// Reads settings.json; a missing file gives the defaults. A file that can't be used as it is never means a
+    /// silent start from scratch (settings are saved every half minute, which would overwrite it): it's copied
+    /// aside first, every setting that still reads is kept (from a file that isn't valid JSON at all, the API keys),
+    /// and the problem says what happened. A file that can't even be read isn't saved over this run.
+    pub fn load(dir: &Path) -> (Self, Option<LoadProblem>) {
+        let path = dir.join("settings.json");
+        let bytes = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return (Settings::default(), None),
+            Err(e) => {
+                tracing::warn!("settings.json can't be read: {e}");
+                let what = format!("Elite Nexus couldn't read settings.json ({e}). It started with the default settings and won't save over that file this time; restart it to try again.");
+                // Not a first start: no welcome.
+                return (Settings { welcomed: true, ..Settings::default() }, Some(LoadProblem { what, ..Default::default() }));
+            }
+        };
+        let text = String::from_utf8_lossy(&bytes);
+        let utf8 = matches!(text, std::borrow::Cow::Borrowed(_));
+        // (settings, what happened, advice for the end of the message)
+        let (mut settings, mut what, advice) = match serde_json::from_str::<Settings>(&text) {
+            Ok(s) if utf8 => return (s, None),
+            Ok(s) => (s, "settings.json isn't UTF-8 text (an editor saved it in another encoding), so letters outside English in it may have been replaced.".to_string(), ""),
+            Err(e) => match serde_json::from_str::<serde_json::Value>(&text) {
+                // Valid JSON, but some settings have the wrong type: keep all the others.
+                Ok(v) => {
+                    let (s, dropped) = salvage(v);
+                    let names: Vec<&str> = dropped.iter().map(String::as_str).collect();
+                    let what = match names.len() {
+                        0 => format!("settings.json couldn't be read ({e}), so Elite Nexus started with the default settings."),
+                        n => format!("Some settings in settings.json couldn't be read ({e}): {} {} back at the default. Every other setting was kept.", and_list(&names), if n == 1 { "is" } else { "are" }),
+                    };
+                    (s, what, "")
+                }
+                // Not JSON at all, typically a folder typed in by hand with single backslashes.
+                Err(_) => {
+                    let (s, recovered) = recover_keys(&text);
+                    let mut what = format!("settings.json isn't valid JSON ({e}), so Elite Nexus started with the default settings.");
+                    if !recovered.is_empty() {
+                        let keys = if recovered.len() == 1 { "key was" } else { "keys were" };
+                        what += &format!(" Your {} {keys} recovered from it; uploads stay off until you switch them on again under Accounts & sync.", and_list(&recovered));
+                    }
+                    let advice = r" If you edited it by hand: JSON needs every backslash written twice, so \\PC\Elite Dangerous is written \\\\PC\\Elite Dangerous. Settings › Journal › Browse… sets folders without editing the file.";
+                    (s, what, advice)
+                }
+            },
+        };
+        let copy = dir.join(format!("settings-unreadable-{}.json", nexus_journal::Timestamp::now().to_local_string("%Y%m%d-%H%M%S")));
+        let can_save = match std::fs::write(&copy, &bytes) {
+            Ok(()) => {
+                what += &format!(" Your file as it was is kept as {} in the data folder.", copy.file_name().map(|n| n.to_string_lossy()).unwrap_or_default());
+                true
+            }
+            Err(e) => {
+                what += &format!(" Elite Nexus couldn't keep a copy of it ({e}), so it won't save over it this time: changes made now aren't kept.");
+                false
+            }
+        };
+        what += advice;
+        // A settings file existed, so this isn't a first start: no welcome over the banner.
+        settings.welcomed = true;
+        tracing::warn!(%what, "settings.json: started without some settings");
+        (settings, Some(LoadProblem { what, can_save }))
     }
 
     pub fn save(&self, dir: &Path) {
-        if let Ok(s) = serde_json::to_string_pretty(self) {
+        let saved = serde_json::to_string_pretty(self).map_err(std::io::Error::other).and_then(|s| {
             let tmp = dir.join("settings.json.tmp");
-            if std::fs::write(&tmp, s).is_ok() {
-                // Linux keeps API keys unencrypted (no DPAPI): only this user account may read them.
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
+            std::fs::write(&tmp, s)?;
+            // Linux keeps API keys unencrypted (no DPAPI): only this user account may read them.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
+            }
+            std::fs::rename(&tmp, dir.join("settings.json"))
+        });
+        if let Err(e) = saved {
+            tracing::warn!("settings.json not saved: {e}");
+        }
+    }
+}
+
+/// Valid JSON with some settings of the wrong type: each setting that still reads is kept, also one level into the
+/// groups (`accounts`, `ai`, …). Returns the names of those that fell back to their defaults.
+fn salvage(v: serde_json::Value) -> (Settings, Vec<String>) {
+    use serde_json::Value;
+    let reads = |v: &Value| serde_json::from_value::<Settings>(v.clone()).is_ok();
+    let mut good = serde_json::to_value(Settings::default()).unwrap_or(Value::Null);
+    let mut dropped = Vec::new();
+    if let (Value::Object(fields), true) = (v, good.is_object()) {
+        for (k, val) in fields {
+            let mut trial = good.clone();
+            trial[k.as_str()] = val.clone();
+            if reads(&trial) {
+                good = trial;
+                continue;
+            }
+            match (val, good[k.as_str()].is_object()) {
+                (Value::Object(inner), true) => {
+                    for (ik, ival) in inner {
+                        let mut trial = good.clone();
+                        trial[k.as_str()][ik.as_str()] = ival;
+                        if reads(&trial) {
+                            good = trial;
+                        } else {
+                            dropped.push(format!("{k}.{ik}"));
+                        }
+                    }
                 }
-                let _ = std::fs::rename(&tmp, dir.join("settings.json"));
+                _ => dropped.push(k),
             }
         }
     }
+    dropped.sort();
+    (serde_json::from_value(good).unwrap_or_default(), dropped)
+}
+
+/// From a file that isn't JSON: the API keys (and the EDSM commander name), found by name. Saved keys are base64
+/// behind `dpapi:`/`b64:`, so a broken folder path elsewhere in the file leaves them intact. Uploads stay off (they're
+/// opt-in); the keys are there when the commander switches them back on.
+fn recover_keys(text: &str) -> (Settings, Vec<&'static str>) {
+    let mut s = Settings::default();
+    let mut found = Vec::new();
+    let sealed = |name: &str| string_value(text, name).filter(|v| v.starts_with("dpapi:") || v.starts_with("b64:"));
+    if let Some(k) = sealed("edsm_api_key") {
+        s.accounts.edsm_api_key = k;
+        found.push("EDSM");
+    }
+    if let Some(k) = sealed("inara_api_key") {
+        s.accounts.inara_api_key = k;
+        found.push("Inara");
+    }
+    if let Some(k) = sealed("api_key") {
+        s.ai.api_key = k;
+        found.push("Ask");
+    }
+    if let Some(name) = string_value(text, "edsm_commander") {
+        s.accounts.edsm_commander = name;
+    }
+    (s, found)
+}
+
+/// "A", "A and B", "A, B and C".
+fn and_list(items: &[&str]) -> String {
+    match items {
+        [] => String::new(),
+        [one] => (*one).to_string(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
+/// The value of the first `"name": "…"` in JSON text that holds no escapes.
+fn string_value(text: &str, name: &str) -> Option<String> {
+    let key = format!("\"{name}\"");
+    let mut rest = text;
+    while let Some(i) = rest.find(&key) {
+        rest = &rest[i + key.len()..];
+        let Some(value) = rest.trim_start().strip_prefix(':').map(str::trim_start).and_then(|r| r.strip_prefix('"')) else { continue };
+        let v = &value[..value.find('"')?];
+        if !v.is_empty() && !v.contains('\\') {
+            return Some(v.to_string());
+        }
+    }
+    None
 }
 
 /// Where Elite Nexus keeps its data.
@@ -220,4 +373,133 @@ fn is_writable(dir: &Path) -> bool {
     let ok = std::fs::write(&probe, b"ok").is_ok();
     let _ = std::fs::remove_file(probe);
     ok
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A folder in the temp directory, deleted on drop.
+    struct Dir(PathBuf);
+
+    impl Dir {
+        fn new(name: &str) -> Dir {
+            let d = std::env::temp_dir().join(format!("nexus-settings-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&d);
+            std::fs::create_dir_all(&d).expect("temp dir");
+            Dir(d)
+        }
+    }
+
+    impl Drop for Dir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// The Frontier Forums case: a network folder typed in by hand with single backslashes, which JSON can't read.
+    const HAND_EDITED: &str = r#"{
+  "journal_dir": "\\192.168.1.50\Elite Dangerous",
+  "tts_rate": 1.2,
+  "accounts": {
+    "edsm_enabled": true,
+    "edsm_commander": "Chequers",
+    "edsm_api_key": "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+s=",
+    "inara_api_key": "dpapi:AAAA+/09"
+  },
+  "ai": { "api_key": "b64:QUJD" }
+}"#;
+
+    fn kept_copies(d: &Dir) -> Vec<PathBuf> {
+        let mut v: Vec<PathBuf> = std::fs::read_dir(&d.0).expect("dir").filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.to_string_lossy().contains("settings-unreadable-")).collect();
+        v.sort();
+        v
+    }
+
+    #[test]
+    fn unreadable_file_keeps_the_keys() {
+        let d = Dir::new("keys");
+        std::fs::write(d.0.join("settings.json"), HAND_EDITED).expect("write");
+        let (s, problem) = Settings::load(&d.0);
+        assert_eq!(s.accounts.edsm_api_key, "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+s=");
+        assert_eq!(s.accounts.inara_api_key, "dpapi:AAAA+/09");
+        assert_eq!(s.ai.api_key, "b64:QUJD");
+        assert_eq!(s.accounts.edsm_commander, "Chequers");
+        // Uploads are opt-in: the keys come back, the switches don't.
+        assert!(!s.accounts.edsm_enabled);
+        assert_eq!(s.journal_dir, None);
+        assert!(s.welcomed, "not a first start");
+        let p = problem.expect("a problem to show");
+        assert!(p.what.contains("Your EDSM, Inara and Ask keys were recovered"), "{}", p.what);
+        assert!(p.what.contains("line 2"), "says where: {}", p.what);
+        assert!(p.can_save);
+        // The file as it was is kept, the message names the copy, and a later save doesn't touch it.
+        let kept = kept_copies(&d);
+        assert_eq!(kept.len(), 1);
+        assert!(p.what.contains(&*kept[0].file_name().expect("name").to_string_lossy()), "{}", p.what);
+        s.save(&d.0);
+        assert_eq!(std::fs::read_to_string(&kept[0]).expect("copy"), HAND_EDITED);
+        assert!(Settings::load(&d.0).1.is_none(), "the saved file reads");
+    }
+
+    #[test]
+    fn a_bad_setting_falls_back_alone() {
+        let d = Dir::new("field");
+        let text = r#"{ "journal_dir": "D:\\Journals", "tts_rate": "fast", "welcomed": true,
+            "accounts": { "edsm_enabled": "yes", "edsm_api_key": "dpapi:QQ==", "eddn_listen": false } }"#;
+        std::fs::write(d.0.join("settings.json"), text).expect("write");
+        let (s, problem) = Settings::load(&d.0);
+        assert_eq!(s.journal_dir, Some(PathBuf::from(r"D:\Journals")));
+        assert!(s.welcomed);
+        assert_eq!(s.tts_rate, Settings::default().tts_rate);
+        assert_eq!(s.accounts.edsm_api_key, "dpapi:QQ==");
+        assert!(!s.accounts.edsm_enabled);
+        assert!(!s.accounts.eddn_listen);
+        let p = problem.expect("a problem to show");
+        assert!(p.what.contains("accounts.edsm_enabled and tts_rate are back at the default"), "{}", p.what);
+        assert!(p.can_save);
+        assert_eq!(kept_copies(&d).len(), 1);
+    }
+
+    #[test]
+    fn not_utf8_is_kept_and_said() {
+        let d = Dir::new("ansi");
+        std::fs::write(d.0.join("settings.json"), b"{ \"tts_rate\": 1.5, \"edsm_commander\": \"\xdcmit\" }").expect("write");
+        let (s, problem) = Settings::load(&d.0);
+        assert_eq!(s.tts_rate, 1.5);
+        assert!(problem.expect("a problem to show").what.contains("UTF-8"));
+        assert_eq!(kept_copies(&d).len(), 1);
+    }
+
+    #[test]
+    fn missing_file_is_a_first_start() {
+        let d = Dir::new("missing");
+        let (s, problem) = Settings::load(&d.0);
+        assert!(problem.is_none());
+        assert!(!s.welcomed);
+    }
+
+    #[test]
+    fn a_file_that_cant_be_read_isnt_saved_over() {
+        let d = Dir::new("locked");
+        // A folder in its place can't be read on any system.
+        std::fs::create_dir(d.0.join("settings.json")).expect("dir");
+        let (_, problem) = Settings::load(&d.0);
+        assert!(!problem.expect("a problem to show").can_save);
+        assert!(kept_copies(&d).is_empty());
+    }
+
+    #[test]
+    fn round_trip() {
+        let d = Dir::new("round");
+        let mut s = Settings { journal_dir: Some(PathBuf::from(r"\\192.168.1.50\Elite Dangerous")), tts_rate: 1.25, ..Default::default() };
+        s.accounts.inara_api_key = "dpapi:AAAA".into();
+        s.save(&d.0);
+        let (back, problem) = Settings::load(&d.0);
+        assert!(problem.is_none());
+        assert_eq!(back.journal_dir, s.journal_dir);
+        assert_eq!(back.tts_rate, 1.25);
+        assert_eq!(back.accounts.inara_api_key, "dpapi:AAAA");
+        assert!(kept_copies(&d).is_empty());
+    }
 }

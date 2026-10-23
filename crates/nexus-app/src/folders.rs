@@ -31,6 +31,24 @@ pub fn parse_folder(text: &str) -> Option<PathBuf> {
     (!t.is_empty()).then(|| PathBuf::from(t))
 }
 
+/// Opens a folder in the system's file manager (Explorer; on Linux whatever xdg-open picks).
+pub fn reveal(dir: &std::path::Path) {
+    let program = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    match std::process::Command::new(program).arg(dir).spawn() {
+        // Waited for on its own thread, so no finished process is left behind.
+        Ok(mut child) => {
+            let _ = std::thread::Builder::new().name("reveal".into()).spawn(move || child.wait());
+        }
+        Err(e) => tracing::warn!("couldn't open {} with {program}: {e}", dir.display()),
+    }
+}
+
 /// The system's folder picker, run off the UI thread so the window keeps drawing (and following the game) while
 /// it's open.
 #[derive(Default)]
