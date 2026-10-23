@@ -14,9 +14,9 @@ use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, TrySendError};
 use parking_lot::{Mutex, RwLock};
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use rustc_hash::FxHashMap;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 /// Upper bound of ingest items per transaction (keeps a single commit short).
@@ -100,6 +100,10 @@ pub(crate) struct Shared {
     pub stale_markets: AtomicU64,
     pub commits: AtomicU64,
     pub write_errors: AtomicU64,
+    /// Rows in `price_history`, kept up to date by the writer: counting the table can take seconds once it holds
+    /// a month of live prices. Only meaningful once `history_counted` (the count at open runs on its own thread).
+    pub history_rows: AtomicI64,
+    pub history_counted: AtomicBool,
 }
 
 impl Shared {
@@ -140,6 +144,8 @@ struct Ctx {
     last_prune: Option<Instant>,
     /// Stations written in the current transaction (refreshed in the index after commit).
     dirty: RefCell<Vec<i64>>,
+    /// Price history rows written in the current transaction (added to the shared count after commit).
+    history_added: Cell<i64>,
 }
 
 #[derive(Default)]
@@ -164,6 +170,7 @@ impl Writer {
                 opts,
                 last_prune: None,
                 dirty: RefCell::new(Vec::new()),
+                history_added: Cell::new(0),
             },
         }
     }
@@ -173,6 +180,14 @@ impl Writer {
         let mut last_commit = Instant::now()
             .checked_sub(interval)
             .unwrap_or_else(Instant::now);
+        // Counted once, here, before anything changes the table; kept up to date from then on. Items queue meanwhile.
+        match self.conn.query_row("SELECT COUNT(*) FROM price_history", [], |r| r.get::<_, i64>(0)) {
+            Ok(n) => {
+                self.ctx.shared.history_rows.fetch_add(n, Ordering::Relaxed);
+                self.ctx.shared.history_counted.store(true, Ordering::Relaxed);
+            }
+            Err(e) => tracing::warn!(error = %e, "couldn't count the price history"),
+        }
         self.ctx.maybe_prune(&mut self.conn);
         loop {
             let Ok(first) = self.rx.recv() else { break };
@@ -286,8 +301,10 @@ impl Writer {
         };
         let shared = &self.ctx.shared;
         let mut dirty = std::mem::take(&mut *self.ctx.dirty.borrow_mut());
+        let history_added = self.ctx.history_added.take();
         if committed {
             shared.commits.fetch_add(1, Ordering::Relaxed);
+            shared.history_rows.fetch_add(history_added, Ordering::Relaxed);
             shared
                 .stale_markets
                 .fetch_add(outcome.stale, Ordering::Relaxed);
@@ -708,6 +725,7 @@ impl Ctx {
 
     fn savepoint(&self, tx: &Transaction, f: impl FnOnce(&Ctx) -> Result<()>) -> Result<()> {
         tx.prepare_cached("SAVEPOINT item")?.execute([])?;
+        let history_before = self.history_added.get();
         match f(self) {
             Ok(()) => {
                 tx.prepare_cached("RELEASE item")?.execute([])?;
@@ -715,6 +733,7 @@ impl Ctx {
             }
             Err(e) => {
                 tx.execute_batch("ROLLBACK TO item; RELEASE item;")?;
+                self.history_added.set(history_before);
                 // a commodity created inside the rolled-back part is gone again
                 self.shared.load_commodities(tx)?;
                 Err(e)
@@ -935,8 +954,9 @@ impl Ctx {
                 if let Some(&(ob, os, ou)) = old.get(&cid) {
                     let min = self.opts.price_history_min_change;
                     if price_changed(ob, it.buy, min) || price_changed(os, it.sell, min) {
-                        hist_old.execute(params![mid, cid, ou, ob, os])?;
-                        hist_new.execute(params![mid, cid, m.timestamp, it.buy, it.sell])?;
+                        let rows = hist_old.execute(params![mid, cid, ou, ob, os])?
+                            + hist_new.execute(params![mid, cid, m.timestamp, it.buy, it.sell])?;
+                        self.history_added.set(self.history_added.get() + rows as i64);
                     }
                 }
             }
@@ -1246,10 +1266,28 @@ impl Ctx {
         }
         self.last_prune = Some(Instant::now());
         let cutoff = crate::util::now_unix() - self.opts.price_history_days.max(1) * 86_400;
-        match conn.execute("DELETE FROM price_history WHERE ts < ?1", [cutoff]) {
-            Ok(n) if n > 0 => tracing::info!(rows = n, "pruned old price history"),
-            Ok(_) => {}
-            Err(e) => tracing::warn!(error = %e, "price history pruning failed"),
+        // In batches, each its own transaction: after a long break the first prune removes days of live prices, and
+        // one statement would hold the writer (and grow the WAL) until it's done.
+        let mut pruned = 0;
+        loop {
+            match conn.execute(
+                "DELETE FROM price_history WHERE (market_id, commodity_id, ts) IN \
+                 (SELECT market_id, commodity_id, ts FROM price_history WHERE ts < ?1 LIMIT 5000)",
+                [cutoff],
+            ) {
+                Ok(0) => break,
+                Ok(n) => {
+                    pruned += n;
+                    self.shared.history_rows.fetch_sub(n as i64, Ordering::Relaxed);
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "price history pruning failed");
+                    break;
+                }
+            }
+        }
+        if pruned > 0 {
+            tracing::info!(rows = pruned, "pruned old price history");
         }
     }
 }

@@ -23,6 +23,11 @@ release time that section becomes the new version and the release workflow publi
   route was plotted from came back as the next stop: the remaining distance grew instead of shrinking, distances were
   measured from that system, and "copy the next system" copied it after every jump. Arriving on the route now leaves
   every system up to there behind, and the Dashboard's jump count no longer counts the system you plotted from.
+- **The window no longer freezes for a second or two with the live market feed on** (GitHub issue #4). While the
+  Market page was open, the database counters it shows were counted on the window's own thread every two seconds, and
+  one of them, the price history, grows with every live price change: after a few weeks, counting it froze the
+  window. The counters are now counted in the background every ten seconds, and the price history count is kept as
+  prices are stored. A frame that still takes over a quarter of a second is noted in `nexus.log` with its page.
 
 ## [0.6.0] - 2026-10-18
 

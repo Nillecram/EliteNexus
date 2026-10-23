@@ -103,6 +103,9 @@ pub struct NexusApp {
     clipboard: Option<arboard::Clipboard>,
     compact: bool,
     compact_request: bool,
+    /// When this frame's work began, and when a slow frame was last logged.
+    frame_started: Option<Instant>,
+    slow_frame_logged: Option<Instant>,
 }
 
 impl NexusApp {
@@ -176,6 +179,9 @@ impl NexusApp {
             clipboard: None,
             compact: false,
             compact_request: false,
+            frame_started: None,
+            // The first frames load fonts and textures: nothing is logged in the first 10 seconds.
+            slow_frame_logged: Some(Instant::now()),
         }
     }
 
@@ -942,6 +948,7 @@ fn page_heading(page: Page, gs: &nexus_model::GameState) -> (String, String) {
 
 impl eframe::App for NexusApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.frame_started = Some(Instant::now());
         self.screenshot_tick(ctx);
         self.drain_alerts();
         self.assistant.poll();
@@ -980,6 +987,31 @@ impl eframe::App for NexusApp {
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+        self.draw(ui);
+        // A frame that took long goes to nexus.log with its page, so a report of the window freezing can be traced.
+        if let Some(took) = self.frame_started.take().map(|t| t.elapsed())
+            && took > Duration::from_millis(250)
+            && self.slow_frame_logged.is_none_or(|t| t.elapsed() > Duration::from_secs(10))
+        {
+            self.slow_frame_logged = Some(Instant::now());
+            tracing::warn!(page = ?self.page, ms = took.as_millis() as u64, "slow frame");
+        }
+    }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, "page", &self.page);
+        self.save_settings();
+    }
+
+    fn on_exit(&mut self) {
+        // Close open batches; whatever the rate limits hold back stays queued on disk.
+        self.sync.flush();
+    }
+}
+
+impl NexusApp {
+    /// The whole window: the sidebar and the page, the compact HUD, the welcome, the banners.
+    fn draw(&mut self, ui: &mut Ui) {
         if std::mem::take(&mut self.compact_request) {
             let ctx = ui.ctx().clone();
             self.set_compact(&ctx, true);
@@ -1023,15 +1055,5 @@ impl eframe::App for NexusApp {
         }
         let ctx = ui.ctx().clone();
         self.toasts(&ctx);
-    }
-
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, "page", &self.page);
-        self.save_settings();
-    }
-
-    fn on_exit(&mut self) {
-        // Close open batches; whatever the rate limits hold back stays queued on disk.
-        self.sync.flush();
     }
 }

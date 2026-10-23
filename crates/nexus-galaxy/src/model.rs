@@ -842,7 +842,8 @@ pub struct DbStats {
     pub commodities: u64,
     pub faction_rows: u64,
     pub ring_signals: u64,
-    pub price_history_rows: u64,
+    /// Kept by the writer; `None` until it has counted the table once after opening.
+    pub price_history_rows: Option<u64>,
     pub newest_market_update: Option<i64>,
     /// Main file + WAL.
     pub db_bytes: u64,

@@ -2750,7 +2750,7 @@ fn database_tab(ui: &mut Ui, svc: &mut MarketService, st: &mut MarketUi, rt: &to
                         ("Systems", digits(s.systems)),
                         ("Ring hotspots", digits(s.ring_signals)),
                         ("Faction entries", digits(s.faction_rows)),
-                        ("Price history points", digits(s.price_history_rows)),
+                        ("Price history points", s.price_history_rows.map_or_else(|| "counting…".to_string(), digits)),
                         ("Size on disk", mb(s.db_bytes)),
                     ] {
                         ui.label(RichText::new(k).color(pal::DIM));
