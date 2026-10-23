@@ -109,9 +109,9 @@ impl GameState {
         }
     }
 
-    /// The plotted route still ahead. NavRoute.json starts with the system the route was plotted from, and arrivals
-    /// take the systems up to the one reached off it; until the first jump (or after a restart mid-route) the
-    /// current system is on it, so everything after it is ahead.
+    /// The plotted route still ahead. The system it was plotted from is dropped when the route arrives, and arrivals
+    /// take the systems up to the one reached off it; read again mid-route (after a restart), the route still holds
+    /// the systems behind, so everything after the current one is ahead.
     pub fn route_remaining(&self) -> &[RouteHop] {
         let start = self.nav_route.iter().position(|h| h.system_address == self.location.system_address).map_or(0, |i| i + 1);
         &self.nav_route[start..]
@@ -1114,6 +1114,10 @@ impl GameState {
                     self.nav_route.clear();
                 } else {
                     self.nav_route = r.route.clone();
+                    // The route starts with the system it was plotted from: while still there, that's already behind.
+                    if self.nav_route.first().is_some_and(|h| h.system_address == self.location.system_address) {
+                        self.nav_route.remove(0);
+                    }
                 }
             }
             Companion::ModulesInfo(m, _) => self.modules_info = Some(m.clone()),

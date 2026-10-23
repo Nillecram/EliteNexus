@@ -439,7 +439,8 @@ impl NexusApp {
                 if widgets::button(ui, "Open data folder").on_hover_text(self.data_dir.display().to_string()).clicked() {
                     crate::folders::reveal(&self.data_dir);
                 }
-                if widgets::button(ui, "Close").clicked() {
+                // While nothing is saved it stays: changes made now would otherwise be lost without a word.
+                if !self.settings_read_only && widgets::button(ui, "Close").clicked() {
                     close = true;
                 }
             });
@@ -617,8 +618,6 @@ impl NexusApp {
         let settings_page = self.page == Page::Settings;
         if settings_page {
             self.page_header(ui, "Settings", "");
-        } else {
-            widgets::empty(ui, icon, title, hint);
         }
         let mut cx = pages::settings::SettingsCtx {
             settings: &mut self.settings,
@@ -629,14 +628,18 @@ impl NexusApp {
             test_voice: false,
             restart_core: false,
         };
-        if settings_page {
-            egui::ScrollArea::vertical().id_salt(("page", Page::Settings as u8)).auto_shrink([false, false]).show(ui, |ui| pages::settings::show(ui, &mut cx));
-        } else {
-            ui.vertical_centered(|ui| {
-                ui.set_max_width(640.0);
-                widgets::card(ui, "Journal folder", |ui| pages::settings::journal_setup(ui, &mut cx));
-            });
-        }
+        // Scrolls: with the settings banner above it, a short window would otherwise cut off the folder's buttons.
+        egui::ScrollArea::vertical().id_salt(("page", Page::Settings as u8, settings_page)).auto_shrink([false, false]).show(ui, |ui| {
+            if settings_page {
+                pages::settings::show(ui, &mut cx);
+            } else {
+                widgets::empty(ui, icon, title, hint);
+                ui.vertical_centered(|ui| {
+                    ui.set_max_width(640.0);
+                    widgets::card(ui, "Journal folder", |ui| pages::settings::journal_setup(ui, &mut cx));
+                });
+            }
+        });
         let (changed, test_voice, restart) = (cx.changed, cx.test_voice, cx.restart_core);
         self.after_settings(ui.ctx(), changed, test_voice, restart);
     }

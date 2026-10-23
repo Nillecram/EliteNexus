@@ -214,6 +214,9 @@ impl Settings {
                 }
             },
         };
+        if !utf8 && !what.contains("UTF-8") {
+            what += " It isn't UTF-8 text either (an editor saved it in another encoding), so letters outside English in it may have been replaced.";
+        }
         let copy = dir.join(format!("settings-unreadable-{}.json", nexus_journal::Timestamp::now().to_local_string("%Y%m%d-%H%M%S")));
         let can_save = match std::fs::write(&copy, &bytes) {
             Ok(()) => {
@@ -469,6 +472,10 @@ mod tests {
         assert_eq!(s.tts_rate, 1.5);
         assert!(problem.expect("a problem to show").what.contains("UTF-8"));
         assert_eq!(kept_copies(&d).len(), 1);
+        // Not UTF-8 and a bad setting: both are said.
+        std::fs::write(d.0.join("settings.json"), b"{ \"tts_rate\": \"fast\", \"edsm_commander\": \"\xdcmit\" }").expect("write");
+        let what = Settings::load(&d.0).1.expect("a problem to show").what;
+        assert!(what.contains("tts_rate is back at the default") && what.contains("UTF-8"), "{what}");
     }
 
     #[test]

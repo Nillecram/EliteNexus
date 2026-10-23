@@ -478,12 +478,13 @@ fn route_read_again_mid_route() {
     assert_eq!(ahead(&m), ["Gamma", "Delta"]);
 }
 
-/// A jump off the plotted route leaves the route as it was.
+/// A jump off the plotted route leaves the route as it was, without the system it was plotted from.
 #[test]
 fn jump_off_the_route_keeps_it() {
     let mut m = Model::default();
     feed(&mut m, LOGIN);
     m.apply_companion(&nav_route(&[("Alpha", 100, 0.0), ("Beta", 200, 10.0), ("Gamma", 300, 20.0)]), true, &mut Alerts::live());
     feed(&mut m, &[jump("2026-10-01T10:05:00Z", "Elsewhere", 900, 5.0).as_str()]);
-    assert_eq!(route_names(&m), ["Alpha", "Beta", "Gamma"]);
+    assert_eq!(route_names(&m), ["Beta", "Gamma"]);
+    assert_eq!(ahead(&m), ["Beta", "Gamma"]);
 }

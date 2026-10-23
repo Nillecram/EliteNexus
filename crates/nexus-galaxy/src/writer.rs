@@ -926,8 +926,12 @@ impl Ctx {
             let mut hist_old = tx.prepare_cached(
                 "INSERT OR IGNORE INTO price_history (market_id, commodity_id, ts, buy, sell) VALUES (?1, ?2, ?3, ?4, ?5)",
             )?;
+            // A new point, or the prices of one already stored for that snapshot (not counted as a new row).
             let mut hist_new = tx.prepare_cached(
-                "INSERT OR REPLACE INTO price_history (market_id, commodity_id, ts, buy, sell) VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT OR IGNORE INTO price_history (market_id, commodity_id, ts, buy, sell) VALUES (?1, ?2, ?3, ?4, ?5)",
+            )?;
+            let mut hist_set = tx.prepare_cached(
+                "UPDATE price_history SET buy = ?4, sell = ?5 WHERE market_id = ?1 AND commodity_id = ?2 AND ts = ?3",
             )?;
             let mut seen = rustc_hash::FxHashSet::default();
             for it in &m.items {
@@ -954,8 +958,12 @@ impl Ctx {
                 if let Some(&(ob, os, ou)) = old.get(&cid) {
                     let min = self.opts.price_history_min_change;
                     if price_changed(ob, it.buy, min) || price_changed(os, it.sell, min) {
-                        let rows = hist_old.execute(params![mid, cid, ou, ob, os])?
-                            + hist_new.execute(params![mid, cid, m.timestamp, it.buy, it.sell])?;
+                        let mut rows = hist_old.execute(params![mid, cid, ou, ob, os])?;
+                        let point = params![mid, cid, m.timestamp, it.buy, it.sell];
+                        match hist_new.execute(point)? {
+                            0 => _ = hist_set.execute(point)?,
+                            n => rows += n,
+                        }
                         self.history_added.set(self.history_added.get() + rows as i64);
                     }
                 }
