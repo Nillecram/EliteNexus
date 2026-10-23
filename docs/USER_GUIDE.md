@@ -77,6 +77,13 @@ still reads (from a file that isn't JSON at all, the EDSM, Inara and Ask keys; u
 on again) and says so in a banner above every page. A file it can't open at all, say one another program is holding,
 isn't saved over until the next start. Settings › Journal › **Browse…** sets folders without editing the file.
 
+If Elite Nexus closes unexpectedly, it writes where to `crash.log` in the data folder (Settings › About › Data folder
+› **Open**), and the next start says it didn't close normally. `nexus.log` there shows what it was doing. Neither file
+is sent anywhere: attaching them to a GitHub issue or a Frontier Forums post helps fix the problem. A journal entry
+Elite Nexus can't handle is skipped (and listed under Settings › Journal) instead of stopping it from following the
+game. Start it from a folder you unzipped it into: run from inside the zip, Windows unpacks it to a new temporary
+folder each time, settings and database included, and Elite Nexus says so.
+
 ## Linux
 
 Elite Nexus runs natively on 64-bit Linux: unpack `EliteNexus-…-linux-x64.tar.gz` anywhere and run `./EliteNexus`.

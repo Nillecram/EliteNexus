@@ -115,8 +115,23 @@ fn main() -> eframe::Result {
         None => tracing_subscriber::fmt().with_env_filter(filter).init(),
     }
     tracing::info!(version = env!("CARGO_PKG_VERSION"), data = %data_dir.display(), "Elite Nexus starting");
-    std::panic::set_hook(Box::new(|info| {
-        tracing::error!("panic: {info}");
+    // A panic is written straight to crash.log (nexus.log may not be open, and a release build has no console), with
+    // where it happened: the next start says so, and the commander can send the file. Nothing is uploaded.
+    let crash_log = data_dir.join("crash.log");
+    std::panic::set_hook(Box::new(move |info| {
+        let thread = std::thread::current();
+        let name = thread.name().unwrap_or("unnamed");
+        tracing::error!("panic in {name}: {info}");
+        let when = nexus_journal::Timestamp::now().to_local_string("%Y-%m-%d %H:%M:%S");
+        let text = format!("{when} Elite Nexus {} panicked in thread '{name}': {info}\n{}\n\n", env!("CARGO_PKG_VERSION"), std::backtrace::Backtrace::force_capture());
+        // Kept to about a megabyte: the previous one moves aside.
+        if std::fs::metadata(&crash_log).is_ok_and(|m| m.len() > 1_000_000) {
+            let _ = std::fs::rename(&crash_log, crash_log.with_extension("old.log"));
+        }
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&crash_log) {
+            use std::io::Write;
+            let _ = f.write_all(text.as_bytes());
+        }
     }));
 
     // Optional: --page <name>  --screenshot <file.png>

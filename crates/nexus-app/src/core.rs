@@ -146,6 +146,12 @@ impl Drop for Core {
     }
 }
 
+/// Runs one event through the model. A panic there (a bug, or journal data the model doesn't expect) skips that
+/// event instead of ending the thread that follows the journal; the panic hook has written it to crash.log.
+fn guarded(apply: impl FnOnce()) -> bool {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(apply)).is_ok()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn run(
     journal_dir: Option<PathBuf>,
@@ -194,12 +200,15 @@ fn run(
     let mut quiet = Alerts::disabled();
     let mut resume: Option<(PathBuf, u64)> = None;
     let mut done = 0usize;
+    let mut skipped = 0usize;
     let mut last_progress = Instant::now();
     load_history(&files, 32, |f, fe| {
         let file_id = idx.add_file(f.path.clone());
         for e in &fe.events {
             let ctx = EventCtx { ts: e.ts, name: fe.name(e), line: fe.line(e), live: false };
-            local.apply(&ctx, &e.event, &mut quiet);
+            if !guarded(|| local.apply(&ctx, &e.event, &mut quiet)) {
+                skipped += 1;
+            }
             idx.push(e.ts, file_id, u64::from(e.offset), e.len as usize, fe.name(e));
             if let Some(sink) = history_sink.as_mut() {
                 sink(fe.name(e), fe.line(e));
@@ -217,7 +226,9 @@ fn run(
     for kind in CompanionKind::ALL {
         if let Ok(text) = std::fs::read_to_string(dir.join(kind.file_name()))
             && let Some(c) = Companion::parse(kind, &text) {
-                local.apply_companion(&c, false, &mut quiet);
+                if !guarded(|| local.apply_companion(&c, false, &mut quiet)) {
+                    skipped += 1;
+                }
                 if let (Companion::Market(_, raw), Some(sink)) = (&c, history_sink.as_mut()) {
                     sink("Market", raw);
                 }
@@ -232,6 +243,9 @@ fn run(
         let mut st = status.write();
         st.load_ms = started.elapsed().as_secs_f64() * 1e3;
         st.phase = Phase::Live;
+        if skipped > 0 {
+            st.errors.push(format!("{skipped} journal entries couldn't be handled and were skipped (crash.log in the data folder has the details)."));
+        }
         st.current_file = resume.as_ref().and_then(|(p, _)| p.file_name()).map(|n| n.to_string_lossy().into_owned());
     }
     tracing::info!(files = total, ms = status.read().load_ms, "journal history loaded");
@@ -265,6 +279,7 @@ fn run(
         }
         let mut alerts = Alerts::live();
         let mut forward = Vec::new();
+        let mut failed: Vec<String> = Vec::new();
         {
             let mut m = model.write();
             for msg in batch {
@@ -272,12 +287,16 @@ fn run(
                     WatchMsg::Event(le) => {
                         index.write().push(le.raw.ts, live_file_id, le.raw.source.offset, le.raw.line.len(), &le.raw.name);
                         let ctx = EventCtx { ts: le.raw.ts, name: &le.raw.name, line: &le.raw.line, live: true };
-                        m.apply(&ctx, &le.event, &mut alerts);
+                        if !guarded(|| m.apply(&ctx, &le.event, &mut alerts)) {
+                            failed.push(format!("A {} event couldn't be handled and was skipped (crash.log in the data folder has the details).", le.raw.name));
+                        }
                         let ectx = EventContext::capture(&m);
                         forward.push(LiveMsg::Event(le, ectx));
                     }
                     WatchMsg::Companion(c) => {
-                        m.apply_companion(&c, true, &mut alerts);
+                        if !guarded(|| m.apply_companion(&c, true, &mut alerts)) {
+                            failed.push(format!("{} couldn't be handled and was skipped (crash.log in the data folder has the details).", c.kind().file_name()));
+                        }
                         let ectx = EventContext::capture(&m);
                         forward.push(LiveMsg::Companion(c, ectx));
                     }
@@ -300,6 +319,9 @@ fn run(
             let mut st = status.write();
             st.live_events += forward.len() as u64;
             st.last_live = Some(Instant::now());
+            st.errors.extend(failed);
+            let excess = st.errors.len().saturating_sub(50);
+            st.errors.drain(..excess);
         }
         for a in alerts.items {
             let _ = alert_tx.send(a);

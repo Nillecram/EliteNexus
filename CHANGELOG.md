@@ -5,6 +5,14 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Added
+- **Crash log** (after a Frontier Forums report of the window vanishing). A crash is written to `crash.log` in the data
+  folder, with where it happened, and the next start says Elite Nexus didn't close normally and where to look. Nothing
+  is sent anywhere. Settings › About › Data folder has an **Open** button. A journal entry Elite Nexus can't handle is
+  now skipped and listed under Settings › Journal, instead of silently stopping it from following the game.
+- Started from inside its zip file, Elite Nexus says so: Windows unpacks it to a new temporary folder each time, so
+  settings and the market database didn't last.
+
 ### Fixed
 - **A settings file that can't be read no longer costs you your settings** (a Frontier Forums report). When
   `settings.json` couldn't be read (typically after editing a folder into it by hand with single backslashes, which

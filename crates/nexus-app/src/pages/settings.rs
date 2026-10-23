@@ -137,7 +137,10 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                 g.row("Support Elite Nexus", "It's free, with no ads. If it helps you, GitHub Sponsors keeps it going.", |ui| {
                     ui.hyperlink_to(format!("{} Sponsor {}", icon::HEART, icon::ARROW_SQUARE_OUT), SPONSOR_URL).on_hover_text(SPONSOR_URL);
                 });
-                g.row("Data folder", "", |ui| {
+                g.row("Data folder", "Settings, the market database, nexus.log and, after a crash, crash.log.", |ui| {
+                    if widgets::button(ui, "Open").clicked() {
+                        folders::reveal(cx.data_dir);
+                    }
                     let d = cx.data_dir.display().to_string();
                     ui.add(egui::Label::new(RichText::new(d.clone()).color(pal::DIM)).truncate()).on_hover_text(d);
                 });

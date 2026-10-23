@@ -327,7 +327,8 @@ pub fn parse_journal_file_name(name: &str) -> Option<(Timestamp, u32)> {
     let rest = name.strip_prefix("Journal.")?.strip_suffix(".log")?;
     let (stamp, part) = rest.rsplit_once('.')?;
     let part: u32 = part.parse().ok()?;
-    let ts = if stamp.len() == 17 && stamp.as_bytes()[10] == b'T' {
+    // ASCII only: the slices below are byte positions (any file in the folder is looked at).
+    let ts = if stamp.len() == 17 && stamp.is_ascii() && stamp.as_bytes()[10] == b'T' {
         // 2026-10-12T073031
         let iso = format!("{}T{}:{}:{}Z", &stamp[..10], &stamp[11..13], &stamp[13..15], &stamp[15..17]);
         Timestamp::parse(&iso)?
@@ -409,6 +410,8 @@ mod tests {
         assert_eq!(t.to_iso(), "2017-04-04T17:06:16Z");
         assert_eq!(p, 2);
         assert!(parse_journal_file_name("Status.json").is_none());
+        // 17 bytes but not ASCII: skipped, not sliced in the middle of a letter.
+        assert!(parse_journal_file_name("Journal.2026-10-12T0é303.01.log").is_none());
     }
 
     #[test]

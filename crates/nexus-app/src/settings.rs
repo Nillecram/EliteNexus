@@ -371,6 +371,11 @@ pub(crate) fn user_data_base() -> Option<PathBuf> {
     xdg.or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share")))
 }
 
+/// The program runs from inside a zip file (Explorer's `Temp1_EliteNexus-….zip` folder, and other zip tools' alike).
+pub fn inside_zip(exe: &Path) -> bool {
+    exe.parent().is_some_and(|d| d.components().any(|c| c.as_os_str().to_string_lossy().to_ascii_lowercase().ends_with(".zip")))
+}
+
 fn is_writable(dir: &Path) -> bool {
     let probe = dir.join(".write-test");
     let ok = std::fs::write(&probe, b"ok").is_ok();
@@ -494,6 +499,13 @@ mod tests {
         let (_, problem) = Settings::load(&d.0);
         assert!(!problem.expect("a problem to show").can_save);
         assert!(kept_copies(&d).is_empty());
+    }
+
+    #[test]
+    fn running_from_a_zip() {
+        assert!(inside_zip(Path::new("/tmp/Temp1_EliteNexus-v0.6.0-windows-x64.zip/EliteNexus-v0.6.0-windows-x64/EliteNexus.exe")));
+        assert!(!inside_zip(Path::new("/games/EliteNexus/EliteNexus.exe")));
+        assert!(!inside_zip(Path::new("/games/zip/EliteNexus.zip.exe")), "only folders count");
     }
 
     #[test]
