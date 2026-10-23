@@ -16,6 +16,9 @@ release time that section becomes the new version and the release workflow publi
 ### Changed
 - The Linux notes (README, user guide, website) say what has been confirmed with the game under Proton so far, and
   link GitHub issue #3, where Linux reports are collected.
+- A cockpit-light dimmer still installed by Elite Nexus 0.3.0 (whose patterns crash the game near the newer fleet
+  carriers) is pointed out by a notice at start, with a button to Cockpit lights, instead of only on that tab
+  (a Frontier Forums report of the game crashing at launch came from such an install).
 
 ### Fixed
 - **A settings file that can't be read no longer costs you your settings** (a Frontier Forums report). When

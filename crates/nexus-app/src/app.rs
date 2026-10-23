@@ -103,6 +103,8 @@ pub struct NexusApp {
     clipboard: Option<arboard::Clipboard>,
     compact: bool,
     compact_request: bool,
+    /// Looking for a cockpit-light dimmer from 0.3.0 in the game folders (a notice if there is one).
+    dimmer_check: Option<crate::jobs::Job<bool>>,
     /// When this frame's work began, and when a slow frame was last logged.
     frame_started: Option<Instant>,
     slow_frame_logged: Option<Instant>,
@@ -114,6 +116,20 @@ struct Notice {
     text: String,
     /// Off while it still applies (settings that aren't being saved).
     closable: bool,
+    action: Option<NoticeAction>,
+}
+
+/// The button a notice offers besides Close.
+#[derive(Clone, Copy)]
+enum NoticeAction {
+    DataFolder,
+    CockpitLights,
+}
+
+/// A cockpit-light dimmer from Elite Nexus 0.3.0 with its hook in place: the game runs its patterns on every shader it
+/// loads, which crashes it near the newer fleet carriers. Only reads the game folders.
+fn old_dimmer_installed() -> bool {
+    nexus_hud::install::installs().iter().any(|i| nexus_hud::dimmer::uses_patterns(&i.folder) && !nexus_hud::dimmer::hook_missing(&i.folder))
 }
 
 /// Written at start, removed on a normal exit: still there at the next start, the last run ended some other way.
@@ -131,7 +147,7 @@ fn last_run(data_dir: &std::path::Path) -> Option<Notice> {
     } else {
         "It may have crashed, or it was ended without closing (the PC shut down, Task Manager). nexus.log in the data folder shows what it was doing; Elite Nexus sends nothing by itself."
     };
-    Some(Notice { title: "Elite Nexus didn't close normally last time", text: text.into(), closable: true })
+    Some(Notice { title: "Elite Nexus didn't close normally last time", text: text.into(), closable: true, action: Some(NoticeAction::DataFolder) })
 }
 
 /// Started from inside its zip: Explorer unpacks it to a new temporary folder every time, data folder included.
@@ -141,6 +157,7 @@ fn running_from_zip() -> Option<Notice> {
         title: "Elite Nexus is running from inside its zip file",
         text: "Windows unpacks it to a temporary folder each time it starts, so your settings and the market database don't last, and a second copy can start alongside this one. Unzip it into a folder of its own (Extract All…) and start it from there.".into(),
         closable: true,
+        action: None,
     })
 }
 
@@ -152,7 +169,7 @@ impl NexusApp {
         let mut notices = Vec::new();
         if let Some(p) = settings_problem {
             // While nothing is saved it stays: changes made then would otherwise be lost without a word.
-            notices.push(Notice { title: "Your settings file couldn't be read as it was", text: p.what, closable: p.can_save });
+            notices.push(Notice { title: "Your settings file couldn't be read as it was", text: p.what, closable: p.can_save, action: Some(NoticeAction::DataFolder) });
         }
         // Test runs (screenshots) leave the marker and the notices of real runs alone.
         if shot.is_none() {
@@ -225,6 +242,7 @@ impl NexusApp {
             clipboard: None,
             compact: false,
             compact_request: false,
+            dimmer_check: Some(crate::jobs::Job::spawn(&cc.egui_ctx, old_dimmer_installed)),
             frame_started: None,
             // The first frames load fonts and textures: nothing is logged in the first 10 seconds.
             slow_frame_logged: Some(Instant::now()),
@@ -476,14 +494,31 @@ impl NexusApp {
 
     /// The notices, above every page until closed.
     fn notices(&mut self, ui: &mut Ui) {
-        let mut close = None;
+        if let Some(found) = self.dimmer_check.as_mut().and_then(crate::jobs::Job::poll) {
+            self.dimmer_check = None;
+            if found {
+                self.notices.push(Notice {
+                    title: "Your cockpit-light dimmer can crash the game",
+                    text: "It's still the install from Elite Nexus 0.3.0, which runs a pattern on every shader the game loads and crashes it near the newer fleet carriers. Update on the Cockpit lights tab replaces it; Remove takes it out.".into(),
+                    closable: true,
+                    action: Some(NoticeAction::CockpitLights),
+                });
+            }
+        }
+        let (mut close, mut cockpit) = (None, false);
         for (i, n) in self.notices.iter().enumerate() {
             widgets::card_tinted(ui, icon::WARNING, n.title, pal::WARN, |ui| {
                 ui.add(egui::Label::new(RichText::new(&n.text).color(pal::TEXT)).wrap());
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    if widgets::button(ui, "Open data folder").on_hover_text(self.data_dir.display().to_string()).clicked() {
-                        crate::folders::reveal(&self.data_dir);
+                    match n.action {
+                        Some(NoticeAction::DataFolder) => {
+                            if widgets::button(ui, "Open data folder").on_hover_text(self.data_dir.display().to_string()).clicked() {
+                                crate::folders::reveal(&self.data_dir);
+                            }
+                        }
+                        Some(NoticeAction::CockpitLights) => cockpit |= widgets::button(ui, "Open Cockpit lights").clicked(),
+                        None => {}
                     }
                     if n.closable && widgets::button(ui, "Close").clicked() {
                         close = Some(i);
@@ -491,6 +526,10 @@ impl NexusApp {
                 });
             });
             ui.add_space(12.0);
+        }
+        if cockpit {
+            self.hud.show_cockpit();
+            self.page = Page::Hud;
         }
         if let Some(i) = close {
             self.notices.remove(i);
