@@ -5,6 +5,14 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.7.0] - 2026-10-23
+
+Elite Nexus for Mac, and fixes for what commanders reported after 0.6.0: a settings file that can't be read no
+longer costs you your settings, the journal folder can be set right where a journal problem is shown, the in-game
+route counts down again, the window no longer freezes with the live market feed on, and a crash log says what went
+wrong if it ever closes unexpectedly. Thanks to leodesca01 for the Mac port, and to everyone who reported these on
+the Frontier Forums and GitHub.
+
 ### Added
 - **macOS**: a native `Elite Nexus.app` (Metal rendering, its own icon). Each release now has an Apple Silicon zip:
   unzip it and drag the app to Applications. It isn't notarized, so macOS asks you to allow it once (System Settings ›

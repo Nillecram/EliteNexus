@@ -47,7 +47,7 @@ Key facts for answering questions about it:
   prefixes; any other folder can be set in Settings › Journal. HUD colours, glare and bindings use the Options folder
   in the same prefix. Cockpit lights (3Dmigoto) is untested under Proton and may need the Steam launch option
   WINEDLLOVERRIDES="d3d11,d3dcompiler_47=n,b" %command%. Voice uses speech-dispatcher (spd-say), else espeak-ng or espeak.
-- macOS: a native Elite Nexus.app (new after 0.6.0); each release has an Apple Silicon zip, and an Intel Mac builds it
+- macOS: a native Elite Nexus.app (new in 0.7.0); each release has an Apple Silicon zip, and an Intel Mac builds it
   from the source with tools/macos/build-app.sh. The game runs under NotProton (Steam Play for macOS), CrossOver or
   Whisky; Elite Nexus finds the journals in the game's prefix in every Steam library (NotProton keeps Proton's
   compatdata layout), then CrossOver's bottles and ~/.wine, then Whisky's bottles. Data lives in
