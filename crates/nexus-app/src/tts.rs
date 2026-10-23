@@ -129,14 +129,17 @@ fn run(rx: Receiver<TtsCmd>, status: Arc<Mutex<VoiceStatus>>) {
     }
 }
 
-/// The first speech program on `PATH`.
+/// The first speech program on `PATH` (an executable file).
 #[cfg(not(windows))]
 fn find_program(path: Option<std::ffi::OsString>) -> Option<&'static str> {
+    use std::os::unix::fs::PermissionsExt;
     let dirs: Vec<std::path::PathBuf> = path.map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
-    PROGRAMS.into_iter().find(|p| dirs.iter().any(|d| d.join(p).is_file()))
+    let runnable = |p: std::path::PathBuf| std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
+    PROGRAMS.into_iter().find(|p| dirs.iter().any(|d| runnable(d.join(p))))
 }
 
-/// Speaks one line and waits for it (so back-to-back alerts queue rather than interrupt), up to 30 s. The error is
+/// Speaks one line and waits for it (so back-to-back alerts queue rather than interrupt), up to 2 minutes (only a
+/// stuck program takes that long). The error is
 /// what the program printed, or how it ended.
 #[cfg(not(windows))]
 fn speak(program: &str, text: &str, rate: f32, volume: f32) -> Result<(), String> {
@@ -154,7 +157,7 @@ fn speak(program: &str, text: &str, rate: f32, volume: f32) -> Result<(), String
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(text.as_bytes());
     }
-    let deadline = Instant::now() + Duration::from_secs(30);
+    let deadline = Instant::now() + Duration::from_secs(120);
     loop {
         match child.try_wait() {
             Ok(Some(exit)) if exit.success() => return Ok(()),
@@ -170,7 +173,7 @@ fn speak(program: &str, text: &str, rate: f32, volume: f32) -> Result<(), String
             Ok(None) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err("it didn't finish within 30 seconds".into());
+                return Err("it didn't finish within 2 minutes".into());
             }
             Err(e) => return Err(e.to_string()),
         }
@@ -226,10 +229,18 @@ mod tests {
         let path = |dirs: &[&std::path::Path]| Some(std::env::join_paths(dirs).expect("PATH"));
         assert_eq!(find_program(path(&[&a, &b])), None);
         assert_eq!(find_program(None), None);
-        std::fs::write(b.join("espeak-ng"), "").expect("file");
+        let program = |file: std::path::PathBuf, mode: u32| {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::write(&file, "").expect("file");
+            std::fs::set_permissions(&file, std::fs::Permissions::from_mode(mode)).expect("mode");
+        };
+        program(b.join("espeak-ng"), 0o755);
+        assert_eq!(find_program(path(&[&a, &b])), Some("espeak-ng"));
+        // A file that can't be run doesn't count.
+        program(a.join("spd-say"), 0o644);
         assert_eq!(find_program(path(&[&a, &b])), Some("espeak-ng"));
         // speech-dispatcher first, wherever it is on PATH.
-        std::fs::write(b.join("spd-say"), "").expect("file");
+        program(b.join("spd-say"), 0o755);
         assert_eq!(find_program(path(&[&a, &b])), Some("spd-say"));
         let _ = std::fs::remove_dir_all(&root);
     }

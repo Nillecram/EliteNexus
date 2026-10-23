@@ -143,7 +143,7 @@ fn last_run(data_dir: &std::path::Path) -> Option<Notice> {
     let started = started?;
     let crashed = std::fs::metadata(data_dir.join("crash.log")).and_then(|m| m.modified()).is_ok_and(|t| t >= started);
     let text = if crashed {
-        "It crashed: crash.log in the data folder says where. Sending that file (a GitHub issue or the Frontier Forums thread) helps fix it; Elite Nexus sends nothing by itself."
+        "It probably crashed: crash.log in the data folder has what went wrong during that run. Sending that file (a GitHub issue or the Frontier Forums thread) helps fix it; Elite Nexus sends nothing by itself."
     } else {
         "It may have crashed, or it was ended without closing (the PC shut down, Task Manager). nexus.log in the data folder shows what it was doing; Elite Nexus sends nothing by itself."
     };
@@ -530,6 +530,8 @@ impl NexusApp {
         if cockpit {
             self.hud.show_cockpit();
             self.page = Page::Hud;
+            // The tab shows the install's state from here on (and Update clears it).
+            self.notices.retain(|n| !matches!(n.action, Some(NoticeAction::CockpitLights)));
         }
         if let Some(i) = close {
             self.notices.remove(i);
@@ -1170,7 +1172,7 @@ mod tests {
         // A crash.log written during that run: it says so.
         std::thread::sleep(Duration::from_millis(20));
         std::fs::write(dir.join("crash.log"), "panicked").expect("crash.log");
-        assert!(last_run(&dir).expect("notice").text.starts_with("It crashed"));
+        assert!(last_run(&dir).expect("notice").text.starts_with("It probably crashed"));
         // A normal exit removes the marker.
         std::fs::remove_file(dir.join(RUNNING_MARKER)).expect("marker");
         assert!(last_run(&dir).is_none());
