@@ -28,6 +28,10 @@ release time that section becomes the new version and the release workflow publi
   one of them, the price history, grows with every live price change: after a few weeks, counting it froze the
   window. The counters are now counted in the background every ten seconds, and the price history count is kept as
   prices are stored. A frame that still takes over a quarter of a second is noted in `nexus.log` with its page.
+- **Market › Services shows results as soon as it opens** (GitHub issue #4). It searched only when a service was
+  clicked, so the first visit showed nothing, and the list stayed where you were when you clicked. It now searches when
+  it opens, when you pick a service or pad, and after every jump, and says so when no known station has the service.
+  It has its own landing pad filter; before, it quietly used the pad picked on other Market tabs.
 
 ## [0.6.0] - 2026-10-18
 

@@ -355,6 +355,8 @@ pub struct MarketUi {
     routes: Slot<Res<TradeRoute>>,
     service: usize,
     stations: Slot<Res<StationHit>>,
+    /// What the Services list was searched for: (service, system, pad). It searches again when that changes.
+    services_key: Option<(usize, u64, Option<char>)>,
     hotspots: Slot<Res<HotspotHit>>,
     hotspot_prices: Slot<Res<CommodityHit>>,
     /// Path typed into "import a downloaded dump".
@@ -408,6 +410,7 @@ impl MarketUi {
             routes: Slot::default(),
             service: 0,
             stations: Slot::default(),
+            services_key: None,
             hotspots: Slot::default(),
             hotspot_prices: Slot::default(),
             import_path: String::new(),
@@ -767,6 +770,9 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
                         st.routes.run(&ctx, move || db.trade_routes(&q).map_err(|e| e.to_string()));
                     }
             });
+            if st.routes.last.is_none() && !st.routes.busy() {
+                crate::widgets::footnote(ui, "Set the area and press Find routes. Every market in the area is loaded, so wide areas take a few seconds: this search waits for you.");
+            }
             nav = results_routes(ui, &st.routes).or(nav);
         }
         Tab::Services => {
@@ -775,15 +781,31 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
                 for (i, (label, _)) in SERVICES.iter().enumerate() {
                     if crate::widgets::pill(ui, st.service == i, label).clicked() {
                         st.service = i;
-                        if let Some(o) = origin {
-                            let q = service_query(SERVICES[i].1, o, st.prefs.min_pad);
-                            let db = db.clone();
-                            st.stations.run(&ctx, move || db.stations_near(&q).map_err(|e| e.to_string()));
-                        }
                     }
                 }
+                pad_combo(ui, "spad", &mut st.prefs.min_pad);
             });
-            results_stations(ui, &st.stations);
+            ui.add_space(8.0);
+            // Searches by itself: when the tab opens, when a service or pad is picked, and after every jump.
+            match origin {
+                None => empty(ui, icon::MAP_PIN, "Position unknown", "Jump or relog once so Elite Nexus knows where you are."),
+                Some(o) => {
+                    let key = (st.service, gs.location.system_address, st.prefs.min_pad);
+                    if st.services_key != Some(key) && !st.stations.busy() {
+                        st.services_key = Some(key);
+                        let q = service_query(SERVICES[st.service].1, o, st.prefs.min_pad);
+                        let db = db.clone();
+                        st.stations.run(&ctx, move || db.stations_near(&q).map_err(|e| e.to_string()));
+                    }
+                    if !st.stations.busy() && matches!(&st.stations.last, Some(Ok(v)) if v.is_empty()) {
+                        let pad = st.prefs.min_pad.map(|p| format!(" with an {p} pad")).unwrap_or_default();
+                        let hint = format!("No station Elite Nexus knows has a {}{pad}. It learns stations from the live feed, your journal and the Spansh import (Database & feed).", SERVICES[st.service].0);
+                        empty(ui, icon::MAGNIFYING_GLASS, "None found", &hint);
+                    } else {
+                        results_stations(ui, &st.stations);
+                    }
+                }
+            }
         }
         Tab::Hotspots => {
             let p = &mut st.prefs;
