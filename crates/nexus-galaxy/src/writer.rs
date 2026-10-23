@@ -101,7 +101,8 @@ pub(crate) struct Shared {
     pub commits: AtomicU64,
     pub write_errors: AtomicU64,
     /// Rows in `price_history`, kept up to date by the writer: counting the table can take seconds once it holds
-    /// a month of live prices. Only meaningful once `history_counted` (the count at open runs on its own thread).
+    /// a month of live prices. Only meaningful once `history_counted` (the writer counts once when it starts,
+    /// before its first prune).
     pub history_rows: AtomicI64,
     pub history_counted: AtomicBool,
 }

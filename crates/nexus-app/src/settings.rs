@@ -284,6 +284,11 @@ fn salvage(v: serde_json::Value) -> (Settings, Vec<String>) {
             }
         }
     }
+    // The Ask key only with its service: if that fell back to the default, the key would be sent to another company.
+    if dropped.iter().any(|d| d == "ai.provider" || d == "ai.base_url") && good["ai"]["api_key"].as_str().is_some_and(|k| !k.is_empty()) {
+        good["ai"]["api_key"] = Value::String(String::new());
+        dropped.push("ai.api_key".into());
+    }
     dropped.sort();
     (serde_json::from_value(good).unwrap_or_default(), dropped)
 }
@@ -303,8 +308,13 @@ fn recover_keys(text: &str) -> (Settings, Vec<&'static str>) {
         s.accounts.inara_api_key = k;
         found.push("Inara");
     }
-    if let Some(k) = sealed("api_key") {
-        s.ai.api_key = k;
+    // The Ask key only with its service: paired with the default service instead, it would be sent to another company.
+    let provider = string_value(text, "provider").and_then(|p| serde_json::from_value::<nexus_ai::ProviderKind>(serde_json::Value::String(p)).ok());
+    let base_url = string_value(text, "base_url").unwrap_or_default();
+    if let (Some(api_key), Some(provider)) = (sealed("api_key"), provider)
+        && (provider != nexus_ai::ProviderKind::Custom || !base_url.is_empty())
+    {
+        s.ai = AiSettings { provider, api_key, model: string_value(text, "model").unwrap_or_default(), base_url };
         found.push("Ask");
     }
     if let Some(name) = string_value(text, "edsm_commander") {
@@ -420,7 +430,7 @@ mod tests {
     "edsm_api_key": "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+s=",
     "inara_api_key": "dpapi:AAAA+/09"
   },
-  "ai": { "api_key": "b64:QUJD" }
+  "ai": { "provider": "Claude", "api_key": "b64:QUJD" }
 }"#;
 
     fn kept_copies(d: &Dir) -> Vec<PathBuf> {
@@ -437,6 +447,7 @@ mod tests {
         assert_eq!(s.accounts.edsm_api_key, "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+s=");
         assert_eq!(s.accounts.inara_api_key, "dpapi:AAAA+/09");
         assert_eq!(s.ai.api_key, "b64:QUJD");
+        assert_eq!(s.ai.provider, nexus_ai::ProviderKind::Claude, "the key comes back with its service");
         assert_eq!(s.accounts.edsm_commander, "Chequers");
         // Uploads are opt-in: the keys come back, the switches don't.
         assert!(!s.accounts.edsm_enabled);
@@ -453,6 +464,22 @@ mod tests {
         s.save(&d.0);
         assert_eq!(std::fs::read_to_string(&kept[0]).expect("copy"), HAND_EDITED);
         assert!(Settings::load(&d.0).1.is_none(), "the saved file reads");
+    }
+
+    #[test]
+    fn the_ask_key_only_comes_back_with_its_service() {
+        let d = Dir::new("ask");
+        // Not JSON, and the service can't be read: the key isn't paired with the default service.
+        std::fs::write(d.0.join("settings.json"), r#"{ "journal_dir": "\\PC\Elite", "ai": { "provider": 3, "api_key": "b64:QUJD" } }"#).expect("write");
+        let (s, problem) = Settings::load(&d.0);
+        assert!(s.ai.api_key.is_empty());
+        assert!(!problem.expect("a problem").what.contains("Ask"));
+        // Valid JSON with a service that doesn't read: same.
+        std::fs::write(d.0.join("settings.json"), r#"{ "ai": { "provider": "claude-3", "api_key": "b64:QUJD" }, "tts_rate": 1.5 }"#).expect("write");
+        let (s, problem) = Settings::load(&d.0);
+        assert!(s.ai.api_key.is_empty());
+        assert_eq!(s.tts_rate, 1.5);
+        assert!(problem.expect("a problem").what.contains("ai.api_key and ai.provider are back at the default"));
     }
 
     #[test]

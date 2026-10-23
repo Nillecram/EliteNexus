@@ -783,7 +783,12 @@ pub fn show(ui: &mut Ui, gs: &GameState, svc: &mut MarketService, st: &mut Marke
                         st.service = i;
                     }
                 }
+                let pad = st.prefs.min_pad;
                 pad_combo(ui, "spad", &mut st.prefs.min_pad);
+                // A pad picked here stays: Find commodity no longer sets it from the ship.
+                if st.prefs.min_pad != pad {
+                    st.prefs.pad_auto = false;
+                }
             });
             ui.add_space(8.0);
             // Searches by itself: when the tab opens, when a service or pad is picked, and after every jump.

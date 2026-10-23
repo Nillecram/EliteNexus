@@ -74,8 +74,8 @@ On Linux, when the folder next to the program can't be written to, data goes to 
 Your settings are in `settings.json` there. If that file can't be read (typically after editing it by hand: JSON
 writes every backslash twice, so a network folder is `"\\\\MAINPC\\Elite Dangerous"`), Elite Nexus never starts over
 silently. It keeps the file as it was (`settings-unreadable-<date>.json`, next to it), keeps every setting that
-still reads (from a file that isn't JSON at all, the EDSM, Inara and Ask keys; uploads stay off until you switch them
-on again) and says so in a banner above every page. A file it can't open at all, say one another program is holding,
+still reads (from a file that isn't JSON at all, the EDSM and Inara keys, and the Ask key with the service it belongs
+to; uploads stay off until you switch them on again) and says so in a banner above every page. A file it can't open at all, say one another program is holding,
 isn't saved over until the next start. Settings › Journal › **Browse…** sets folders without editing the file.
 
 If Elite Nexus closes unexpectedly, it writes where to `crash.log` in the data folder (Settings › About › Data folder

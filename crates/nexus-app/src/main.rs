@@ -14,6 +14,7 @@ mod folders;
 mod icon;
 mod jobs;
 mod market;
+mod notices;
 mod pages;
 mod runplan;
 mod secrets;
@@ -124,9 +125,10 @@ fn main() -> eframe::Result {
         let name = thread.name().unwrap_or("unnamed");
         tracing::error!("panic in {name}: {info}");
         // The first ones matter: a panic the core survives can repeat with every update of a file, and the backtraces
-        // would bury the first report (and slow the thread down).
+        // would bury the first report (and slow the thread down). The window's own thread always gets in: its panic
+        // is the one that closes Elite Nexus.
         let n = REPORTED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        if n >= 10 {
+        if n >= 10 && name != "main" {
             return;
         }
         let more = if n == 9 { "Further panics this run are only in nexus.log.\n\n" } else { "" };

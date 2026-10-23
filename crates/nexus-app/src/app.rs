@@ -60,7 +60,7 @@ pub struct NexusApp {
     core: Core,
     settings: Settings,
     /// What the commander should know from the start (settings file, last run, …), above every page until closed.
-    notices: Vec<Notice>,
+    notices: Vec<crate::notices::Notice>,
     /// settings.json couldn't be read (or copied aside), so it isn't saved over this run.
     settings_read_only: bool,
     data_dir: PathBuf,
@@ -110,57 +110,6 @@ pub struct NexusApp {
     slow_frame_logged: Option<Instant>,
 }
 
-/// Something the commander should know from the start, above every page until closed.
-struct Notice {
-    title: &'static str,
-    text: String,
-    /// Off while it still applies (settings that aren't being saved).
-    closable: bool,
-    action: Option<NoticeAction>,
-}
-
-/// The button a notice offers besides Close.
-#[derive(Clone, Copy)]
-enum NoticeAction {
-    DataFolder,
-    CockpitLights,
-}
-
-/// A cockpit-light dimmer from Elite Nexus 0.3.0 with its hook in place: the game runs its patterns on every shader it
-/// loads, which crashes it near the newer fleet carriers. Only reads the game folders.
-fn old_dimmer_installed() -> bool {
-    nexus_hud::install::installs().iter().any(|i| nexus_hud::dimmer::uses_patterns(&i.folder) && !nexus_hud::dimmer::hook_missing(&i.folder))
-}
-
-/// Written at start, removed on a normal exit: still there at the next start, the last run ended some other way.
-const RUNNING_MARKER: &str = "running";
-
-/// The notice when the last run didn't end normally (and the marker for this one).
-fn last_run(data_dir: &std::path::Path) -> Option<Notice> {
-    let marker = data_dir.join(RUNNING_MARKER);
-    let started = std::fs::metadata(&marker).and_then(|m| m.modified()).ok();
-    let _ = std::fs::write(&marker, b"");
-    let started = started?;
-    let crashed = std::fs::metadata(data_dir.join("crash.log")).and_then(|m| m.modified()).is_ok_and(|t| t >= started);
-    let text = if crashed {
-        "It probably crashed: crash.log in the data folder has what went wrong during that run. Sending that file (a GitHub issue or the Frontier Forums thread) helps fix it; Elite Nexus sends nothing by itself."
-    } else {
-        "It may have crashed, or it was ended without closing (the PC shut down, Task Manager). nexus.log in the data folder shows what it was doing; Elite Nexus sends nothing by itself."
-    };
-    Some(Notice { title: "Elite Nexus didn't close normally last time", text: text.into(), closable: true, action: Some(NoticeAction::DataFolder) })
-}
-
-/// Started from inside its zip: Explorer unpacks it to a new temporary folder every time, data folder included.
-fn running_from_zip() -> Option<Notice> {
-    let exe = std::env::current_exe().ok()?;
-    crate::settings::inside_zip(&exe).then(|| Notice {
-        title: "Elite Nexus is running from inside its zip file",
-        text: "Windows unpacks it to a temporary folder each time it starts, so your settings and the market database don't last, and a second copy can start alongside this one. Unzip it into a folder of its own (Extract All…) and start it from there.".into(),
-        closable: true,
-        action: None,
-    })
-}
-
 impl NexusApp {
     pub fn new(cc: &eframe::CreationContext<'_>, data_dir: PathBuf, start_page: Option<Page>, shot: Option<ScreenshotJob>, ov: Overrides) -> Self {
         crate::theme::install(&cc.egui_ctx);
@@ -169,12 +118,12 @@ impl NexusApp {
         let mut notices = Vec::new();
         if let Some(p) = settings_problem {
             // While nothing is saved it stays: changes made then would otherwise be lost without a word.
-            notices.push(Notice { title: "Your settings file couldn't be read as it was", text: p.what, closable: p.can_save, action: Some(NoticeAction::DataFolder) });
+            notices.push(crate::notices::Notice { title: "Your settings file couldn't be read as it was", text: p.what, closable: p.can_save, action: Some(crate::notices::Action::DataFolder) });
         }
         // Test runs (screenshots) leave the marker and the notices of real runs alone.
         if shot.is_none() {
-            notices.extend(last_run(&data_dir));
-            notices.extend(running_from_zip());
+            notices.extend(crate::notices::last_run(&data_dir));
+            notices.extend(crate::notices::running_from_zip());
         }
         nexus_hud::install::set_game_dir(settings.game_dir.as_deref());
         let page = start_page.or_else(|| cc.storage.and_then(|s| eframe::get_value(s, "page"))).unwrap_or(Page::Dashboard);
@@ -242,7 +191,7 @@ impl NexusApp {
             clipboard: None,
             compact: false,
             compact_request: false,
-            dimmer_check: Some(crate::jobs::Job::spawn(&cc.egui_ctx, old_dimmer_installed)),
+            dimmer_check: Some(crate::jobs::Job::spawn(&cc.egui_ctx, crate::notices::old_dimmer_installed)),
             frame_started: None,
             // The first frames load fonts and textures: nothing is logged in the first 10 seconds.
             slow_frame_logged: Some(Instant::now()),
@@ -497,44 +446,12 @@ impl NexusApp {
         if let Some(found) = self.dimmer_check.as_mut().and_then(crate::jobs::Job::poll) {
             self.dimmer_check = None;
             if found {
-                self.notices.push(Notice {
-                    title: "Your cockpit-light dimmer can crash the game",
-                    text: "It's still the install from Elite Nexus 0.3.0, which runs a pattern on every shader the game loads and crashes it near the newer fleet carriers. Update on the Cockpit lights tab replaces it; Remove takes it out.".into(),
-                    closable: true,
-                    action: Some(NoticeAction::CockpitLights),
-                });
+                self.notices.push(crate::notices::old_dimmer());
             }
         }
-        let (mut close, mut cockpit) = (None, false);
-        for (i, n) in self.notices.iter().enumerate() {
-            widgets::card_tinted(ui, icon::WARNING, n.title, pal::WARN, |ui| {
-                ui.add(egui::Label::new(RichText::new(&n.text).color(pal::TEXT)).wrap());
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    match n.action {
-                        Some(NoticeAction::DataFolder) => {
-                            if widgets::button(ui, "Open data folder").on_hover_text(self.data_dir.display().to_string()).clicked() {
-                                crate::folders::reveal(&self.data_dir);
-                            }
-                        }
-                        Some(NoticeAction::CockpitLights) => cockpit |= widgets::button(ui, "Open Cockpit lights").clicked(),
-                        None => {}
-                    }
-                    if n.closable && widgets::button(ui, "Close").clicked() {
-                        close = Some(i);
-                    }
-                });
-            });
-            ui.add_space(12.0);
-        }
-        if cockpit {
+        if crate::notices::show(ui, &mut self.notices, &self.data_dir) == Some(crate::notices::Action::CockpitLights) {
             self.hud.show_cockpit();
             self.page = Page::Hud;
-            // The tab shows the install's state from here on (and Update clears it).
-            self.notices.retain(|n| !matches!(n.action, Some(NoticeAction::CockpitLights)));
-        }
-        if let Some(i) = close {
-            self.notices.remove(i);
         }
     }
 
@@ -1098,9 +1015,9 @@ impl eframe::App for NexusApp {
     fn on_exit(&mut self) {
         // Close open batches; whatever the rate limits hold back stays queued on disk.
         self.sync.flush();
-        // A normal exit: the next start has nothing to report (see last_run).
+        // A normal exit: the next start has nothing to report.
         if self.shot.is_none() {
-            let _ = std::fs::remove_file(self.data_dir.join(RUNNING_MARKER));
+            crate::notices::clean_exit(&self.data_dir);
         }
     }
 }
@@ -1154,28 +1071,3 @@ impl NexusApp {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn last_run_reports_an_unclean_exit() {
-        let dir = std::env::temp_dir().join(format!("nexus-last-run-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).expect("dir");
-        // First start: nothing to report, and the marker is down.
-        assert!(last_run(&dir).is_none());
-        assert!(dir.join(RUNNING_MARKER).exists());
-        // Not removed (no normal exit): reported, without blaming a crash it can't see.
-        let n = last_run(&dir).expect("notice");
-        assert!(n.text.starts_with("It may have crashed"), "{}", n.text);
-        // A crash.log written during that run: it says so.
-        std::thread::sleep(Duration::from_millis(20));
-        std::fs::write(dir.join("crash.log"), "panicked").expect("crash.log");
-        assert!(last_run(&dir).expect("notice").text.starts_with("It probably crashed"));
-        // A normal exit removes the marker.
-        std::fs::remove_file(dir.join(RUNNING_MARKER)).expect("marker");
-        assert!(last_run(&dir).is_none());
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-}

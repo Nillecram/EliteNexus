@@ -26,7 +26,8 @@ release time that section becomes the new version and the release workflow publi
   JSON doesn't allow), Elite Nexus started with the default settings and saved them over the file within half a
   minute: API keys, the journal folder and everything else were gone, without a word. Now the file is kept as it was
   (`settings-unreadable-<date>.json` in the data folder), every setting that still reads is kept (from a file that
-  isn't JSON at all, the EDSM, Inara and Ask keys; uploads stay off until you switch them on again), and a banner
+  isn't JSON at all, the EDSM and Inara keys, and the Ask key with the service it belongs to; uploads stay off until
+  you switch them on again), and a banner
   above every page says what happened and how JSON writes a folder. A file that can't be opened at all isn't saved
   over until the next start.
 - **A journal folder that can't be read no longer locks you out of Settings** (a Frontier Forums report: a laptop
