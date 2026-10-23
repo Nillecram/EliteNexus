@@ -249,7 +249,7 @@ fn journal_folder(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                 JournalFolderCheck::Empty => (pal::WARN, format!("No journal files (Journal.….log) in this folder, so Elite Nexus keeps reading {reading} for now. The folder is saved: Reload journals, or the next start, switches to it.")),
                 JournalFolderCheck::Unreadable(e) => (
                     pal::BAD,
-                    format!("Elite Nexus can't open this folder ({e}), so it keeps reading {reading} for now. The folder is saved: Reload journals, or the next start, tries it again. A folder on another PC needs that PC on and the folder shared."),
+                    format!("Elite Nexus can't open this folder ({e}), so it keeps reading {reading} for now. The folder is saved: Reload journals, or the next start, tries it again. A folder on another computer needs that computer on and the folder shared."),
                 ),
             });
         }
@@ -306,7 +306,7 @@ fn game_folder(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
             (Some(f), Some(_)) => (pal::GOOD, format!("Found the game: {f}.")),
             (Some(f), None) => (pal::GOOD, format!("Back to the folder found automatically: {f}.")),
             (None, Some(_)) => (pal::WARN, "No EliteDangerous64.exe in that folder or under it, so HUD & cockpit and Bindings have no game folder.".into()),
-            (None, None) => (pal::WARN, "Elite Nexus doesn't find the game by itself on this PC: choose its folder here.".into()),
+            (None, None) => (pal::WARN, "Elite Nexus doesn't find the game by itself on this computer: choose its folder here.".into()),
         });
         st.game_found = Some((cx.settings.game_dir.clone(), found));
     }

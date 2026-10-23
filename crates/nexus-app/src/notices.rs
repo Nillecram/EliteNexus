@@ -82,7 +82,7 @@ pub fn last_run(data_dir: &Path) -> Option<Notice> {
     let text = if crashed {
         "It probably crashed: crash.log in the data folder has what went wrong during that run. Sending that file (a GitHub issue or the Frontier Forums thread) helps fix it; Elite Nexus sends nothing by itself."
     } else {
-        "It may have crashed, or it was ended without closing (the PC shut down, Task Manager). nexus.log in the data folder shows what it was doing; Elite Nexus sends nothing by itself."
+        "It may have crashed, or it was ended without closing (the computer shut down, or it was force-quit). nexus.log in the data folder shows what it was doing; Elite Nexus sends nothing by itself."
     };
     Some(Notice { title: "Elite Nexus didn't close normally last time", text: text.into(), closable: true, action: Some(Action::DataFolder) })
 }

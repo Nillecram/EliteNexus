@@ -32,7 +32,7 @@ pub fn parse_folder(text: &str) -> Option<PathBuf> {
     (!t.is_empty()).then(|| PathBuf::from(t))
 }
 
-/// Opens a folder in the system's file manager (Explorer; on Linux whatever xdg-open picks).
+/// Opens a folder in the system's file manager: Explorer, Finder on macOS, and on Linux whatever xdg-open picks.
 pub fn reveal(dir: &std::path::Path) {
     let program = if cfg!(windows) {
         "explorer"
