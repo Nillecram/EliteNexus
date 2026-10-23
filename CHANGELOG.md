@@ -13,6 +13,10 @@ release time that section becomes the new version and the release workflow publi
 - Started from inside its zip file, Elite Nexus says so: Windows unpacks it to a new temporary folder each time, so
   settings and the market database didn't last.
 
+### Changed
+- The Linux notes (README, user guide, website) say what has been confirmed with the game under Proton so far, and
+  link GitHub issue #3, where Linux reports are collected.
+
 ### Fixed
 - **A settings file that can't be read no longer costs you your settings** (a Frontier Forums report). When
   `settings.json` couldn't be read (typically after editing a folder into it by hand with single backslashes, which

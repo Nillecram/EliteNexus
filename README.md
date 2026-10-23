@@ -10,7 +10,9 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 **[Download the latest release](https://github.com/uruskan/EliteNexus/releases/latest)**, unzip it anywhere and run
 `EliteNexus.exe` (Windows, 64-bit), or unpack the Linux `tar.gz` and run `./EliteNexus` (64-bit; it finds the journals
 in the game's Proton prefix, and Settings › About adds it to your app menu; see [Linux](docs/USER_GUIDE.md#linux)).
-The Linux build is tested on Ubuntu but hasn't been tried yet with the game itself running under Proton or Wine.
+The Linux build is tested on Ubuntu, and a commander has confirmed it with the game under Proton (Nobara Linux on
+Wayland: journals found by themselves, Exploration and Exobiology working). What works on Linux and what doesn't yet is
+collected in [GitHub issue #3](https://github.com/uruskan/EliteNexus/issues/3).
 There is no installer: everything it keeps lives in a `nexus-data` folder next to the program. Website: **[uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)**.
 Elite Nexus is free, with no ads. If it helps you, you can **[sponsor it on GitHub](https://github.com/sponsors/uruskan)**.
 
