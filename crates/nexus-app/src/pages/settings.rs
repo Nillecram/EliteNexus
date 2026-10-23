@@ -22,6 +22,8 @@ pub struct SettingsCtx<'a> {
     pub changed: bool,
     pub test_voice: bool,
     pub restart_core: bool,
+    /// What happened the last time Elite Nexus spoke (shown under Test voice).
+    pub voice: crate::tts::VoiceStatus,
 }
 
 /// What the Settings page keeps between frames: the folder fields and what checking a folder found.
@@ -71,6 +73,9 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                 g.content(|ui| {
                     if widgets::button(ui, "Test voice").clicked() {
                         cx.test_voice = true;
+                    }
+                    if let Some((color, text)) = voice_line(&cx.voice) {
+                        ui.add(egui::Label::new(RichText::new(text).size(size::FOOTNOTE).color(color)).wrap());
                     }
                 });
             });
@@ -150,6 +155,27 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
             footnote(ui, "Elite Nexus is free software under the GNU GPL, version 3 or later, and comes with no warranty. Source: github.com/uruskan/EliteNexus. Elite Dangerous is a trademark of Frontier Developments plc; Elite Nexus is an unofficial community tool.");
         });
     });
+}
+
+/// The last speech attempt in a line, when there is something to say about it.
+fn voice_line(status: &crate::tts::VoiceStatus) -> Option<(Color32, String)> {
+    use crate::tts::VoiceStatus;
+    match status {
+        VoiceStatus::Untried => None,
+        VoiceStatus::Spoke(engine) => Some((pal::DIM, format!("Speaking through {engine}. Nothing heard? Check the volume of the sound device it uses."))),
+        VoiceStatus::Missing => Some((
+            pal::WARN,
+            "Voice needs speech-dispatcher (spd-say) or espeak-ng, and neither is installed: install the speech-dispatcher package with its espeak-ng module, then restart Elite Nexus.".into(),
+        )),
+        VoiceStatus::Failed(engine, why) => Some((
+            pal::BAD,
+            if *engine == "spd-say" {
+                format!("spd-say couldn't speak: {why}. speech-dispatcher needs an output module too, for example speech-dispatcher-espeak-ng on Fedora and Nobara.")
+            } else {
+                format!("{engine} couldn't speak: {why}.")
+            },
+        )),
+    }
 }
 
 /// The journal folder setting with, on Linux, where Elite Nexus looks by itself. Also shown under a journal problem

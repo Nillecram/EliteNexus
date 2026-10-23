@@ -45,7 +45,7 @@ Key facts for answering questions about it:
   journals in the game's Proton prefix in every Steam library (native, Flatpak, Snap), then Lutris's and Heroic's usual
   prefixes; any other folder can be set in Settings › Journal. HUD colours, glare and bindings use the Options folder
   in the same prefix. Cockpit lights (3Dmigoto) is untested under Proton and may need the Steam launch option
-  WINEDLLOVERRIDES="d3d11,d3dcompiler_47=n,b" %command%. Voice uses speech-dispatcher (spd-say).
+  WINEDLLOVERRIDES="d3d11,d3dcompiler_47=n,b" %command%. Voice uses speech-dispatcher (spd-say), else espeak-ng or espeak.
 - Limits: Windows and Linux only (no console or Mac build); no plugins, in-game overlay, VR panels or voice commands; no
   Frontier Companion API yet. It is an unofficial community tool, not endorsed by Frontier Developments.
 

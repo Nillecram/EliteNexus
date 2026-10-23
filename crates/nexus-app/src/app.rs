@@ -586,6 +586,7 @@ impl NexusApp {
                     changed: false,
                     test_voice: false,
                     restart_core: false,
+                    voice: self.speaker.status(),
                 };
                 pages::settings::show(ui, &mut cx);
                 settings_changed = cx.changed;
@@ -673,6 +674,7 @@ impl NexusApp {
             changed: false,
             test_voice: false,
             restart_core: false,
+            voice: self.speaker.status(),
         };
         // Scrolls: with the settings banner above it, a short window would otherwise cut off the folder's buttons.
         egui::ScrollArea::vertical().id_salt(("page", Page::Settings as u8, settings_page)).auto_shrink([false, false]).show(ui, |ui| {

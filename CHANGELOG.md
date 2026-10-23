@@ -40,6 +40,11 @@ release time that section becomes the new version and the release workflow publi
   clicked, so the first visit showed nothing, and the list stayed where you were when you clicked. It now searches when
   it opens, when you pick a service or pad, and after every jump, and says so when no known station has the service.
   It has its own landing pad filter; before, it quietly used the pad picked on other Market tabs.
+- **Linux: Test voice says why it's silent** (GitHub issue #3, Nobara on Wayland). When speech-dispatcher's
+  `spd-say` was missing or failed, alerts stayed silent and nothing said so. Settings now shows, under Test voice,
+  which program spoke, that none is installed, or what the program said when it failed (speech-dispatcher also needs
+  an output module, such as `speech-dispatcher-espeak-ng` on Fedora and Nobara). Without `spd-say`, Elite Nexus uses
+  `espeak-ng` or `espeak`, and a speech program that hangs no longer holds up the alerts after it.
 - **Engineering › Synthesis: the Basic grade of every recipe no longer draws over itself** (GitHub issue #4, with a
   screenshot). Basic grades have no effect text, and the empty line sent the materials back over the recipe's name.
 

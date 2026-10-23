@@ -54,7 +54,8 @@ choices or market filters, is one click away under **› Options**.
 ## Voice
 
 Alerts are spoken through Windows speech (on Linux through speech-dispatcher's `spd-say`, which most desktop
-distributions include; without it alerts are shown, not spoken). Choose the minimum priority in Settings:
+distributions include, or `espeak-ng` / `espeak` without it; with none of them alerts are shown, not spoken).
+Settings › **Test voice** says which one spoke, or why none could. Choose the minimum priority in Settings:
 * **Critical** — hull critical, ship destroyed.
 * **High** — Earth-like/water/ammonia/terraformable/high-value bodies, motherlodes, analysis complete, massacre
   mission done, fuel low with a non-scoopable star next, interdiction.
@@ -107,7 +108,9 @@ tested on Ubuntu, but hasn't yet been tried by us with the game running under Pr
   (`~/.local/share/applications/elite-nexus.desktop` and icons under `~/.local/share/icons`, no root needed); Wayland
   docks then show its icon too. From a terminal: `./EliteNexus --install-desktop` (`--uninstall-desktop` takes it
   out). Move the program and the row says the menu still starts the old copy, with **Point it here**.
-* **Voice** uses `spd-say` (speech-dispatcher). **API keys** aren't encrypted (Linux has no DPAPI); the settings
+* **Voice** uses `spd-say` (speech-dispatcher), else `espeak-ng` or `espeak`. Under **Test voice**, Settings says
+  which one spoke, that none is installed, or what went wrong (speech-dispatcher also needs an output module, such as
+  `speech-dispatcher-espeak-ng` on Fedora and Nobara). **API keys** aren't encrypted (Linux has no DPAPI); the settings
   file that holds them is readable only by your user account.
 * The window draws with Vulkan or OpenGL, on X11 or Wayland. On Wayland the compact HUD can't keep itself above
   other windows (Wayland doesn't let apps do that): start Elite Nexus as `WAYLAND_DISPLAY= ./EliteNexus` to run it
