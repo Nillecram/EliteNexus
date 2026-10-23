@@ -19,6 +19,10 @@ release time that section becomes the new version and the release workflow publi
   every page showed only the problem, Settings included, so the folder couldn't be changed. Now the journal folder
   setting (with Browse…) is right under the problem on every page, Settings opens as usual, and the message says
   plainly that the folder doesn't exist on this PC and what to do when the game runs on another PC.
+- **Navigation's in-game route counts down again** (a Frontier Forums report). After the first jump, the system the
+  route was plotted from came back as the next stop: the remaining distance grew instead of shrinking, distances were
+  measured from that system, and "copy the next system" copied it after every jump. Arriving on the route now leaves
+  every system up to there behind, and the Dashboard's jump count no longer counts the system you plotted from.
 
 ## [0.6.0] - 2026-10-18
 

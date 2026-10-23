@@ -426,3 +426,64 @@ fn claimed_and_delivered_constructions_are_yours() {
     let col = &m.active().unwrap().colonisation;
     assert_eq!(col.involvement(&col.depots[&3_956_000_100]), Involvement::Visited);
 }
+
+/// NavRoute.json as the game writes it when a route is plotted: the system it was plotted from comes first.
+fn nav_route(systems: &[(&str, u64, f64)]) -> nexus_journal::Companion {
+    let hops: Vec<String> = systems
+        .iter()
+        .map(|(name, addr, x)| format!(r#"{{ "StarSystem":"{name}", "SystemAddress":{addr}, "StarPos":[{x:.1},0.0,0.0], "StarClass":"M" }}"#))
+        .collect();
+    let text = format!(r#"{{ "timestamp":"2026-10-01T10:01:00Z", "event":"NavRoute", "Route":[ {} ] }}"#, hops.join(", "));
+    nexus_journal::Companion::parse(nexus_journal::CompanionKind::NavRoute, &text).expect("NavRoute.json")
+}
+
+fn jump(ts: &str, name: &str, addr: u64, x: f64) -> String {
+    format!(r#"{{ "timestamp":"{ts}", "event":"FSDJump", "StarSystem":"{name}", "SystemAddress":{addr}, "StarPos":[{x:.1},0.0,0.0], "Population":0, "JumpDist":10.0, "FuelUsed":1.0, "FuelLevel":60.0 }}"#)
+}
+
+fn route_names(m: &Model) -> Vec<String> {
+    m.active().expect("commander").nav_route.iter().map(|h| h.star_system.clone()).collect()
+}
+
+/// What the Navigation page, the Dashboard and "copy the next system" show as still ahead.
+fn ahead(m: &Model) -> Vec<String> {
+    m.active().expect("commander").route_remaining().iter().map(|h| h.star_system.clone()).collect()
+}
+
+/// Frontier Forums report: after the first jump of a plotted route, the system it was plotted from came back as
+/// the next stop (and the remaining distance grew), because only the system just reached was taken off the route.
+#[test]
+fn plotted_route_drops_the_systems_behind_you() {
+    let mut m = Model::default();
+    feed(&mut m, LOGIN);
+    m.apply_companion(&nav_route(&[("Alpha", 100, 0.0), ("Beta", 200, 10.0), ("Gamma", 300, 20.0), ("Delta", 400, 30.0)]), true, &mut Alerts::live());
+    assert_eq!(ahead(&m), ["Beta", "Gamma", "Delta"], "3 jumps from where it was plotted");
+    feed(&mut m, &[jump("2026-10-01T10:05:00Z", "Beta", 200, 10.0).as_str()]);
+    assert_eq!(route_names(&m), ["Gamma", "Delta"]);
+    assert_eq!(ahead(&m), ["Gamma", "Delta"]);
+    feed(&mut m, &[jump("2026-10-01T10:06:00Z", "Gamma", 300, 20.0).as_str()]);
+    assert_eq!(route_names(&m), ["Delta"]);
+    assert_eq!(ahead(&m), ["Delta"]);
+    feed(&mut m, &[jump("2026-10-01T10:07:00Z", "Delta", 400, 30.0).as_str()]);
+    assert!(ahead(&m).is_empty());
+}
+
+/// NavRoute.json read again in the middle of a route (as after a restart): what's behind is skipped.
+#[test]
+fn route_read_again_mid_route() {
+    let mut m = Model::default();
+    feed(&mut m, LOGIN);
+    feed(&mut m, &[jump("2026-10-01T10:05:00Z", "Beta", 200, 10.0).as_str()]);
+    m.apply_companion(&nav_route(&[("Alpha", 100, 0.0), ("Beta", 200, 10.0), ("Gamma", 300, 20.0), ("Delta", 400, 30.0)]), true, &mut Alerts::live());
+    assert_eq!(ahead(&m), ["Gamma", "Delta"]);
+}
+
+/// A jump off the plotted route leaves the route as it was.
+#[test]
+fn jump_off_the_route_keeps_it() {
+    let mut m = Model::default();
+    feed(&mut m, LOGIN);
+    m.apply_companion(&nav_route(&[("Alpha", 100, 0.0), ("Beta", 200, 10.0), ("Gamma", 300, 20.0)]), true, &mut Alerts::live());
+    feed(&mut m, &[jump("2026-10-01T10:05:00Z", "Elsewhere", 900, 5.0).as_str()]);
+    assert_eq!(route_names(&m), ["Alpha", "Beta", "Gamma"]);
+}

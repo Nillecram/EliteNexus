@@ -166,9 +166,10 @@ fn location(ui: &mut Ui, gs: &GameState) {
             ui.add_space(6.0);
             sub(ui, format!("{} Target: {} ({}){}", icon::CROSSHAIR, t.name, t.star_class, t.remaining_jumps.map(|j| format!(" · {j} jumps left")).unwrap_or_default()), pal::CYAN);
         }
-        if !gs.nav_route.is_empty() {
-            let dest = gs.nav_route.last().map(|h| h.star_system.clone()).unwrap_or_default();
-            sub(ui, format!("{} Route: {} jumps to {}", icon::PATH, gs.nav_route.len(), dest), pal::DIM);
+        let route = gs.route_remaining();
+        if let Some(dest) = route.last() {
+            let jumps = if route.len() == 1 { "1 jump".to_string() } else { format!("{} jumps", route.len()) };
+            sub(ui, format!("{} Route: {jumps} to {}", icon::PATH, dest.star_system), pal::DIM);
         }
     });
 }
