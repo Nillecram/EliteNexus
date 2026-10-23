@@ -55,6 +55,16 @@ wsl -d EliteNexusLinux -u root -- bash tools/dev/linux.sh shot --page Settings -
 
 Builds go to `/root/target` inside the distro. CI runs the same clippy and tests on `ubuntu-latest`.
 
+## macOS
+
+The game runs under NotProton (Steam Play for the macOS Steam client, built on CrossOver), CrossOver or Whisky, so
+macOS shares the Linux code paths (`cfg(not(windows))`); the differences are behind `cfg!(target_os = "macos")`:
+the Steam folder and the bottles in `nexus_journal::paths`, the data folder (`settings::data_dir`: never inside an
+app bundle), voice through `/usr/bin/say` (`tts.rs`) and the bundle's own Dock icon (`main.rs`). Prefer `cfg!` over
+`#[cfg]` there, so the Linux build type-checks the macOS branches. `tools/macos/build-app.sh` builds, packs and
+ad-hoc signs `Elite Nexus.app` (`--install` copies it to Applications); its icon comes from
+`crates/nexus-app/examples/macos_iconset.rs`. CI runs clippy and tests on `macos-latest`.
+
 ## Hard rules
 
 * **Never upload history**, only live events. Test runs (`--journal-dir`, `--screenshot`) never upload at all.
@@ -78,7 +88,7 @@ powershell -File tools\dev\cargo.ps1 -Log test   -CargoArgs "test --workspace -j
 ```
 
 Output goes to `target\cc\<Log>.log`. CI (`.github/workflows/ci.yml`) runs the same clippy and tests on
-`windows-latest` for every push to `main` and every pull request; keep both green.
+`windows-latest`, `ubuntu-latest` and `macos-latest` for every push to `main` and every pull request; keep them green.
 
 * Tests that need the internet are `#[ignore]`d, e.g. `cargo test -p nexus-app untouched -- --ignored --nocapture`.
 * Spansh planners, live: `cargo run -p nexus-spansh --example smoke -- --only riches,exobio` (all steps: no `--only`).
@@ -157,10 +167,12 @@ egui 0.36 layout lessons learned here:
 5. Tag `vx.y.z` **in GitHub Desktop** (History, right-click the commit, Create Tag, then Push origin). Desktop doesn't
    push tags made with the git command line; if one exists with that name, delete it (`git tag -d`) and have the
    owner click Fetch origin so Desktop forgets it.
-6. The tag runs `.github/workflows/release.yml` (about 10 minutes on a cold cache): it builds on `windows-latest`
-   and `ubuntu-22.04` (an older glibc, so the binary starts on older distributions), packs the exe and the Linux
-   binary with the README, NOTICE, user guide and Inter licence (a zip and a tar.gz), and publishes the GitHub
-   Release with that version's CHANGELOG section as notes.
+6. The tag runs `.github/workflows/release.yml` (about 10 minutes on a cold cache): it builds on `windows-latest`,
+   `ubuntu-22.04` (an older glibc, so the binary starts on older distributions) and `macos-latest` (Apple Silicon),
+   packs the exe and the Linux binary with the README, NOTICE, user guide and Inter licence (a zip and a tar.gz) and
+   the Mac app with `tools/macos/build-app.sh` (a zip of the ad-hoc signed `Elite Nexus.app`), and publishes the
+   GitHub Release with that version's CHANGELOG section as notes. Windows and Linux must build; if only the macOS
+   job fails, the release still goes out, without the Mac zip.
 7. Check it without credentials (the repo is public):
    `https://api.github.com/repos/uruskan/EliteNexus/releases/latest`.
 

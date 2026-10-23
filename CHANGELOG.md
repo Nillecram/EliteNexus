@@ -6,6 +6,16 @@ release time that section becomes the new version and the release workflow publi
 ## Unreleased
 
 ### Added
+- **macOS**: a native `Elite Nexus.app` (Metal rendering, its own icon). Each release now has an Apple Silicon zip:
+  unzip it and drag the app to Applications. It isn't notarized, so macOS asks you to allow it once (System Settings ›
+  Privacy & Security › Open Anyway). On an Intel Mac, `tools/macos/build-app.sh --install` builds it from the source
+  and puts it in Applications. Thanks to leodesca01 for the port. The game runs under NotProton
+  (Steam Play for the macOS Steam client), CrossOver or Whisky; Elite Nexus finds its journals in the game's prefix
+  in every Steam library (NotProton keeps Proton's `compatdata` layout), then in CrossOver's bottles and `~/.wine`,
+  and in Whisky's bottles only when none of those has one (macOS asks before an app looks into Whisky's container).
+  Data lives in `~/Library/Application Support/EliteNexus`, never inside the app. Voice alerts use the system's
+  `say`. API keys aren't encrypted on macOS (no DPAPI), and the app says so. Cockpit lights under CrossOver is
+  untested; the tab names the Steam launch option it may need.
 - **Crash log** (after a Frontier Forums report of the window vanishing). A crash is written to `crash.log` in the data
   folder, with where it happened, and the next start says Elite Nexus didn't close normally and where to look. Nothing
   is sent anywhere. Settings › About › Data folder has an **Open** button. A journal entry Elite Nexus can't handle is

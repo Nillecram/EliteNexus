@@ -218,7 +218,7 @@ impl Settings {
             what += " It isn't UTF-8 text either (an editor saved it in another encoding), so letters outside English in it may have been replaced.";
         }
         let copy = dir.join(format!("settings-unreadable-{}.json", nexus_journal::Timestamp::now().to_local_string("%Y%m%d-%H%M%S")));
-        let can_save = match std::fs::write(&copy, &bytes) {
+        let can_save = match write_private(&copy, &bytes) {
             Ok(()) => {
                 what += &format!(" Your file as it was is kept as {} in the data folder.", copy.file_name().map(|n| n.to_string_lossy()).unwrap_or_default());
                 true
@@ -238,19 +238,31 @@ impl Settings {
     pub fn save(&self, dir: &Path) {
         let saved = serde_json::to_string_pretty(self).map_err(std::io::Error::other).and_then(|s| {
             let tmp = dir.join("settings.json.tmp");
-            std::fs::write(&tmp, s)?;
-            // Linux keeps API keys unencrypted (no DPAPI): only this user account may read them.
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
-            }
+            write_private(&tmp, s.as_bytes())?;
             std::fs::rename(&tmp, dir.join("settings.json"))
         });
         if let Err(e) = saved {
             tracing::warn!("settings.json not saved: {e}");
         }
     }
+}
+
+/// Writes a settings file only this user account may read: Linux and macOS keep API keys unencrypted (no DPAPI).
+/// Created that way, and a file left from before is made so too.
+fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let mut file = options.open(path)?;
+    // The mode only applies to a new file: set it on one left from before too, before anything is written.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+    file.write_all(bytes)
 }
 
 /// Valid JSON with some settings of the wrong type: each setting that still reads is kept, also one level into the
@@ -352,13 +364,19 @@ fn string_value(text: &str, name: &str) -> Option<String> {
 /// Portable by default: a `nexus-data` folder next to the executable (keeps everything on the
 /// drive the app lives on). Falls back to `%LOCALAPPDATA%\EliteNexus` if that isn't writable (on Linux
 /// `$XDG_DATA_HOME/EliteNexus`, usually `~/.local/share/EliteNexus`). `ELITE_NEXUS_HOME` overrides both.
+///
+/// macOS: the app inside `Elite Nexus.app` keeps its data in `~/Library/Application Support/EliteNexus`, never in
+/// the bundle (a signed bundle must not change, and an update replaces it whole). A bare `EliteNexus` binary
+/// outside a bundle stays portable, as on Linux.
 pub fn data_dir() -> PathBuf {
     if let Some(p) = std::env::var_os("ELITE_NEXUS_HOME") {
         let p = PathBuf::from(p);
         let _ = std::fs::create_dir_all(&p);
         return p;
     }
-    if let Some(exe_dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
+    if let Some(exe_dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf))
+        && !(cfg!(target_os = "macos") && in_app_bundle(&exe_dir))
+    {
         let p = exe_dir.join("nexus-data");
         if std::fs::create_dir_all(&p).is_ok() && is_writable(&p) {
             return p;
@@ -369,13 +387,32 @@ pub fn data_dir() -> PathBuf {
     p
 }
 
+/// macOS: this program is the one inside an app bundle (`Elite Nexus.app`), not a bare binary.
+pub fn runs_from_app_bundle() -> bool {
+    std::env::current_exe().ok().and_then(|e| e.parent().map(in_app_bundle)).unwrap_or(false)
+}
+
+/// True for the folder of an executable inside a macOS app bundle: `<Name>.app/Contents/MacOS`.
+fn in_app_bundle(exe_dir: &Path) -> bool {
+    let named = |p: Option<&Path>, name: &str| p.and_then(Path::file_name).is_some_and(|n| n == name);
+    let contents = exe_dir.parent();
+    let bundle = contents.and_then(Path::parent);
+    named(Some(exe_dir), "MacOS") && named(contents, "Contents") && bundle.and_then(Path::extension).is_some_and(|e| e.eq_ignore_ascii_case("app"))
+}
+
 #[cfg(windows)]
 pub(crate) fn user_data_base() -> Option<PathBuf> {
     std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
 }
 
+/// `~/Library/Application Support`.
+#[cfg(target_os = "macos")]
+pub(crate) fn user_data_base() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library").join("Application Support"))
+}
+
 /// `$XDG_DATA_HOME`, else `~/.local/share`.
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 pub(crate) fn user_data_base() -> Option<PathBuf> {
     let xdg = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).filter(|p| p.is_absolute());
     xdg.or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share")))
@@ -460,6 +497,12 @@ mod tests {
         // The file as it was is kept, the message names the copy, and a later save doesn't touch it.
         let kept = kept_copies(&d);
         assert_eq!(kept.len(), 1);
+        // It holds the keys: only this user account may read it, like settings.json.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&kept[0]).expect("copy").permissions().mode() & 0o777, 0o600);
+        }
         assert!(p.what.contains(&*kept[0].file_name().expect("name").to_string_lossy()), "{}", p.what);
         s.save(&d.0);
         assert_eq!(std::fs::read_to_string(&kept[0]).expect("copy"), HAND_EDITED);
@@ -550,9 +593,23 @@ mod tests {
         s.save(&d.0);
         let (back, problem) = Settings::load(&d.0);
         assert!(problem.is_none());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(d.0.join("settings.json")).expect("saved").permissions().mode() & 0o777, 0o600);
+        }
         assert_eq!(back.journal_dir, s.journal_dir);
         assert_eq!(back.tts_rate, 1.25);
         assert_eq!(back.accounts.inara_api_key, "dpapi:AAAA");
         assert!(kept_copies(&d).is_empty());
+    }
+
+    #[test]
+    fn knows_a_macos_app_bundle() {
+        assert!(in_app_bundle(Path::new("/Applications/Elite Nexus.app/Contents/MacOS")));
+        assert!(in_app_bundle(Path::new("/Users/cmdr/Applications/EliteNexus.APP/Contents/MacOS")));
+        assert!(!in_app_bundle(Path::new("/Users/cmdr/Desktop/EliteNexus-v0.5.0-macos-arm64")));
+        assert!(!in_app_bundle(Path::new("/Users/cmdr/MacOS")));
+        assert!(!in_app_bundle(Path::new("/Users/cmdr/Contents/MacOS")));
     }
 }

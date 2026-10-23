@@ -473,7 +473,7 @@ impl NexusApp {
                 return;
             }
             Phase::Error(e) => {
-                let hint = format!("{e} If the game runs on another PC, share its journal folder and pick it here.");
+                let hint = format!("{e} If the game runs on another computer, share its journal folder and pick it here.");
                 self.before_commander(ui, &status, icon::WARNING, "Journal problem", &hint);
                 return;
             }
@@ -483,7 +483,7 @@ impl NexusApp {
         let model = self.core.model.read();
         let Some(gs) = model.active() else {
             drop(model);
-            let hint = "Start Elite Dangerous: Elite Nexus picks everything up live. If the game runs on another PC, share its journal folder and pick it here.";
+            let hint = "Start Elite Dangerous: Elite Nexus picks everything up live. If the game runs on another computer, share its journal folder and pick it here.";
             self.before_commander(ui, &status, icon::USER, "No commander found", hint);
             return;
         };

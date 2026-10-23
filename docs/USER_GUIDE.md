@@ -3,7 +3,8 @@
 Start `Start-EliteNexus.cmd` (or `dist\EliteNexus\EliteNexus.exe`). It finds your journal folder automatically
 (Saved Games\Frontier Developments\Elite Dangerous), reads your whole history in well under a second, then follows
 the game live. Run it before or after the game — order doesn't matter. On Linux, run `./EliteNexus`: it finds the
-journals in the game's Proton prefix (see [Linux](#linux)).
+journals in the game's Proton prefix (see [Linux](#linux)). On a Mac, open `Elite Nexus.app`: it finds them in the
+game's NotProton, CrossOver or Whisky prefix (see [macOS](#macos)).
 
 ## The window
 
@@ -54,8 +55,9 @@ choices or market filters, is one click away under **› Options**.
 ## Voice
 
 Alerts are spoken through Windows speech (on Linux through speech-dispatcher's `spd-say`, which most desktop
-distributions include, or `espeak-ng` / `espeak` without it; with none of them alerts are shown, not spoken).
-Settings › **Test voice** says which one spoke, or why none could. Choose the minimum priority in Settings:
+distributions include, or `espeak-ng` / `espeak` without it; with none of them alerts are shown, not spoken; on macOS
+through the system's `say`). Settings › **Test voice** says which one spoke, or why none could. Choose the minimum
+priority in Settings:
 * **Critical** — hull critical, ship destroyed.
 * **High** — Earth-like/water/ammonia/terraformable/high-value bodies, motherlodes, analysis complete, massacre
   mission done, fuel low with a non-scoopable star next, interdiction.
@@ -69,14 +71,16 @@ unless you enable it in Accounts & sync; when you do, only live game data is sen
 cargo), following each service's published rules.
 
 On Linux, when the folder next to the program can't be written to, data goes to `~/.local/share/EliteNexus` (or
-`$XDG_DATA_HOME/EliteNexus`).
+`$XDG_DATA_HOME/EliteNexus`). On macOS, `Elite Nexus.app` keeps its data in `~/Library/Application Support/EliteNexus`
+(never inside the app, so replacing the app keeps it).
 
-Your settings are in `settings.json` there. If that file can't be read (typically after editing it by hand: JSON
-writes every backslash twice, so a network folder is `"\\\\MAINPC\\Elite Dangerous"`), Elite Nexus never starts over
-silently. It keeps the file as it was (`settings-unreadable-<date>.json`, next to it), keeps every setting that
-still reads (from a file that isn't JSON at all, the EDSM and Inara keys, and the Ask key with the service it belongs
-to; uploads stay off until you switch them on again) and says so in a banner above every page. A file it can't open at all, say one another program is holding,
-isn't saved over until the next start. Settings › Journal › **Browse…** sets folders without editing the file.
+Your settings are in `settings.json` in the data folder. If that file can't be read (typically after editing it by
+hand: JSON writes every backslash twice, so a network folder is `"\\\\MAINPC\\Elite Dangerous"`), Elite Nexus never
+starts over silently. It keeps the file as it was (`settings-unreadable-<date>.json`, next to it), keeps every
+setting that still reads (from a file that isn't JSON at all, the EDSM and Inara keys, and the Ask key with the
+service it belongs to; uploads stay off until you switch them on again) and says so in a banner above every page. A
+file it can't open at all, say one another program is holding, isn't saved over until the next start. Settings ›
+Journal › **Browse…** sets folders without editing the file.
 
 If Elite Nexus closes unexpectedly, it writes where to `crash.log` in the data folder (Settings › About › Data folder
 › **Open**), and the next start says it didn't close normally. `nexus.log` there shows what it was doing. Neither file
@@ -117,3 +121,33 @@ yet. Reports are collected in GitHub issue #3 (github.com/uruskan/EliteNexus/iss
 * The window draws with Vulkan or OpenGL, on X11 or Wayland. On Wayland the compact HUD can't keep itself above
   other windows (Wayland doesn't let apps do that): start Elite Nexus as `WAYLAND_DISPLAY= ./EliteNexus` to run it
   through XWayland, where it can.
+
+## macOS
+
+Elite Nexus runs natively on macOS (Apple Silicon and Intel) as `Elite Nexus.app`, next to Elite Dangerous running
+under NotProton (Steam Play for the macOS Steam client), CrossOver or Whisky. On a Mac with Apple Silicon, download
+`EliteNexus-…-macos-arm64.zip` from the latest release, unzip it and drag `Elite Nexus.app` to Applications. The app
+isn't notarized by Apple (that needs a paid developer account), so the first time you open it macOS refuses: open
+System Settings › Privacy & Security and click **Open Anyway** next to Elite Nexus, once. On an Intel Mac, build it
+from the source with `tools/macos/build-app.sh --install` (it needs Xcode's Command Line Tools and Rust), which puts
+the app in Applications. The macOS build is new and hasn't been tried by us with every way of running the game.
+
+* **Journal folder**: found automatically in the game's prefix in every Steam library, which is where NotProton keeps
+  it, the same layout as Proton's: `~/Library/Application Support/Steam/steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous`.
+  Then in CrossOver's bottles (`~/Library/Application Support/CrossOver/Bottles/<bottle>`) and `~/.wine`, and only
+  when none of those has one, in Whisky's bottles (they sit in Whisky's own container, so macOS asks once whether
+  Elite Nexus may look there). For any other prefix (Sikarugir, a Wineskin wrapper), enter the folder under
+  **Settings › Journal › Custom journal folder**.
+* **Bindings, HUD colours, Glare and exposure** use the game's Options folder in the same prefix, as on Linux.
+* **The game folder** (built-in control presets, Cockpit lights) is found in your Steam libraries
+  (`~/Library/Application Support/Steam/steamapps/common/Elite Dangerous`) and in Program Files inside the prefix.
+* **Cockpit lights** and **Keep hostile red, friendly green and shield blue** use 3Dmigoto, which is untested on
+  macOS: CrossOver runs Direct3D 11 through D3DMetal or DXVK. If calibrating finds no shaders, add
+  `WINEDLLOVERRIDES="d3d11,d3dcompiler_47=n,b" %command%` to the game's launch options in Steam; if it still finds
+  none, the hook can't run there, and **Remove** takes it out again.
+* **Voice** uses the system's `say`, in the system voice chosen in System Settings › Accessibility › Spoken
+  Content. **API keys** aren't encrypted (there's no DPAPI); the settings file that holds them is readable only by
+  your user account.
+* The window draws with Metal. The compact HUD stays above other windows, but macOS gives a full-screen app a Space
+  of its own, where other apps' windows don't show: run the game in a window, or put the compact HUD on a second
+  display.

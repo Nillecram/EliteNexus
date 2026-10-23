@@ -165,18 +165,20 @@ fn run(
     mut history_sink: Option<HistorySink>,
 ) {
     let Some(dir) = journal_dir.or_else(nexus_journal::default_journal_dir) else {
-        status.write().phase = Phase::Error("Elite Nexus couldn't find Elite Dangerous's journal folder on this PC.".into());
+        tracing::warn!("no journal folder found");
+        status.write().phase = Phase::Error("Elite Nexus couldn't find Elite Dangerous's journal folder on this computer.".into());
         repaint();
         return;
     };
-    // Bindings and HUD colours read the game's Options folder, which on Linux sits in the same Wine prefix.
+    tracing::info!(dir = %dir.display(), "journal folder");
+    // Bindings and HUD colours read the game's Options folder, which on Linux and macOS sits in the same Wine prefix.
     nexus_journal::set_journal_dir_in_use(Some(&dir));
     status.write().journal_dir = Some(dir.clone());
     let files = match list_journal_files(&dir) {
         Ok(f) => f,
         Err(e) => {
             status.write().phase = Phase::Error(if e.kind() == std::io::ErrorKind::NotFound {
-                format!("Elite Nexus looked for the journals in {}, but that folder doesn't exist on this PC.", dir.display())
+                format!("Elite Nexus looked for the journals in {}, but that folder doesn't exist on this computer.", dir.display())
             } else {
                 format!("Elite Nexus can't read the journal folder {} ({e}).", dir.display())
             });

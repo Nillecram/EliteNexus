@@ -162,7 +162,8 @@ fn voice_line(status: &crate::tts::VoiceStatus) -> Option<(Color32, String)> {
     use crate::tts::VoiceStatus;
     match status {
         VoiceStatus::Untried => None,
-        VoiceStatus::Spoke(engine) => Some((pal::DIM, format!("Speaking through {engine}. Nothing heard? Check the volume of the sound device it uses."))),
+        VoiceStatus::Spoke(engine) => Some((pal::DIM, format!("Speaking through {}. Nothing heard? Check the volume of the sound device it uses.", program_name(engine)))),
+        VoiceStatus::Missing if cfg!(target_os = "macos") => Some((pal::WARN, "Voice uses macOS's own say (/usr/bin/say), which isn't there.".into())),
         VoiceStatus::Missing => Some((
             pal::WARN,
             "Voice needs speech-dispatcher (spd-say) or espeak-ng, and neither is installed: install the speech-dispatcher package with its espeak-ng module, then restart Elite Nexus.".into(),
@@ -172,18 +173,27 @@ fn voice_line(status: &crate::tts::VoiceStatus) -> Option<(Color32, String)> {
             if *engine == "spd-say" {
                 format!("spd-say couldn't speak: {why}. speech-dispatcher needs an output module too, for example speech-dispatcher-espeak-ng on Fedora and Nobara.")
             } else {
-                format!("{engine} couldn't speak: {why}.")
+                format!("{} couldn't speak: {why}.", program_name(engine))
             },
         )),
     }
 }
 
-/// The journal folder setting with, on Linux, where Elite Nexus looks by itself. Also shown under a journal problem
-/// on every page, so the folder can be set before any commander is loaded.
+/// A speech program as the commander knows it: `say`, not `/usr/bin/say`.
+fn program_name(engine: &str) -> &str {
+    std::path::Path::new(engine).file_name().and_then(|n| n.to_str()).unwrap_or(engine)
+}
+
+/// The journal folder setting with, on Linux and macOS, where Elite Nexus looks by itself. Also shown under a journal
+/// problem on every page, so the folder can be set before any commander is loaded.
 pub fn journal_setup(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
     journal_folder(ui, cx);
     if cfg!(not(windows)) {
-        let hint = "Linux: Elite Nexus looks in the game's Proton prefix in every Steam library (steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous), then in Lutris's and Heroic's usual folders. For any other Wine prefix, enter its folder here: Bindings and HUD colours then use the Options folder in that same prefix.";
+        let hint = if cfg!(target_os = "macos") {
+            "macOS: Elite Nexus looks in the game's prefix in every Steam library, where NotProton (Steam Play for macOS) keeps it (~/Library/Application Support/Steam/steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous), then in CrossOver's bottles, ~/.wine and Whisky's bottles. For any other Wine prefix, enter its folder here: Bindings and HUD colours then use the Options folder in that same prefix."
+        } else {
+            "Linux: Elite Nexus looks in the game's Proton prefix in every Steam library (steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous), then in Lutris's and Heroic's usual folders. For any other Wine prefix, enter its folder here: Bindings and HUD colours then use the Options folder in that same prefix."
+        };
         ui.add(egui::Label::new(RichText::new(hint).size(size::FOOTNOTE).color(pal::DIM)).wrap());
     }
 }
