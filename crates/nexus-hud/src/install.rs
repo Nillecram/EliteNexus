@@ -99,8 +99,9 @@ fn store_of(folder: &Path) -> &'static str {
 }
 
 /// Every game client folder found in the usual Steam, Epic and Frontier locations, and wherever Windows' list of
-/// installed programs says the game is (a Steam library or launcher on another drive). On Linux: every Steam
-/// library (Proton), and Program Files in the game's Wine prefix (a Frontier or Epic launcher under Wine).
+/// installed programs says the game is (a Steam library or launcher on another drive). On Linux and macOS: every
+/// Steam library (Proton, NotProton), and Program Files in the game's Wine prefix (a Frontier or Epic launcher under
+/// Wine or CrossOver).
 pub fn find_installs() -> Vec<GameInstall> {
     let env = |k: &str| std::env::var_os(k).map(PathBuf::from);
     let mut roots: Vec<(PathBuf, &'static str)> = nexus_journal::steam_libraries().into_iter().map(|lib| (lib.join("steamapps").join("common").join("Elite Dangerous"), "Steam")).collect();
