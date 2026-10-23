@@ -5,6 +5,10 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.7.1] - 2026-10-24
+
+A small fix: the BGS & Powerplay page now remembers your tick hour.
+
 ### Fixed
 - **BGS & Powerplay** remembers the tick hour you set and the period you picked; the tick hour used to go back to
   13:00 UTC at every start. Thanks to NetworX on the Frontier Forums for the report.
