@@ -59,6 +59,10 @@ fn save_png(path: &std::path::Path, img: &egui::ColorImage) {
 pub struct NexusApp {
     core: Core,
     settings: Settings,
+    /// What the commander should know from the start (settings file, last run, …), above every page until closed.
+    notices: Vec<crate::notices::Notice>,
+    /// settings.json couldn't be read (or copied aside), so it isn't saved over this run.
+    settings_read_only: bool,
     data_dir: PathBuf,
     page: Page,
     toasts: Vec<Toast>,
@@ -99,12 +103,28 @@ pub struct NexusApp {
     clipboard: Option<arboard::Clipboard>,
     compact: bool,
     compact_request: bool,
+    /// Looking for a cockpit-light dimmer from 0.3.0 in the game folders (a notice if there is one).
+    dimmer_check: Option<crate::jobs::Job<bool>>,
+    /// When this frame's work began, and when a slow frame was last logged.
+    frame_started: Option<Instant>,
+    slow_frame_logged: Option<Instant>,
 }
 
 impl NexusApp {
     pub fn new(cc: &eframe::CreationContext<'_>, data_dir: PathBuf, start_page: Option<Page>, shot: Option<ScreenshotJob>, ov: Overrides) -> Self {
         crate::theme::install(&cc.egui_ctx);
-        let settings = Settings::load(&data_dir);
+        let (settings, settings_problem) = Settings::load(&data_dir);
+        let settings_read_only = settings_problem.as_ref().is_some_and(|p| !p.can_save);
+        let mut notices = Vec::new();
+        if let Some(p) = settings_problem {
+            // While nothing is saved it stays: changes made then would otherwise be lost without a word.
+            notices.push(crate::notices::Notice { title: "Your settings file couldn't be read as it was", text: p.what, closable: p.can_save, action: Some(crate::notices::Action::DataFolder) });
+        }
+        // Test runs (screenshots) leave the marker and the notices of real runs alone.
+        if shot.is_none() {
+            notices.extend(crate::notices::last_run(&data_dir));
+            notices.extend(crate::notices::running_from_zip());
+        }
         nexus_hud::install::set_game_dir(settings.game_dir.as_deref());
         let page = start_page.or_else(|| cc.storage.and_then(|s| eframe::get_value(s, "page"))).unwrap_or(Page::Dashboard);
         let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).thread_name("nexus-net").enable_all().build().expect("tokio runtime");
@@ -126,6 +146,8 @@ impl NexusApp {
         NexusApp {
             core,
             settings,
+            notices,
+            settings_read_only,
             data_dir,
             page,
             // `--demo` screenshots show one banner so its design can be checked.
@@ -145,7 +167,7 @@ impl NexusApp {
             explo: pages::exploration::ExplorationUi::new(ov.tab.as_deref(), shot.is_some()),
             exo: pages::exobio::ExobioUi::new(ov.tab.as_deref(), shot.is_some()),
             fleet: Default::default(),
-            eng: Default::default(),
+            eng: pages::engineering::EngineeringUi::new(ov.tab.as_deref()),
             log: Default::default(),
             map,
             binds: Default::default(),
@@ -169,6 +191,10 @@ impl NexusApp {
             clipboard: None,
             compact: false,
             compact_request: false,
+            dimmer_check: Some(crate::jobs::Job::spawn(&cc.egui_ctx, crate::notices::old_dimmer_installed)),
+            frame_started: None,
+            // The first frames load fonts and textures: nothing is logged in the first 10 seconds.
+            slow_frame_logged: Some(Instant::now()),
         }
     }
 
@@ -209,8 +235,9 @@ impl NexusApp {
     fn screenshot_tick(&mut self, ctx: &egui::Context) {
         let Some(job) = self.shot.as_mut() else { return };
         job.frames += 1;
-        let live = matches!(self.core.status.read().phase, Phase::Live);
-        if live && !job.requested && job.frames > 40 && job.started.elapsed() >= job.delay {
+        // Once the journals are read, or couldn't be (to check the journal problem screen).
+        let ready = matches!(self.core.status.read().phase, Phase::Live | Phase::Error(_));
+        if ready && !job.requested && job.frames > 40 && job.started.elapsed() >= job.delay {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
             job.requested = true;
         }
@@ -407,7 +434,29 @@ impl NexusApp {
         }
     }
 
+    /// Writes settings.json, unless it couldn't be read at start (then the file stays as the commander left it).
+    fn save_settings(&self) {
+        if !self.settings_read_only {
+            self.settings.save(&self.data_dir);
+        }
+    }
+
+    /// The notices, above every page until closed.
+    fn notices(&mut self, ui: &mut Ui) {
+        if let Some(found) = self.dimmer_check.as_mut().and_then(crate::jobs::Job::poll) {
+            self.dimmer_check = None;
+            if found {
+                self.notices.push(crate::notices::old_dimmer());
+            }
+        }
+        if crate::notices::show(ui, &mut self.notices, &self.data_dir) == Some(crate::notices::Action::CockpitLights) {
+            self.hud.show_cockpit();
+            self.page = Page::Hud;
+        }
+    }
+
     fn content(&mut self, ui: &mut Ui) {
+        self.notices(ui);
         let status = self.core.status.read().clone();
         match &status.phase {
             Phase::Loading { done, total } => {
@@ -424,7 +473,8 @@ impl NexusApp {
                 return;
             }
             Phase::Error(e) => {
-                widgets::empty(ui, icon::WARNING, "Journal problem", e);
+                let hint = format!("{e} If the game runs on another computer, share its journal folder and pick it here.");
+                self.before_commander(ui, &status, icon::WARNING, "Journal problem", &hint);
                 return;
             }
             Phase::Starting => return,
@@ -432,7 +482,9 @@ impl NexusApp {
         }
         let model = self.core.model.read();
         let Some(gs) = model.active() else {
-            widgets::empty(ui, icon::USER, "No commander found", "Start Elite Dangerous — Elite Nexus picks everything up live.");
+            drop(model);
+            let hint = "Start Elite Dangerous: Elite Nexus picks everything up live. If the game runs on another computer, share its journal folder and pick it here.";
+            self.before_commander(ui, &status, icon::USER, "No commander found", hint);
             return;
         };
         let (title, subtitle) = page_heading(self.page, gs);
@@ -492,6 +544,7 @@ impl NexusApp {
                     changed: false,
                     test_voice: false,
                     restart_core: false,
+                    voice: self.speaker.status(),
                 };
                 pages::settings::show(ui, &mut cx);
                 settings_changed = cx.changed;
@@ -560,7 +613,46 @@ impl NexusApp {
             }
             None => {}
         }
-        if settings_changed {
+        self.after_settings(ui.ctx(), settings_changed, test_voice, restart);
+    }
+
+    /// Before a commander is loaded: the journal folder can't be read, or holds no commander yet. Settings opens as
+    /// usual; every other page shows the problem with the journal folder setting right under it (a laptop reading
+    /// another PC's journals has no Saved Games folder of its own to fall back on).
+    fn before_commander(&mut self, ui: &mut Ui, status: &crate::core::CoreStatus, icon: &str, title: &str, hint: &str) {
+        let settings_page = self.page == Page::Settings;
+        if settings_page {
+            self.page_header(ui, "Settings", "");
+        }
+        let mut cx = pages::settings::SettingsCtx {
+            settings: &mut self.settings,
+            ui: &mut self.settings_ui,
+            status,
+            data_dir: &self.data_dir,
+            changed: false,
+            test_voice: false,
+            restart_core: false,
+            voice: self.speaker.status(),
+        };
+        // Scrolls: with the settings banner above it, a short window would otherwise cut off the folder's buttons.
+        egui::ScrollArea::vertical().id_salt(("page", Page::Settings as u8, settings_page)).auto_shrink([false, false]).show(ui, |ui| {
+            if settings_page {
+                pages::settings::show(ui, &mut cx);
+            } else {
+                widgets::empty(ui, icon, title, hint);
+                ui.vertical_centered(|ui| {
+                    ui.set_max_width(640.0);
+                    widgets::card(ui, "Journal folder", |ui| pages::settings::journal_setup(ui, &mut cx));
+                });
+            }
+        });
+        let (changed, test_voice, restart) = (cx.changed, cx.test_voice, cx.restart_core);
+        self.after_settings(ui.ctx(), changed, test_voice, restart);
+    }
+
+    /// Applies what the Settings page changed: services, voice, and reading the journals again from a new folder.
+    fn after_settings(&mut self, ctx: &egui::Context, changed: bool, test_voice: bool, restart: bool) {
+        if changed {
             self.settings_dirty = Some(Instant::now());
             self.speaker.set_rate(self.settings.tts_rate);
             self.speaker.set_volume(self.settings.tts_volume);
@@ -572,7 +664,7 @@ impl NexusApp {
             self.speaker.say("Elite Nexus voice check. All systems nominal, commander.");
         }
         if restart {
-            self.core = start_core(ui.ctx(), self.overrides.journal_dir.as_ref().or(self.settings.journal_dir.as_ref()), self.market.history_sink());
+            self.core = start_core(ctx, self.overrides.journal_dir.as_ref().or(self.settings.journal_dir.as_ref()), self.market.history_sink());
             self.sync.attach(&self.core);
             self.market.attach(&self.core);
         }
@@ -865,6 +957,7 @@ fn page_heading(page: Page, gs: &nexus_model::GameState) -> (String, String) {
 
 impl eframe::App for NexusApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.frame_started = Some(Instant::now());
         self.screenshot_tick(ctx);
         self.drain_alerts();
         self.assistant.poll();
@@ -895,7 +988,7 @@ impl eframe::App for NexusApp {
         }
         if let Some(t) = self.settings_dirty
             && t.elapsed() > Duration::from_millis(600) {
-                self.settings.save(&self.data_dir);
+                self.save_settings();
                 self.settings_dirty = None;
             }
         // Keep clocks/countdowns ticking even without journal activity.
@@ -903,6 +996,35 @@ impl eframe::App for NexusApp {
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+        self.draw(ui);
+        // A frame that took long goes to nexus.log with its page, so a report of the window freezing can be traced.
+        if let Some(took) = self.frame_started.take().map(|t| t.elapsed())
+            && took > Duration::from_millis(250)
+            && self.slow_frame_logged.is_none_or(|t| t.elapsed() > Duration::from_secs(10))
+        {
+            self.slow_frame_logged = Some(Instant::now());
+            tracing::warn!(page = ?self.page, ms = took.as_millis() as u64, "slow frame");
+        }
+    }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, "page", &self.page);
+        self.save_settings();
+    }
+
+    fn on_exit(&mut self) {
+        // Close open batches; whatever the rate limits hold back stays queued on disk.
+        self.sync.flush();
+        // A normal exit: the next start has nothing to report.
+        if self.shot.is_none() {
+            crate::notices::clean_exit(&self.data_dir);
+        }
+    }
+}
+
+impl NexusApp {
+    /// The whole window: the sidebar and the page, the compact HUD, the welcome, the banners.
+    fn draw(&mut self, ui: &mut Ui) {
         if std::mem::take(&mut self.compact_request) {
             let ctx = ui.ctx().clone();
             self.set_compact(&ctx, true);
@@ -947,14 +1069,5 @@ impl eframe::App for NexusApp {
         let ctx = ui.ctx().clone();
         self.toasts(&ctx);
     }
-
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, "page", &self.page);
-        self.settings.save(&self.data_dir);
-    }
-
-    fn on_exit(&mut self) {
-        // Close open batches; whatever the rate limits hold back stays queued on disk.
-        self.sync.flush();
-    }
 }
+

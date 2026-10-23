@@ -5,6 +5,75 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.7.0] - 2026-10-23
+
+Elite Nexus for Mac, and fixes for what commanders reported after 0.6.0: a settings file that can't be read no
+longer costs you your settings, the journal folder can be set right where a journal problem is shown, the in-game
+route counts down again, the window no longer freezes with the live market feed on, and a crash log says what went
+wrong if it ever closes unexpectedly. Thanks to leodesca01 for the Mac port, and to everyone who reported these on
+the Frontier Forums and GitHub.
+
+### Added
+- **macOS**: a native `Elite Nexus.app` (Metal rendering, its own icon). Each release now has an Apple Silicon zip:
+  unzip it and drag the app to Applications. It isn't notarized, so macOS asks you to allow it once (System Settings ›
+  Privacy & Security › Open Anyway). On an Intel Mac, `tools/macos/build-app.sh --install` builds it from the source
+  and puts it in Applications. Thanks to leodesca01 for the port. The game runs under NotProton
+  (Steam Play for the macOS Steam client), CrossOver or Whisky; Elite Nexus finds its journals in the game's prefix
+  in every Steam library (NotProton keeps Proton's `compatdata` layout), then in CrossOver's bottles and `~/.wine`,
+  and in Whisky's bottles only when none of those has one (macOS asks before an app looks into Whisky's container).
+  Data lives in `~/Library/Application Support/EliteNexus`, never inside the app. Voice alerts use the system's
+  `say`. API keys aren't encrypted on macOS (no DPAPI), and the app says so. Cockpit lights under CrossOver is
+  untested; the tab names the Steam launch option it may need.
+- **Crash log** (after a Frontier Forums report of the window vanishing). A crash is written to `crash.log` in the data
+  folder, with where it happened, and the next start says Elite Nexus didn't close normally and where to look. Nothing
+  is sent anywhere. Settings › About › Data folder has an **Open** button. A journal entry Elite Nexus can't handle is
+  now skipped and listed under Settings › Journal, instead of silently stopping it from following the game.
+- Started from inside its zip file, Elite Nexus says so: Windows unpacks it to a new temporary folder each time, so
+  settings and the market database didn't last.
+
+### Changed
+- The Linux notes (README, user guide, website) say what has been confirmed with the game under Proton so far, and
+  link GitHub issue #3, where Linux reports are collected.
+- A cockpit-light dimmer still installed by Elite Nexus 0.3.0 (whose patterns crash the game near the newer fleet
+  carriers) is pointed out by a notice at start, with a button to Cockpit lights, instead of only on that tab
+  (a Frontier Forums report of the game crashing at launch came from such an install).
+
+### Fixed
+- **A settings file that can't be read no longer costs you your settings** (a Frontier Forums report). When
+  `settings.json` couldn't be read (typically after editing a folder into it by hand with single backslashes, which
+  JSON doesn't allow), Elite Nexus started with the default settings and saved them over the file within half a
+  minute: API keys, the journal folder and everything else were gone, without a word. Now the file is kept as it was
+  (`settings-unreadable-<date>.json` in the data folder), every setting that still reads is kept (from a file that
+  isn't JSON at all, the EDSM and Inara keys, and the Ask key with the service it belongs to; uploads stay off until
+  you switch them on again), and a banner
+  above every page says what happened and how JSON writes a folder. A file that can't be opened at all isn't saved
+  over until the next start.
+- **A journal folder that can't be read no longer locks you out of Settings** (a Frontier Forums report: a laptop
+  reading the main PC's journals over the network). When the journal folder couldn't be read, or held no commander,
+  every page showed only the problem, Settings included, so the folder couldn't be changed. Now the journal folder
+  setting (with Browse…) is right under the problem on every page, Settings opens as usual, and the message says
+  plainly that the folder doesn't exist on this PC and what to do when the game runs on another PC.
+- **Navigation's in-game route counts down again** (a Frontier Forums report). After the first jump, the system the
+  route was plotted from came back as the next stop: the remaining distance grew instead of shrinking, distances were
+  measured from that system, and "copy the next system" copied it after every jump. Arriving on the route now leaves
+  every system up to there behind, and the Dashboard's jump count no longer counts the system you plotted from.
+- **The window no longer freezes for a second or two with the live market feed on** (GitHub issue #4). While the
+  Market page was open, the database counters it shows were counted on the window's own thread every two seconds, and
+  one of them, the price history, grows with every live price change: after a few weeks, counting it froze the
+  window. The counters are now counted in the background every ten seconds, and the price history count is kept as
+  prices are stored. A frame that still takes over a quarter of a second is noted in `nexus.log` with its page.
+- **Market › Services shows results as soon as it opens** (GitHub issue #4). It searched only when a service was
+  clicked, so the first visit showed nothing, and the list stayed where you were when you clicked. It now searches when
+  it opens, when you pick a service or pad, and after every jump, and says so when no known station has the service.
+  It has its own landing pad filter; before, it quietly used the pad picked on other Market tabs.
+- **Linux: Test voice says why it's silent** (GitHub issue #3, Nobara on Wayland). When speech-dispatcher's
+  `spd-say` was missing or failed, alerts stayed silent and nothing said so. Settings now shows, under Test voice,
+  which program spoke, that none is installed, or what the program said when it failed (speech-dispatcher also needs
+  an output module, such as `speech-dispatcher-espeak-ng` on Fedora and Nobara). Without `spd-say`, Elite Nexus uses
+  `espeak-ng` or `espeak`, and a speech program that hangs no longer holds up the alerts after it.
+- **Engineering › Synthesis: the Basic grade of every recipe no longer draws over itself** (GitHub issue #4, with a
+  screenshot). Basic grades have no effect text, and the empty line sent the materials back over the recipe's name.
+
 ## [0.6.0] - 2026-10-18
 
 A live jump timer for your fleet carrier and your squadron's, colonisation that keeps other commanders' depots

@@ -194,8 +194,7 @@ pub fn active_route(gs: &GameState, planned: Option<&PlannedRoute>) -> Vec<Waypo
     if let Some(p) = planned {
         return p.remaining().to_vec();
     }
-    let start = gs.nav_route.iter().position(|h| h.system_address == gs.location.system_address).map(|i| i + 1).unwrap_or(0);
-    gs.nav_route[start.min(gs.nav_route.len())..]
+    gs.route_remaining()
         .iter()
         .map(|h| Waypoint {
             system: h.star_system.clone(),

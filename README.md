@@ -10,8 +10,14 @@ Pure Rust. No Python, no Node.js, no browser engine. One executable, GPU-rendere
 **[Download the latest release](https://github.com/uruskan/EliteNexus/releases/latest)**, unzip it anywhere and run
 `EliteNexus.exe` (Windows, 64-bit), or unpack the Linux `tar.gz` and run `./EliteNexus` (64-bit; it finds the journals
 in the game's Proton prefix, and Settings › About adds it to your app menu; see [Linux](docs/USER_GUIDE.md#linux)).
-The Linux build is tested on Ubuntu but hasn't been tried yet with the game itself running under Proton or Wine.
-There is no installer: everything it keeps lives in a `nexus-data` folder next to the program. Website: **[uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)**.
+The Linux build is tested on Ubuntu, and a commander has confirmed it with the game under Proton (Nobara Linux on
+Wayland: journals found by themselves, Exploration and Exobiology working). What works on Linux and what doesn't yet is
+collected in [GitHub issue #3](https://github.com/uruskan/EliteNexus/issues/3).
+On a Mac (Apple Silicon), unzip the macOS zip and drag `Elite Nexus.app` to Applications; the first time, allow it
+once under System Settings › Privacy & Security › Open Anyway (it isn't notarized). It finds the journals in
+NotProton's, CrossOver's or Whisky's prefix; see [macOS](docs/USER_GUIDE.md#macos).
+There is no installer: everything it keeps lives in a `nexus-data` folder next to the program (on a Mac, in
+`~/Library/Application Support/EliteNexus`). Website: **[uruskan.github.io/EliteNexus](https://uruskan.github.io/EliteNexus/)**.
 Elite Nexus is free, with no ads. If it helps you, you can **[sponsor it on GitHub](https://github.com/sponsors/uruskan)**.
 
 ![Elite Nexus, an Elite Dangerous companion app: dashboard with commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
@@ -64,7 +70,7 @@ approved them.
   your history) and respect each service's rate limits.
 * Game settings change only when you click, and only the values you change; your original settings file is kept.
   Whatever Elite Nexus puts in the game folder is listed there in a manifest and comes out again in one click.
-* API keys are stored encrypted with Windows DPAPI (Linux has no DPAPI: there they sit in a settings file only your
+* API keys are stored encrypted with Windows DPAPI (Linux and macOS have no DPAPI: there they sit in a settings file only your
   user account can read, and the app says so).
 
 ## Why it's faster
@@ -127,7 +133,7 @@ approved them.
   and glare and exposure: see [Make the cockpit yours](#make-the-cockpit-yours-hud-colours-cockpit-lights-glare).
 * **Accounts & sync** — strictly compliant EDDN contribution, EDSM journal sync, Inara profile sync, EDAstro. All opt-in;
   only live events (never history); persistent retry queues that respect each service's rate limits.
-* **Alerts & voice** — toasts plus speech (Windows speech; speech-dispatcher on Linux) for high-value bodies, likely
+* **Alerts & voice** — toasts plus speech (Windows speech; speech-dispatcher on Linux; `say` on macOS) for high-value bodies, likely
   high-value biology, sample spacing, motherlodes, non-scoopable stars when fuel is low, interdictions, hull critical,
   mission completion, carrier jumps…
 * **Compact HUD** — one click turns the window into a small always-on-top panel for a second screen.
@@ -136,16 +142,21 @@ approved them.
 
 Download the latest `EliteNexus-…-windows-x64.zip` from the GitHub Releases page, unzip anywhere, run `EliteNexus.exe`.
 On Linux: `EliteNexus-…-linux-x64.tar.gz`, unpack anywhere, run `./EliteNexus`.
+On a Mac with Apple Silicon: `EliteNexus-…-macos-arm64.zip`, unzip, drag `Elite Nexus.app` to Applications (an Intel
+Mac builds it from the source, below).
 
-To build it yourself (Windows or Linux, [Rust](https://rustup.rs) stable):
+To build it yourself (Windows, Linux or macOS, [Rust](https://rustup.rs) stable):
 
 ```powershell
 cargo run -p nexus-app                 # debug
 cargo build --release -p nexus-app     # target\release\EliteNexus.exe (target/release/EliteNexus on Linux)
 ```
 
+On macOS (with Xcode's Command Line Tools), `tools/macos/build-app.sh` builds and packs `target/macos/Elite Nexus.app`
+and a zip of it; `--install` also copies the app to Applications.
+
 On the original dev machine the toolchain is not on PATH: run `. .\tools\env.ps1` first. Pushing a tag such as `v0.1.0`
-makes GitHub Actions build the Windows exe and the Linux binary and publish a Release
+makes GitHub Actions build the Windows exe, the Linux binary and the Apple Silicon Mac app and publish a Release
 (`.github/workflows/release.yml`), with that version's `CHANGELOG.md` section as the notes. Working on the code, as a person or an AI agent? Read `AGENTS.md` first.
 
 Command-line options: `--page <name>`, `--tab <name>`, `--journal-dir <dir>`, `--mute`, on Linux
@@ -172,7 +183,7 @@ your journals), `cargo run -p nexus-eddn --example live -- <db> <seconds>` (watc
 * **Frontier Companion API (CAPI)** needs a client ID approved by Frontier (docs/research/capi.md) — optional; the
   journal already provides almost everything.
 
-Keys are stored encrypted with Windows DPAPI (on Linux: unencrypted, readable only by your user account).
+Keys are stored encrypted with Windows DPAPI (on Linux and macOS: unencrypted, readable only by your user account).
 
 ## Docs
 

@@ -826,12 +826,12 @@ pub(crate) fn price_history(
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
 }
 
-/// Row counts. Station / market numbers come from the in-memory index; the rest are `COUNT(*)`s.
+/// Row counts. Station / market numbers come from the in-memory index; the rest are `COUNT(*)`s, except the price
+/// history (the writer keeps that count, see `GalaxyDb::stats`).
 pub(crate) fn stats(conn: &Connection, index: &RwLock<StationIndex>) -> Result<DbStats> {
     let mut s = conn.query_row(
         "SELECT (SELECT COUNT(*) FROM systems), (SELECT COUNT(*) FROM commodities), \
-                (SELECT COUNT(*) FROM system_factions), (SELECT COUNT(*) FROM ring_signals), \
-                (SELECT COUNT(*) FROM price_history)",
+                (SELECT COUNT(*) FROM system_factions), (SELECT COUNT(*) FROM ring_signals)",
         [],
         |r| {
             Ok(DbStats {
@@ -839,7 +839,6 @@ pub(crate) fn stats(conn: &Connection, index: &RwLock<StationIndex>) -> Result<D
                 commodities: r.get::<_, i64>(1)? as u64,
                 faction_rows: r.get::<_, i64>(2)? as u64,
                 ring_signals: r.get::<_, i64>(3)? as u64,
-                price_history_rows: r.get::<_, i64>(4)? as u64,
                 ..DbStats::default()
             })
         },

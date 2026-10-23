@@ -22,6 +22,8 @@ pub struct SettingsCtx<'a> {
     pub changed: bool,
     pub test_voice: bool,
     pub restart_core: bool,
+    /// What happened the last time Elite Nexus spoke (shown under Test voice).
+    pub voice: crate::tts::VoiceStatus,
 }
 
 /// What the Settings page keeps between frames: the folder fields and what checking a folder found.
@@ -72,6 +74,9 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                     if widgets::button(ui, "Test voice").clicked() {
                         cx.test_voice = true;
                     }
+                    if let Some((color, text)) = voice_line(&cx.voice) {
+                        ui.add(egui::Label::new(RichText::new(text).size(size::FOOTNOTE).color(color)).wrap());
+                    }
                 });
             });
             section(ui, "Exploration");
@@ -120,13 +125,7 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                     ui.add(egui::Label::new(RichText::new(st.current_file.clone().unwrap_or_default()).color(pal::DIM)).truncate());
                 });
                 g.value("Live events this run", st.live_events.to_string());
-                g.content(|ui| {
-                    journal_folder(ui, cx);
-                    if cfg!(not(windows)) {
-                        let hint = "Linux: Elite Nexus looks in the game's Proton prefix in every Steam library (steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous), then in Lutris's and Heroic's usual folders. For any other Wine prefix, enter its folder here: Bindings and HUD colours then use the Options folder in that same prefix.";
-                        ui.add(egui::Label::new(RichText::new(hint).size(size::FOOTNOTE).color(pal::DIM)).wrap());
-                    }
-                });
+                g.content(|ui| journal_setup(ui, cx));
                 if !st.errors.is_empty() {
                     g.content(|ui| {
                         for e in st.errors.iter().rev().take(5) {
@@ -143,7 +142,10 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                 g.row("Support Elite Nexus", "It's free, with no ads. If it helps you, GitHub Sponsors keeps it going.", |ui| {
                     ui.hyperlink_to(format!("{} Sponsor {}", icon::HEART, icon::ARROW_SQUARE_OUT), SPONSOR_URL).on_hover_text(SPONSOR_URL);
                 });
-                g.row("Data folder", "", |ui| {
+                g.row("Data folder", "Settings, the market database, nexus.log and, after a crash, crash.log.", |ui| {
+                    if widgets::button(ui, "Open").clicked() {
+                        folders::reveal(cx.data_dir);
+                    }
                     let d = cx.data_dir.display().to_string();
                     ui.add(egui::Label::new(RichText::new(d.clone()).color(pal::DIM)).truncate()).on_hover_text(d);
                 });
@@ -153,6 +155,47 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
             footnote(ui, "Elite Nexus is free software under the GNU GPL, version 3 or later, and comes with no warranty. Source: github.com/uruskan/EliteNexus. Elite Dangerous is a trademark of Frontier Developments plc; Elite Nexus is an unofficial community tool.");
         });
     });
+}
+
+/// The last speech attempt in a line, when there is something to say about it.
+fn voice_line(status: &crate::tts::VoiceStatus) -> Option<(Color32, String)> {
+    use crate::tts::VoiceStatus;
+    match status {
+        VoiceStatus::Untried => None,
+        VoiceStatus::Spoke(engine) => Some((pal::DIM, format!("Speaking through {}. Nothing heard? Check the volume of the sound device it uses.", program_name(engine)))),
+        VoiceStatus::Missing if cfg!(target_os = "macos") => Some((pal::WARN, "Voice uses macOS's own say (/usr/bin/say), which isn't there.".into())),
+        VoiceStatus::Missing => Some((
+            pal::WARN,
+            "Voice needs speech-dispatcher (spd-say) or espeak-ng, and neither is installed: install the speech-dispatcher package with its espeak-ng module, then restart Elite Nexus.".into(),
+        )),
+        VoiceStatus::Failed(engine, why) => Some((
+            pal::BAD,
+            if *engine == "spd-say" {
+                format!("spd-say couldn't speak: {why}. speech-dispatcher needs an output module too, for example speech-dispatcher-espeak-ng on Fedora and Nobara.")
+            } else {
+                format!("{} couldn't speak: {why}.", program_name(engine))
+            },
+        )),
+    }
+}
+
+/// A speech program as the commander knows it: `say`, not `/usr/bin/say`.
+fn program_name(engine: &str) -> &str {
+    std::path::Path::new(engine).file_name().and_then(|n| n.to_str()).unwrap_or(engine)
+}
+
+/// The journal folder setting with, on Linux and macOS, where Elite Nexus looks by itself. Also shown under a journal
+/// problem on every page, so the folder can be set before any commander is loaded.
+pub fn journal_setup(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
+    journal_folder(ui, cx);
+    if cfg!(not(windows)) {
+        let hint = if cfg!(target_os = "macos") {
+            "macOS: Elite Nexus looks in the game's prefix in every Steam library, where NotProton (Steam Play for macOS) keeps it (~/Library/Application Support/Steam/steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous), then in CrossOver's bottles, ~/.wine and Whisky's bottles. For any other Wine prefix, enter its folder here: Bindings and HUD colours then use the Options folder in that same prefix."
+        } else {
+            "Linux: Elite Nexus looks in the game's Proton prefix in every Steam library (steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous), then in Lutris's and Heroic's usual folders. For any other Wine prefix, enter its folder here: Bindings and HUD colours then use the Options folder in that same prefix."
+        };
+        ui.add(egui::Label::new(RichText::new(hint).size(size::FOOTNOTE).color(pal::DIM)).wrap());
+    }
 }
 
 /// The custom journal folder: typed, pasted or picked; checked for journals when entered, and read from at once
@@ -206,7 +249,7 @@ fn journal_folder(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                 JournalFolderCheck::Empty => (pal::WARN, format!("No journal files (Journal.….log) in this folder, so Elite Nexus keeps reading {reading} for now. The folder is saved: Reload journals, or the next start, switches to it.")),
                 JournalFolderCheck::Unreadable(e) => (
                     pal::BAD,
-                    format!("Elite Nexus can't open this folder ({e}), so it keeps reading {reading} for now. The folder is saved: Reload journals, or the next start, tries it again. A folder on another PC needs that PC on and the folder shared."),
+                    format!("Elite Nexus can't open this folder ({e}), so it keeps reading {reading} for now. The folder is saved: Reload journals, or the next start, tries it again. A folder on another computer needs that computer on and the folder shared."),
                 ),
             });
         }
@@ -263,7 +306,7 @@ fn game_folder(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
             (Some(f), Some(_)) => (pal::GOOD, format!("Found the game: {f}.")),
             (Some(f), None) => (pal::GOOD, format!("Back to the folder found automatically: {f}.")),
             (None, Some(_)) => (pal::WARN, "No EliteDangerous64.exe in that folder or under it, so HUD & cockpit and Bindings have no game folder.".into()),
-            (None, None) => (pal::WARN, "Elite Nexus doesn't find the game by itself on this PC: choose its folder here.".into()),
+            (None, None) => (pal::WARN, "Elite Nexus doesn't find the game by itself on this computer: choose its folder here.".into()),
         });
         st.game_found = Some((cx.settings.game_dir.clone(), found));
     }

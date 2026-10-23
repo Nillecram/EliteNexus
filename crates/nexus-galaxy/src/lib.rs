@@ -457,6 +457,7 @@ impl GalaxyDb {
         s.market_snapshots = sh.market_snapshots.load(Ordering::Relaxed);
         s.stale_markets = sh.stale_markets.load(Ordering::Relaxed);
         s.commits = sh.commits.load(Ordering::Relaxed);
+        s.price_history_rows = sh.history_counted.load(Ordering::Relaxed).then(|| sh.history_rows.load(Ordering::Relaxed).max(0) as u64);
         Ok(s)
     }
 }

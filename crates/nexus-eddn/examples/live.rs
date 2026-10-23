@@ -114,7 +114,7 @@ fn main() {
         st.market_rows,
         st.faction_rows,
         st.ring_signals,
-        st.price_history_rows,
+        st.price_history_rows.map_or("not counted yet".to_string(), |n| n.to_string()),
         st.stale_markets,
         st.commits,
         st.db_bytes as f64 / 1e6

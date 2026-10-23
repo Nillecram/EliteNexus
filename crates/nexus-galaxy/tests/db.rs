@@ -393,6 +393,45 @@ fn station_market_and_history() {
     assert!(db.station_market(999).expect("q").is_none());
 }
 
+/// The price history count shown on Market › Database is kept by the writer instead of counted on every look
+/// (counting a month of live prices took seconds): it must match the rows stored, also after reopening.
+#[test]
+fn price_history_count_is_kept() {
+    let mut t = TempDb::new("history-count");
+    let db = t.db();
+    populate(db);
+    let ts = now() - 30;
+    for (i, gold) in [(10, 9100), (20, 9100), (30, 9200)] {
+        db.ingest(market(1, "Alpha", "A Port", ts + i, &[("gold", gold, 8900, 100, 0), ("silver", 0, 5000, 0, 400)]));
+    }
+    db.flush().expect("flush");
+    let stored = db.price_history(1, "gold").expect("history").len() as u64;
+    assert_eq!(stored, 4, "two changes, each with the price before and after");
+    assert_eq!(db.stats().expect("stats").price_history_rows, Some(stored));
+    t.reopen();
+    t.db().flush().expect("flush");
+    assert_eq!(t.db().stats().expect("stats").price_history_rows, Some(stored));
+}
+
+/// History older than the 30 days kept is pruned (in batches) when the writer starts, and the kept count follows.
+#[test]
+fn old_price_history_is_pruned_and_uncounted() {
+    let mut t = TempDb::new("history-prune");
+    let db = t.db();
+    populate(db);
+    let old = now() - 40 * 86_400;
+    for (i, gold) in [(0, 9000), (10, 9100), (20, 9200)] {
+        db.ingest(market(9, "Alpha", "Old Port", old + i, &[("gold", gold, 8900, 100, 0)]));
+    }
+    db.flush().expect("flush");
+    // 9000 → 9100 → 9200: three points (each change stores the price before it, unless already there).
+    assert_eq!(db.price_history(9, "gold").expect("history").len(), 3);
+    t.reopen();
+    t.db().flush().expect("flush");
+    assert!(t.db().price_history(9, "gold").expect("history").is_empty());
+    assert_eq!(t.db().stats().expect("stats").price_history_rows, Some(0));
+}
+
 #[test]
 fn market_before_system_is_linked_later() {
     let t = TempDb::new("link");

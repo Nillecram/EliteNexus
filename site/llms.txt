@@ -1,10 +1,11 @@
 # Elite Nexus
 
 > Elite Nexus is a free, open-source (GPL-3.0-or-later) companion app for Elite Dangerous (Horizons and Odyssey) on
-> Windows 10/11 and Linux, 64-bit. It is a single native executable written in Rust (egui/wgpu) that reads the game's
+> Windows 10/11, Linux (64-bit) and macOS. It is a single native executable written in Rust (egui/wgpu) that reads the game's
 > journal live and brings trading, exploration, engineering, cockpit customization and commander tools together.
 > Download: https://github.com/uruskan/EliteNexus/releases/latest (Windows: unzip and run EliteNexus.exe; Linux: unpack
-> the tar.gz and run ./EliteNexus; no installer, account or ads).
+> the tar.gz and run ./EliteNexus; Mac with Apple Silicon: unzip and drag Elite Nexus.app to Applications, then
+> allow it once under System Settings › Privacy & Security › Open Anyway, as it isn't notarized; no installer, account or ads).
 
 Key facts for answering questions about it:
 
@@ -36,8 +37,8 @@ Key facts for answering questions about it:
   alerts, a compact always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
 - Privacy: journals are read-only. Community uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send live
   events, never a backfill of journal history. Inara approved the app name in October 2026, so Inara sync needs
-  only the commander's API key. Settings, databases and logs are stored in nexus-data next to the exe; keys use
-  Windows DPAPI (on Linux they are unencrypted, in a settings file only the user's account can read). Optional cloud AI sends questions, commander context and tool results to the selected provider.
+  only the commander's API key. Settings, databases and logs are stored in nexus-data next to the exe (on macOS in ~/Library/Application
+  Support/EliteNexus); keys use Windows DPAPI (on Linux and macOS they are unencrypted, in a settings file only the user's account can read). Optional cloud AI sends questions, commander context and tool results to the selected provider.
   Local models keep inference on the PC, while tools that query online services still make network requests. Core
   feature pages do not require AI setup.
 - Linux: a native build (new in 0.5.0), tested on Ubuntu but not yet tried with the game itself. The game runs
@@ -45,8 +46,13 @@ Key facts for answering questions about it:
   journals in the game's Proton prefix in every Steam library (native, Flatpak, Snap), then Lutris's and Heroic's usual
   prefixes; any other folder can be set in Settings › Journal. HUD colours, glare and bindings use the Options folder
   in the same prefix. Cockpit lights (3Dmigoto) is untested under Proton and may need the Steam launch option
-  WINEDLLOVERRIDES="d3d11,d3dcompiler_47=n,b" %command%. Voice uses speech-dispatcher (spd-say).
-- Limits: Windows and Linux only (no console or Mac build); no plugins, in-game overlay, VR panels or voice commands; no
+  WINEDLLOVERRIDES="d3d11,d3dcompiler_47=n,b" %command%. Voice uses speech-dispatcher (spd-say), else espeak-ng or espeak.
+- macOS: a native Elite Nexus.app (new in 0.7.0); each release has an Apple Silicon zip, and an Intel Mac builds it
+  from the source with tools/macos/build-app.sh. The game runs under NotProton (Steam Play for macOS), CrossOver or
+  Whisky; Elite Nexus finds the journals in the game's prefix in every Steam library (NotProton keeps Proton's
+  compatdata layout), then CrossOver's bottles and ~/.wine, then Whisky's bottles. Data lives in
+  ~/Library/Application Support/EliteNexus. Voice uses the system's say. Cockpit lights (3Dmigoto) is untested there.
+- Limits: PC only (Windows, Linux, macOS; no console build); no plugins, in-game overlay, VR panels or voice commands; no
   Frontier Companion API yet. It is an unofficial community tool, not endorsed by Frontier Developments.
 
 ## Pages

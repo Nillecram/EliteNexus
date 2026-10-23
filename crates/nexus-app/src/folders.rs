@@ -1,5 +1,6 @@
 //! Folders the commander points Elite Nexus at (the journal folder, the game folder): typed or pasted into a field,
-//! or picked with the system's folder picker (Windows' own; on Linux the desktop's file-chooser portal, else zenity).
+//! or picked with the system's folder picker (Windows' own; on Linux the desktop's file-chooser portal, else zenity;
+//! on macOS the system's open panel).
 
 use crate::jobs::Job;
 use crate::theme::{pal, size};
@@ -29,6 +30,24 @@ pub fn parse_folder(text: &str) -> Option<PathBuf> {
     // Linux file managers quote a path with spaces in single quotes.
     let t = t.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')).map_or(t, str::trim);
     (!t.is_empty()).then(|| PathBuf::from(t))
+}
+
+/// Opens a folder in the system's file manager: Explorer, Finder on macOS, and on Linux whatever xdg-open picks.
+pub fn reveal(dir: &std::path::Path) {
+    let program = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    match std::process::Command::new(program).arg(dir).spawn() {
+        // Waited for on its own thread, so no finished process is left behind.
+        Ok(mut child) => {
+            let _ = std::thread::Builder::new().name("reveal".into()).spawn(move || child.wait());
+        }
+        Err(e) => tracing::warn!("couldn't open {} with {program}: {e}", dir.display()),
+    }
 }
 
 /// The system's folder picker, run off the UI thread so the window keeps drawing (and following the game) while

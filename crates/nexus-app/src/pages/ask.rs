@@ -133,7 +133,7 @@ fn setup(ui: &mut Ui, st: &mut AskUi, ai: &mut AiSettings) -> AskAction {
                         });
                     }
                 } else {
-                    ui.add(Label::new(RichText::new("Uses a model running on this PC: start Ollama or LM Studio with a model that supports tools.").color(pal::DIM)).wrap());
+                    ui.add(Label::new(RichText::new("Uses a model running on this computer: start Ollama or LM Studio with a model that supports tools.").color(pal::DIM)).wrap());
                     ui.add_space(6.0);
                     if widgets::primary_button(ui, "Connect").clicked() {
                         st.show_setup = false;
@@ -145,7 +145,7 @@ fn setup(ui: &mut Ui, st: &mut AskUi, ai: &mut AiSettings) -> AskAction {
                 let note = match kind {
                     ProviderKind::Gemini => format!("{kept} On Google's free tier, questions may be used to improve Google's models; paid use is not."),
                     ProviderKind::Claude => format!("{kept} Claude Haiku costs about a tenth of a cent per question."),
-                    ProviderKind::Local => "Nothing leaves this PC.".to_string(),
+                    ProviderKind::Local => "Nothing leaves this computer.".to_string(),
                     ProviderKind::Custom => kept,
                 };
                 ui.add(Label::new(RichText::new(note).size(12.5).color(pal::FAINT)).wrap());

@@ -5,6 +5,7 @@
 //! live journal events / Market.json while playing. Queries run in background jobs (pages/market.rs).
 
 use crate::core::{Core, HistorySink, LiveMsg};
+use crate::jobs::Job;
 use crate::settings::PriceWatch;
 use crossbeam_channel::{Receiver, Sender};
 use nexus_eddn::{EddnHandle, EddnStatsSnapshot, EddnSubscriber};
@@ -18,6 +19,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+/// How often the database counters are counted again while a page shows them.
+const STATS_EVERY: Duration = Duration::from_secs(10);
 
 /// Daily Spansh dump of every system with stations: services, pads, markets (about 4.5 GB gzip).
 pub const SPANSH_STATIONS_URL: &str = "https://downloads.spansh.co.uk/galaxy_stations.json.gz";
@@ -37,11 +41,16 @@ pub struct MarketService {
     pub db: Option<GalaxyDb>,
     pub db_error: Option<String>,
     eddn: Option<EddnHandle>,
-    stats: Option<(Instant, DbStats)>,
+    /// The last database counters, counted on a worker thread: the counts scan big tables, which froze the window
+    /// for a second or more while the live feed was filling them.
+    stats: Option<DbStats>,
+    stats_job: Option<Job<Option<DbStats>>>,
+    stats_at: Option<Instant>,
     import: Option<ImportJob>,
     watch: Arc<RwLock<WatchState>>,
     /// Price alerts raised by the watcher thread (drained by the app with the core's alerts).
     pub alerts: Receiver<Alert>,
+    ctx: egui::Context,
 }
 
 impl MarketService {
@@ -58,7 +67,7 @@ impl MarketService {
                 (None, Some(format!("Cannot open the market database: {e}")))
             }
         };
-        MarketService { db, db_error, eddn: None, stats: None, import: None, watch, alerts }
+        MarketService { db, db_error, eddn: None, stats: None, stats_job: None, stats_at: None, import: None, watch, alerts, ctx: ctx.clone() }
     }
 
     /// Replaces the price-alert rules (call when they change).
@@ -152,16 +161,25 @@ impl MarketService {
         self.eddn.as_ref().map(|h| h.stats().headlines(n).into_iter().map(|h| h.text).collect()).unwrap_or_default()
     }
 
-    /// Database size line, refreshed at most every 2 s.
-    /// Database counters, refreshed at most every 2 s.
+    /// The last database counters; asking counts them again on a worker thread every [`STATS_EVERY`] at most.
     pub fn db_stats(&mut self) -> Option<&DbStats> {
-        let db = self.db.as_ref()?;
-        if self.stats.as_ref().is_none_or(|(t, _)| t.elapsed() > Duration::from_secs(2))
-            && let Ok(s) = db.stats()
-        {
-            self.stats = Some((Instant::now(), s));
+        if let Some(job) = self.stats_job.as_mut() {
+            if let Some(s) = job.poll() {
+                self.stats_job = None;
+                self.stats = s.or(self.stats.take());
+            } else if job.elapsed() > Duration::from_secs(120) {
+                // Never answered (the thread died): count again.
+                self.stats_job = None;
+            }
         }
-        self.stats.as_ref().map(|(_, s)| s)
+        if self.stats_job.is_none()
+            && self.stats_at.is_none_or(|t| t.elapsed() > STATS_EVERY)
+            && let Some(db) = self.db.clone()
+        {
+            self.stats_at = Some(Instant::now());
+            self.stats_job = Some(Job::spawn(&self.ctx, move || db.stats().ok()));
+        }
+        self.stats.as_ref()
     }
 
     pub fn feed_snapshot(&self) -> Option<EddnStatsSnapshot> {

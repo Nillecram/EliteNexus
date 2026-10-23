@@ -108,6 +108,11 @@ impl HudUi {
     /// `tab` (screenshots): `glare` opens Glare and exposure, `cockpit` Cockpit lights; a preset name
     /// such as `mocha` or `royalpurple` starts the colours from that theme; `options` opens the
     /// protection's options. Combine them with commas: `empireblue,options`.
+    /// Opens the Cockpit lights tab (from the notice about an old dimmer install).
+    pub fn show_cockpit(&mut self) {
+        self.tab = Tab::Cockpit;
+    }
+
     pub fn new(tab: Option<&str>) -> Self {
         let mut st = HudUi::default();
         for t in tab.unwrap_or_default().split(',').map(str::trim).filter(|t| !t.is_empty()) {

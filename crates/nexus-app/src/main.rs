@@ -14,6 +14,7 @@ mod folders;
 mod icon;
 mod jobs;
 mod market;
+mod notices;
 mod pages;
 mod runplan;
 mod secrets;
@@ -28,6 +29,11 @@ mod untouched;
 mod widgets;
 
 fn app_icon() -> egui::IconData {
+    // macOS: an app bundle's own icon (Contents/Resources/EliteNexus.icns) is the one in the Dock. An empty icon
+    // keeps eframe from replacing it with this small square one at start.
+    if cfg!(target_os = "macos") && settings::runs_from_app_bundle() {
+        return egui::IconData::default();
+    }
     egui::IconData { rgba: icon::rgba(64), width: 64, height: 64 }
 }
 
@@ -115,8 +121,32 @@ fn main() -> eframe::Result {
         None => tracing_subscriber::fmt().with_env_filter(filter).init(),
     }
     tracing::info!(version = env!("CARGO_PKG_VERSION"), data = %data_dir.display(), "Elite Nexus starting");
-    std::panic::set_hook(Box::new(|info| {
-        tracing::error!("panic: {info}");
+    // A panic is written straight to crash.log (nexus.log may not be open, and a release build has no console), with
+    // where it happened: the next start says so, and the commander can send the file. Nothing is uploaded.
+    let crash_log = data_dir.join("crash.log");
+    static REPORTED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    std::panic::set_hook(Box::new(move |info| {
+        let thread = std::thread::current();
+        let name = thread.name().unwrap_or("unnamed");
+        tracing::error!("panic in {name}: {info}");
+        // The first ones matter: a panic the core survives can repeat with every update of a file, and the backtraces
+        // would bury the first report (and slow the thread down). The window's own thread always gets in: its panic
+        // is the one that closes Elite Nexus.
+        let n = REPORTED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if n >= 10 && name != "main" {
+            return;
+        }
+        let more = if n == 9 { "Further panics this run are only in nexus.log.\n\n" } else { "" };
+        let when = nexus_journal::Timestamp::now().to_local_string("%Y-%m-%d %H:%M:%S");
+        let text = format!("{when} Elite Nexus {} panicked in thread '{name}': {info}\n{}\n\n{more}", env!("CARGO_PKG_VERSION"), std::backtrace::Backtrace::force_capture());
+        // Kept to about a megabyte: the previous one moves aside.
+        if std::fs::metadata(&crash_log).is_ok_and(|m| m.len() > 1_000_000) {
+            let _ = std::fs::rename(&crash_log, crash_log.with_extension("old.log"));
+        }
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&crash_log) {
+            use std::io::Write;
+            let _ = f.write_all(text.as_bytes());
+        }
     }));
 
     // Optional: --page <name>  --screenshot <file.png>

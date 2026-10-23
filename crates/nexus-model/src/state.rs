@@ -109,6 +109,14 @@ impl GameState {
         }
     }
 
+    /// The plotted route still ahead. The system it was plotted from is dropped when the route arrives, and arrivals
+    /// take the systems up to the one reached off it; read again mid-route (after a restart), the route still holds
+    /// the systems behind, so everything after the current one is ahead.
+    pub fn route_remaining(&self) -> &[RouteHop] {
+        let start = self.nav_route.iter().position(|h| h.system_address == self.location.system_address).map_or(0, |i| i + 1);
+        &self.nav_route[start..]
+    }
+
     /// The carriers the commander has at `now`, their own first: known and not decommissioned.
     pub fn carriers(&self, now: Timestamp) -> Vec<(CarrierKind, &Carrier)> {
         [CarrierKind::Personal, CarrierKind::Squadron].into_iter().map(|k| (k, self.carrier_of(k))).filter(|(_, c)| c.active(now)).collect()
@@ -273,7 +281,10 @@ impl GameState {
                 self.exobio.on_system(a.system_address);
                 self.exploration.enter_system(a.system_address, &a.star_system, a.star_pos, ts);
                 self.mining.end_session();
-                self.nav_route.retain(|h| h.system_address != a.system_address);
+                // Arriving on the route leaves everything up to here behind, the system it was plotted from too.
+                if let Some(i) = self.nav_route.iter().position(|h| h.system_address == a.system_address) {
+                    self.nav_route.drain(..=i);
+                }
                 let pop = if a.population > 0 { format!(", pop {}", compact_credits(a.population as i64)) } else { String::new() };
                 self.feed(ts, "FSDJump", format!("Jumped {:.2} ly to {}{}", dist, a.star_system, pop));
                 let star = self.pending_star_class.as_ref().filter(|(s, _)| *s == a.star_system).map(|(_, c)| nexus_data::exploration::star_description(c));
@@ -1103,6 +1114,10 @@ impl GameState {
                     self.nav_route.clear();
                 } else {
                     self.nav_route = r.route.clone();
+                    // The route starts with the system it was plotted from: while still there, that's already behind.
+                    if self.nav_route.first().is_some_and(|h| h.system_address == self.location.system_address) {
+                        self.nav_route.remove(0);
+                    }
                 }
             }
             Companion::ModulesInfo(m, _) => self.modules_info = Some(m.clone()),
