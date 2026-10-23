@@ -216,8 +216,9 @@ impl NexusApp {
     fn screenshot_tick(&mut self, ctx: &egui::Context) {
         let Some(job) = self.shot.as_mut() else { return };
         job.frames += 1;
-        let live = matches!(self.core.status.read().phase, Phase::Live);
-        if live && !job.requested && job.frames > 40 && job.started.elapsed() >= job.delay {
+        // Once the journals are read, or couldn't be (to check the journal problem screen).
+        let ready = matches!(self.core.status.read().phase, Phase::Live | Phase::Error(_));
+        if ready && !job.requested && job.frames > 40 && job.started.elapsed() >= job.delay {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
             job.requested = true;
         }
@@ -461,7 +462,8 @@ impl NexusApp {
                 return;
             }
             Phase::Error(e) => {
-                widgets::empty(ui, icon::WARNING, "Journal problem", e);
+                let hint = format!("{e} If the game runs on another PC, share its journal folder and pick it here.");
+                self.before_commander(ui, &status, icon::WARNING, "Journal problem", &hint);
                 return;
             }
             Phase::Starting => return,
@@ -469,7 +471,9 @@ impl NexusApp {
         }
         let model = self.core.model.read();
         let Some(gs) = model.active() else {
-            widgets::empty(ui, icon::USER, "No commander found", "Start Elite Dangerous — Elite Nexus picks everything up live.");
+            drop(model);
+            let hint = "Start Elite Dangerous: Elite Nexus picks everything up live. If the game runs on another PC, share its journal folder and pick it here.";
+            self.before_commander(ui, &status, icon::USER, "No commander found", hint);
             return;
         };
         let (title, subtitle) = page_heading(self.page, gs);
@@ -597,7 +601,43 @@ impl NexusApp {
             }
             None => {}
         }
-        if settings_changed {
+        self.after_settings(ui.ctx(), settings_changed, test_voice, restart);
+    }
+
+    /// Before a commander is loaded: the journal folder can't be read, or holds no commander yet. Settings opens as
+    /// usual; every other page shows the problem with the journal folder setting right under it (a laptop reading
+    /// another PC's journals has no Saved Games folder of its own to fall back on).
+    fn before_commander(&mut self, ui: &mut Ui, status: &crate::core::CoreStatus, icon: &str, title: &str, hint: &str) {
+        let settings_page = self.page == Page::Settings;
+        if settings_page {
+            self.page_header(ui, "Settings", "");
+        } else {
+            widgets::empty(ui, icon, title, hint);
+        }
+        let mut cx = pages::settings::SettingsCtx {
+            settings: &mut self.settings,
+            ui: &mut self.settings_ui,
+            status,
+            data_dir: &self.data_dir,
+            changed: false,
+            test_voice: false,
+            restart_core: false,
+        };
+        if settings_page {
+            egui::ScrollArea::vertical().id_salt(("page", Page::Settings as u8)).auto_shrink([false, false]).show(ui, |ui| pages::settings::show(ui, &mut cx));
+        } else {
+            ui.vertical_centered(|ui| {
+                ui.set_max_width(640.0);
+                widgets::card(ui, "Journal folder", |ui| pages::settings::journal_setup(ui, &mut cx));
+            });
+        }
+        let (changed, test_voice, restart) = (cx.changed, cx.test_voice, cx.restart_core);
+        self.after_settings(ui.ctx(), changed, test_voice, restart);
+    }
+
+    /// Applies what the Settings page changed: services, voice, and reading the journals again from a new folder.
+    fn after_settings(&mut self, ctx: &egui::Context, changed: bool, test_voice: bool, restart: bool) {
+        if changed {
             self.settings_dirty = Some(Instant::now());
             self.speaker.set_rate(self.settings.tts_rate);
             self.speaker.set_volume(self.settings.tts_volume);
@@ -609,7 +649,7 @@ impl NexusApp {
             self.speaker.say("Elite Nexus voice check. All systems nominal, commander.");
         }
         if restart {
-            self.core = start_core(ui.ctx(), self.overrides.journal_dir.as_ref().or(self.settings.journal_dir.as_ref()), self.market.history_sink());
+            self.core = start_core(ctx, self.overrides.journal_dir.as_ref().or(self.settings.journal_dir.as_ref()), self.market.history_sink());
             self.sync.attach(&self.core);
             self.market.attach(&self.core);
         }

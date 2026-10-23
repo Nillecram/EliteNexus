@@ -120,13 +120,7 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                     ui.add(egui::Label::new(RichText::new(st.current_file.clone().unwrap_or_default()).color(pal::DIM)).truncate());
                 });
                 g.value("Live events this run", st.live_events.to_string());
-                g.content(|ui| {
-                    journal_folder(ui, cx);
-                    if cfg!(not(windows)) {
-                        let hint = "Linux: Elite Nexus looks in the game's Proton prefix in every Steam library (steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous), then in Lutris's and Heroic's usual folders. For any other Wine prefix, enter its folder here: Bindings and HUD colours then use the Options folder in that same prefix.";
-                        ui.add(egui::Label::new(RichText::new(hint).size(size::FOOTNOTE).color(pal::DIM)).wrap());
-                    }
-                });
+                g.content(|ui| journal_setup(ui, cx));
                 if !st.errors.is_empty() {
                     g.content(|ui| {
                         for e in st.errors.iter().rev().take(5) {
@@ -153,6 +147,16 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
             footnote(ui, "Elite Nexus is free software under the GNU GPL, version 3 or later, and comes with no warranty. Source: github.com/uruskan/EliteNexus. Elite Dangerous is a trademark of Frontier Developments plc; Elite Nexus is an unofficial community tool.");
         });
     });
+}
+
+/// The journal folder setting with, on Linux, where Elite Nexus looks by itself. Also shown under a journal problem
+/// on every page, so the folder can be set before any commander is loaded.
+pub fn journal_setup(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
+    journal_folder(ui, cx);
+    if cfg!(not(windows)) {
+        let hint = "Linux: Elite Nexus looks in the game's Proton prefix in every Steam library (steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous), then in Lutris's and Heroic's usual folders. For any other Wine prefix, enter its folder here: Bindings and HUD colours then use the Options folder in that same prefix.";
+        ui.add(egui::Label::new(RichText::new(hint).size(size::FOOTNOTE).color(pal::DIM)).wrap());
+    }
 }
 
 /// The custom journal folder: typed, pasted or picked; checked for journals when entered, and read from at once

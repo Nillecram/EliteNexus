@@ -14,6 +14,11 @@ release time that section becomes the new version and the release workflow publi
   isn't JSON at all, the EDSM, Inara and Ask keys; uploads stay off until you switch them on again), and a banner
   above every page says what happened and how JSON writes a folder. A file that can't be opened at all isn't saved
   over until the next start.
+- **A journal folder that can't be read no longer locks you out of Settings** (a Frontier Forums report: a laptop
+  reading the main PC's journals over the network). When the journal folder couldn't be read, or held no commander,
+  every page showed only the problem, Settings included, so the folder couldn't be changed. Now the journal folder
+  setting (with Browse…) is right under the problem on every page, Settings opens as usual, and the message says
+  plainly that the folder doesn't exist on this PC and what to do when the game runs on another PC.
 
 ## [0.6.0] - 2026-10-18
 

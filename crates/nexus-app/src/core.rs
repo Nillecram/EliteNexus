@@ -159,7 +159,7 @@ fn run(
     mut history_sink: Option<HistorySink>,
 ) {
     let Some(dir) = journal_dir.or_else(nexus_journal::default_journal_dir) else {
-        status.write().phase = Phase::Error("Could not locate the Elite Dangerous journal folder: set it under Settings › Journal".into());
+        status.write().phase = Phase::Error("Elite Nexus couldn't find Elite Dangerous's journal folder on this PC.".into());
         repaint();
         return;
     };
@@ -169,7 +169,11 @@ fn run(
     let files = match list_journal_files(&dir) {
         Ok(f) => f,
         Err(e) => {
-            status.write().phase = Phase::Error(format!("Cannot read {}: {e}", dir.display()));
+            status.write().phase = Phase::Error(if e.kind() == std::io::ErrorKind::NotFound {
+                format!("Elite Nexus looked for the journals in {}, but that folder doesn't exist on this PC.", dir.display())
+            } else {
+                format!("Elite Nexus can't read the journal folder {} ({e}).", dir.display())
+            });
             repaint();
             return;
         }
