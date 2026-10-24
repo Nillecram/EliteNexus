@@ -261,7 +261,7 @@ pub fn resolve_parent_stars(parents: &[ParentRef], stars: &[SystemStar]) -> Vec<
 /// the scan made before your own landing), and the species not logged there (`ScanOrganic.WasLogged`, the latest
 /// value seen for that species on that body; `None` before any scan).
 ///
-/// `WasLogged = false` proves nothing on its own: across the commander's sales (2026-10) it was false for 67 species
+/// `WasLogged = false` proves nothing on its own: across one commander's sales (2026-10) it was false for 67 species
 /// and the bonus came for 2, never in a populated system (0 of 46). `WasLogged = true` always meant no bonus (it can
 /// flip while you sample if another commander sells first). The 2 paid ones were on a body someone had set foot on,
 /// where a third species on the same body paid none: the bonus is per species, so a footfalled body can still pay
