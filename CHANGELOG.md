@@ -5,6 +5,10 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.7.2] - 2026-10-24
+
+A hotfix: Exobiology no longer promises the first-logged bonus (×5) for species that won't get it.
+
 ### Fixed
 - **Exobiology** no longer promises the first-logged bonus (×5) for nearly every species you analyse. It used to
   trust the game's `WasLogged: false` alone, which doesn't mean the bonus is coming: across one commander's sales it
