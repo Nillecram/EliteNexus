@@ -257,19 +257,19 @@ pub fn resolve_parent_stars(parents: &[ParentRef], stars: &[SystemStar]) -> Vec<
 
 /// Whether Vista Genomics will probably pay the first-logged bonus (×5 in total) for a species on a body.
 ///
-/// * Once the species has been scanned, `ScanOrganic.WasLogged` decides — pass the latest value seen for that
-///   species on that body (it can flip to `true` while you sample if another commander sells it first). The
-///   commander's journals show the bonus paid on a body others had already set foot on (`WasFootfalled = true`)
-///   while `WasLogged` stayed false, and withheld when `WasLogged` turned true before the sale.
-/// * Before any scan (`was_logged = None`), BioScan/SrvSurvey's heuristic applies: unpopulated system and nobody
-///   has landed yet (`Scan.WasFootfalled == false`, from the scan made before your own landing).
+/// BioScan/SrvSurvey's rule: unpopulated system and nobody had landed yet (`Scan.WasFootfalled == false`, from
+/// the scan made before your own landing), and the species not logged there (`ScanOrganic.WasLogged`, the latest
+/// value seen for that species on that body; `None` before any scan).
+///
+/// `WasLogged = false` proves nothing on its own: across the commander's sales (2026-10) it was false for 67 species
+/// and the bonus came for 2, never in a populated system (0 of 46). `WasLogged = true` always meant no bonus (it can
+/// flip while you sample if another commander sells first). The 2 paid ones were on a body someone had set foot on,
+/// where a third species on the same body paid none: the bonus is per species, so a footfalled body can still pay
+/// for a species nobody sold there, but nothing in the journal tells which one.
 ///
 /// MEDIUM certainty: only the sale (`SellOrganicData.Bonus`) confirms it.
 pub fn first_logged_bonus_likely(body_was_footfalled: Option<bool>, system_populated: bool, was_logged: Option<bool>) -> bool {
-    match was_logged {
-        Some(logged) => !logged,
-        None => !system_populated && body_was_footfalled == Some(false),
-    }
+    was_logged != Some(true) && !system_populated && body_was_footfalled == Some(false)
 }
 
 /// Vista Genomics payout for one species: base value, ×5 with the first-logged bonus.
@@ -1504,8 +1504,12 @@ mod tests {
         assert!(!first_logged_bonus_likely(Some(true), false, None));
         assert!(!first_logged_bonus_likely(Some(false), true, None));
         assert!(!first_logged_bonus_likely(None, false, None));
-        // Journals: paid on an already-footfalled body while WasLogged was false; withheld once it was true.
-        assert!(first_logged_bonus_likely(Some(true), false, Some(false)));
+        assert!(first_logged_bonus_likely(Some(false), false, Some(false)));
+        // Sales (2026-10-24): WasLogged false paid nothing in populated systems (HR 8061 B 4, not footfalled) and
+        // nothing for 19 of 21 species on footfalled bodies; true never paid.
+        assert!(!first_logged_bonus_likely(Some(false), true, Some(false)));
+        assert!(!first_logged_bonus_likely(Some(true), false, Some(false)));
+        assert!(!first_logged_bonus_likely(None, false, Some(false)));
         assert!(!first_logged_bonus_likely(Some(false), false, Some(true)));
         assert_eq!(payout(1_362_000, true), 6_810_000);
         assert_eq!(payout(1_362_000, false), 1_362_000);
