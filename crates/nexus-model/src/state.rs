@@ -1037,8 +1037,8 @@ impl GameState {
                 body.and_then(|b| b.was_footfalled),
             )
         };
-        // First-logged bonus (5x): decided by the latest ScanOrganic.WasLogged (verified against Vista Genomics sales);
-        // footfall/population only matter when WasLogged is missing.
+        // First-logged bonus (5x): unpopulated system, nobody on the body at our first scan, and the latest
+        // ScanOrganic.WasLogged not true. WasLogged false alone is no proof (checked against Vista Genomics sales).
         let bonus = nexus_data::bio_predict::first_logged_bonus_likely(unfootfalled, populated, o.was_logged);
         let outcome = self.exobio.on_scan_organic(o, ts, pos, &system, &body_name, bonus);
         let species = o.species_localised.clone().unwrap_or_else(|| o.species.clone());

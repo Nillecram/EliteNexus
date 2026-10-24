@@ -5,6 +5,14 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Fixed
+- **Exobiology** no longer promises the first-logged bonus (×5) for nearly every species you analyse. It used to
+  trust the game's `WasLogged: false` alone, which the game writes even where someone already sold the species:
+  across one commander's sales it was false for 67 species and the bonus came for 2, never in a populated system.
+  The bonus now counts only in an uninhabited system, on a body nobody had set foot on when you first scanned it,
+  for a species not marked as logged, as the user guide always said. A species nobody sold on an already-visited
+  body can still pay it; that shows up as a good surprise at Vista Genomics rather than a promise the sale breaks.
+
 ## [0.7.1] - 2026-10-24
 
 A small fix: the BGS & Powerplay page now remembers your tick hour.
