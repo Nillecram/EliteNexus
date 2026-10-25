@@ -49,9 +49,13 @@ Mac, in `~/Library/Application Support/EliteNexus`). Every page, and the Linux a
 ## Support Elite Nexus
 
 Elite Nexus is made by one commander, with no company behind it, no ads and no subscription. If it has saved you an
-evening of alt-tabbing, found you a payday or kept hostile contacts red in your favourite HUD, you can
-**[sponsor it on GitHub](https://github.com/sponsors/uruskan)** or **[buy me a coffee](https://buymeacoffee.com/uruskan)**.
+evening of alt-tabbing, found you a payday or kept hostile contacts red in your favourite HUD, you can sponsor it.
 Nothing in the app depends on it. o7
+
+<p>
+  <a href="https://github.com/sponsors/uruskan"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
+  <a href="https://buymeacoffee.com/uruskan"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-ffdd00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
+</p>
 
 ## Thanks
 
