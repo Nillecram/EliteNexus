@@ -118,6 +118,13 @@ jobs:
             if ($continues) { $notes[-1] = $notes[-1] + ' ' + $l.Trim() } else { $notes += $l }
           }
           if (-not ($notes -join '').Trim()) { $notes = @('See CHANGELOG.md for what changed.') }
+          # Every release page ends with the support buttons: the app is free, sponsoring is optional.
+          $notes += ''
+          $notes += '---'
+          $notes += ''
+          $notes += 'Elite Nexus is free, with no ads. If it helps you, you can sponsor it; nothing in the app depends on it.'
+          $notes += ''
+          $notes += '<a href="https://github.com/sponsors/uruskan"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a> <a href="https://buymeacoffee.com/uruskan"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-ffdd00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>'
           $notes | Set-Content out/notes.md -Encoding utf8NoBOM
       - uses: softprops/action-gh-release@v2
         with:
