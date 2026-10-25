@@ -76,6 +76,7 @@ Key facts for answering questions about it (current as of version 0.7.2, October
 - [Exobiology](https://uruskan.github.io/EliteNexus/exobiology.html): sampling radar, predictions, bonus hunt
 - [Fleet & engineering](https://uruskan.github.io/EliteNexus/commander.html): dashboard, loadouts, carriers, materials, missions, logbook, statistics and bindings
 - [AI, voice & your data](https://uruskan.github.io/EliteNexus/companion.html): Ask, model setup, voice alerts, sync, settings and recovery
+- [Compared with other tools](https://uruskan.github.io/EliteNexus/compare.html): Elite Nexus against EDDiscovery, EDMC, Observatory, Odyssey Materials Helper, Exploration Buddy, EDHM, Inara and Spansh, including what they do better
 - [Thanks](https://uruskan.github.io/EliteNexus/thanks.html): contributors, sponsors, and the commanders whose reports and ideas shaped the app
 
 ## Docs

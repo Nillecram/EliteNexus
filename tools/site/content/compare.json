@@ -1,0 +1,22 @@
+{
+  "slug": "compare",
+  "title": "Elite Dangerous companion apps compared: Elite Nexus, EDDiscovery, EDMC, Observatory",
+  "description": "A fair comparison of Elite Dangerous companion apps: Elite Nexus against EDDiscovery, ED Market Connector, Elite Observatory, Odyssey Materials Helper, Exploration Buddy, EDHM, Inara and Spansh. Platforms, live market data, exploration, exobiology, engineering, HUD colours, and what each tool still does better.",
+  "kicker": "Compared",
+  "heading": "Which Elite Dangerous companion app?",
+  "lead": "Elite Nexus replaces most of a typical toolkit, not all of it. Here is how it lines up against the tools commanders run today, including what they still do better.",
+  "hero_image": "dashboard.png",
+  "hero_alt": "Elite Nexus dashboard with commander ranks, ship status, location and session statistics",
+  "hero_caption": "One native app for Windows, Linux and macOS; the table below says where it stands.",
+  "toc": [
+    { "id": "glance", "label": "At a glance" },
+    { "id": "better", "label": "What the others do better" },
+    { "id": "choose", "label": "Which should you use?" },
+    { "id": "sources", "label": "About this comparison" }
+  ],
+  "next": {
+    "href": "index.html#download",
+    "label": "Next: Get Elite Nexus",
+    "description": "One download for Windows, Linux and Mac. Unpack and fly."
+  }
+}

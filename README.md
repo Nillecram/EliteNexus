@@ -189,7 +189,8 @@ keeps the advanced settings one click away under Options. Here is every page in 
   [Exploration & navigation](https://uruskan.github.io/EliteNexus/exploration.html),
   [Exobiology](https://uruskan.github.io/EliteNexus/exobiology.html),
   [Fleet & engineering](https://uruskan.github.io/EliteNexus/commander.html),
-  [AI, voice & your data](https://uruskan.github.io/EliteNexus/companion.html) and
+  [AI, voice & your data](https://uruskan.github.io/EliteNexus/companion.html),
+  [Compared with other tools](https://uruskan.github.io/EliteNexus/compare.html) and
   [Thanks](https://uruskan.github.io/EliteNexus/thanks.html).
 * **[Changelog](CHANGELOG.md)** and **[release notes](https://github.com/uruskan/EliteNexus/releases)**: what
   changed in each version.

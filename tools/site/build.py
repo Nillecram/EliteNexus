@@ -13,6 +13,28 @@ BASE = 'https://uruskan.github.io/EliteNexus/'
 REPO = 'https://github.com/uruskan/EliteNexus'
 DOWNLOAD = REPO + '/releases/latest'
 SPONSOR = 'https://github.com/sponsors/uruskan'
+VERSION = re.search(r'^version = "([^"]+)"', (ROOT / 'Cargo.toml').read_text(encoding='utf-8'), re.M).group(1)
+# What the app does, for the SoftwareApplication schema that search engines and AI assistants read.
+FEATURES = [
+    'Live market data from EDDN: commodity search, sell-my-cargo, trade routes, pinned orders, a run planner and price alerts',
+    'Exploration body values, Observatory-style highlights and Road to Riches tours',
+    'Exobiology sampling radar, species predictions and a first-logged bonus hunt',
+    'Spansh neutron, exact and fleet-carrier route planners, with the next system copied to the clipboard',
+    'HUD colour editor that keeps hostile red, friendly green and shield blue',
+    'Cockpit light dimmer and Odyssey glare and exposure presets',
+    'Engineering blueprint wishlist, materials shopping list and material-trader plan',
+    'Fleet loadouts, missions and massacre stacks, mining, fleet carrier, colonisation and BGS tracking',
+    'AI co-pilot grounded in your own ship, journal and market data',
+    'Opt-in sync with EDDN, EDSM, Inara and EDAstro',
+]
+KEYWORDS = 'Elite Dangerous, companion app, EDDN, exobiology, exploration, trading, HUD colours, cockpit lights, Odyssey glare, engineering, fleet carrier, Spansh, EDDiscovery alternative, EDMC alternative'
+
+def faq_schema(body):
+    """The page's plain <details><summary> questions as an FAQPage schema, or None."""
+    text = lambda s: html.unescape(re.sub(r'<[^>]+>', '', s)).strip()
+    items = [{'@type': 'Question', 'name': text(q), 'acceptedAnswer': {'@type': 'Answer', 'text': text(a)}}
+             for q, a in re.findall(r'<details>\s*<summary>(.*?)</summary>(.*?)</details>', body, re.S)]
+    return {'@context': 'https://schema.org', '@type': 'FAQPage', 'mainEntity': items} if items else None
 
 def escape(value):
     return html.escape(str(value), quote=True)
@@ -37,6 +59,7 @@ def header(slug):
 {link('trading.html', 'Trading')}
 <details class="nav-dropdown"><summary>Explore <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel">{link('exploration.html', 'Exploration &amp; navigation')}{link('exobiology.html', 'Exobiology')}</div></details>
 <details class="nav-dropdown"><summary>Commander <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel">{link('commander.html', 'Fleet &amp; engineering')}{link('companion.html', 'AI, voice &amp; your data')}</div></details>
+{link('compare.html', 'Compare')}
 <a class="nav-source" href="{REPO}">GitHub <span aria-hidden="true">↗</span></a>
 <a class="button button-small" href="{DOWNLOAD}">Download <span aria-hidden="true">↓</span></a>
 </nav></div></header>'''
@@ -45,7 +68,7 @@ def footer():
     return f'''<footer class="site-footer"><div class="container footer-grid">
 <div class="footer-brand"><a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span><span>Elite Nexus</span></a><p>One app. Your whole galaxy.</p><span class="small-label">Free software · Native app for Windows, Linux and macOS</span></div>
 <div><h2>Features</h2><a href="hud-colours.html">HUD colours</a><a href="cockpit-lights.html">Cockpit lights</a><a href="odyssey-glare.html">Glare &amp; exposure</a><a href="trading.html">Trading &amp; markets</a><a href="exploration.html">Exploration &amp; navigation</a><a href="exobiology.html">Exobiology</a><a href="commander.html">Fleet &amp; engineering</a><a href="companion.html">AI, voice &amp; your data</a></div>
-<div><h2>Project</h2><a href="{DOWNLOAD}">Download</a><a href="{REPO}/releases">Release notes</a><a href="{REPO}/blob/main/docs/USER_GUIDE.md">User guide</a><a href="{REPO}">Source on GitHub</a><a href="{REPO}/issues">Report an issue</a><a href="{SPONSOR}">Sponsor on GitHub</a><a href="thanks.html">Thanks</a><a href="{REPO}/blob/main/LICENSE">GPL-3.0 licence</a></div>
+<div><h2>Project</h2><a href="{DOWNLOAD}">Download</a><a href="{REPO}/releases">Release notes</a><a href="{REPO}/blob/main/docs/USER_GUIDE.md">User guide</a><a href="{REPO}">Source on GitHub</a><a href="{REPO}/issues">Report an issue</a><a href="{SPONSOR}">Sponsor on GitHub</a><a href="compare.html">Compared with other tools</a><a href="thanks.html">Thanks</a><a href="{REPO}/blob/main/LICENSE">GPL-3.0 licence</a></div>
 </div><div class="container footer-bottom"><p>An independent community companion. Not affiliated with or endorsed by Frontier Developments.<br>Elite Dangerous is a trademark of Frontier Developments plc.</p><a href="#top">Back to top ↑</a></div></footer>'''
 
 def page_body(page):
@@ -87,14 +110,17 @@ def render(page):
         return render_redirect(page)
     slug = page['slug']
     url = BASE if slug == 'index' else BASE + slug + '.html'
-    schema = {'@context': 'https://schema.org', '@type': 'SoftwareApplication', 'name': 'Elite Nexus', 'applicationCategory': 'GameApplication', 'operatingSystem': 'Windows 10, Windows 11, Linux (64-bit), macOS 11 or later', 'description': page['description'], 'url': BASE, 'downloadUrl': DOWNLOAD, 'codeRepository': REPO, 'license': REPO + '/blob/main/LICENSE', 'offers': {'@type': 'Offer', 'price': '0', 'priceCurrency': 'USD'}}
+    schema = {'@context': 'https://schema.org', '@type': 'SoftwareApplication', 'name': 'Elite Nexus', 'applicationCategory': 'GameApplication', 'applicationSubCategory': 'Game companion', 'operatingSystem': 'Windows 10, Windows 11, Linux (64-bit), macOS 11 or later', 'softwareVersion': VERSION, 'description': page['description'], 'url': BASE, 'downloadUrl': DOWNLOAD, 'codeRepository': REPO, 'license': REPO + '/blob/main/LICENSE', 'isAccessibleForFree': True, 'offers': {'@type': 'Offer', 'price': '0', 'priceCurrency': 'USD'}, 'featureList': FEATURES, 'keywords': KEYWORDS, 'screenshot': [BASE + 'screenshots/dashboard.png', BASE + 'screenshots/market.png', BASE + 'screenshots/exobiology.png'], 'author': {'@type': 'Person', 'name': 'uruskan', 'url': 'https://github.com/uruskan'}, 'sameAs': [REPO]}
+    body = page_body(page)
+    faq = faq_schema(body)
+    scripts = f'<script type="application/ld+json">{json.dumps(schema)}</script>' + (f'<script type="application/ld+json">{json.dumps(faq)}</script>' if faq else '')
     return f'''<!doctype html>
 <html lang="en" id="top"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b0d10"><meta name="google-site-verification" content="qddrMPdC8qXkPKaDAJsy4fdm2HvshZ6FeSoM-YSG02w">
 <title>{escape(page['title'])}</title><meta name="description" content="{escape(page['description'])}"><link rel="canonical" href="{url}">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Elite Nexus"><meta property="og:title" content="{escape(page['title'])}"><meta property="og:description" content="{escape(page['description'])}"><meta property="og:url" content="{url}"><meta property="og:image" content="{BASE}assets/social-preview.jpg"><meta property="og:image:width" content="1280"><meta property="og:image:height" content="640"><meta property="og:image:alt" content="Elite Nexus: cockpit customization, trading, exploration, engineering and more in one companion app for Windows, Linux and macOS."><meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="preload" href="fonts/Inter-Regular.ttf" as="font" type="font/ttf" crossorigin><link rel="stylesheet" href="style.css"><script>document.documentElement.classList.add('js');</script><script src="site.js" defer></script>
-<script type="application/ld+json">{json.dumps(schema)}</script></head><body class="{'home' if slug == 'index' else 'detail-page'}">
-{header(slug)}<main id="main">{page_body(page)}</main>{footer()}
+{scripts}</head><body class="{'home' if slug == 'index' else 'detail-page'}">
+{header(slug)}<main id="main">{body}</main>{footer()}
 </body></html>\n'''
 
 def build(destination):
@@ -108,7 +134,7 @@ def build(destination):
             raise ValueError(f'Invalid page slug: {page["slug"]!r}')
         (destination / (page['slug'] + '.html')).write_text(render(page), encoding='utf-8')
     if destination.resolve() != SOURCE.resolve():
-        for name in ('style.css', 'site.js', 'robots.txt', 'llms.txt'):
+        for name in ['style.css', 'site.js'] + [p.name for p in SOURCE.glob('*.txt')]:
             shutil.copy2(SOURCE / name, destination / name)
         shutil.copytree(SOURCE / 'assets', destination / 'assets', dirs_exist_ok=True)
     for source, target in [(ROOT / 'docs/screenshots', destination / 'screenshots'), (ROOT / 'data/fonts/inter', destination / 'fonts')]:
