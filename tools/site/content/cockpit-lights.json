@@ -1,7 +1,7 @@
 {
   "slug": "cockpit-lights",
   "title": "Elite Dangerous Cockpit Light Dimmer — Elite Nexus",
-  "description": "Dim Elite Dangerous cockpit lights independently of the HUD. Adjust light kept and reach, use F9/F10/F11 in flight, and manage the optional graphics hook from Elite Nexus.",
+  "description": "Dim Elite Dangerous cockpit lights independently of the HUD. Set how much light stays and how far the dimmer reaches, use F9, F10 and F11 in flight, and install or remove the optional graphics hook in one click.",
   "kicker": "Cockpit lights",
   "heading": "Less cabin light. More of the galaxy.",
   "lead": "Turn down the cockpit’s own lamps and glow with a dedicated dimmer. Keep your HUD readable, your surroundings unchanged, and adjust the cabin while you fly.",
@@ -19,28 +19,16 @@
     },
     {
       "id": "setup",
-      "label": "Hook setup"
+      "label": "Install & calibrate"
     },
     {
       "id": "details",
-      "label": "Compatibility & details"
+      "label": "Good to know"
     }
   ],
-  "related": [
-    {
-      "href": "hud-colours.html",
-      "label": "HUD colours",
-      "description": "Make your own theme and preserve the contact colours you fly by."
-    },
-    {
-      "href": "odyssey-glare.html",
-      "label": "Glare & exposure",
-      "description": "Find a more comfortable balance of bright lights and dark tones."
-    },
-    {
-      "href": "exploration.html",
-      "label": "Exploration & navigation",
-      "description": "Plan the journey beyond the canopy and keep valuable discoveries in view."
-    }
-  ]
+  "next": {
+    "href": "odyssey-glare.html",
+    "label": "Next: Glare & exposure",
+    "description": "Tame Odyssey's glare and lift the darks with the game's own tone-mapping values."
+  }
 }

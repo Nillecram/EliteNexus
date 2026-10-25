@@ -1,7 +1,7 @@
 {
   "slug": "odyssey-glare",
   "title": "Elite Dangerous Odyssey Glare & Exposure Controls — Elite Nexus",
-  "description": "Tune Odyssey glare, dark tones and exposure in Elite Nexus. Start from Less glare or Morbad’s Odyssey tweak, adjust the ACES curve, and restore game defaults anytime.",
+  "description": "Tune Odyssey glare, dark tones and exposure in Elite Nexus. Start from Less glare or Morbad’s Odyssey tweak, adjust the ACES curve and the auto-exposure targets, and restore the game’s defaults any time.",
   "kicker": "Glare & exposure",
   "heading": "Find the light you want to fly in.",
   "lead": "Tame bright-light glare and lift dark tones with Odyssey’s own tone-mapping settings. Start with a preset, refine the picture and keep a direct path back to the game’s defaults.",
@@ -11,11 +11,11 @@
   "toc": [
     {
       "id": "picture",
-      "label": "Tone-mapping controls"
+      "label": "What it changes"
     },
     {
       "id": "presets",
-      "label": "Presets & adjustments"
+      "label": "Presets"
     },
     {
       "id": "apply",
@@ -23,24 +23,12 @@
     },
     {
       "id": "details",
-      "label": "Exposure questions"
+      "label": "Good to know"
     }
   ],
-  "related": [
-    {
-      "href": "cockpit-lights.html",
-      "label": "Cockpit lights",
-      "description": "Dim the lamps themselves, with independent amount and reach controls."
-    },
-    {
-      "href": "hud-colours.html",
-      "label": "HUD colours",
-      "description": "Find a palette and brightness that feel right in your cockpit."
-    },
-    {
-      "href": "exobiology.html",
-      "label": "Exobiology",
-      "description": "Find promising worlds and track each sample on the surface."
-    }
-  ]
+  "next": {
+    "href": "trading.html",
+    "label": "Next: Trading & markets",
+    "description": "Find a buyer for the hold you have, plan a run from your pins and catch abnormal prices as commanders report them."
+  }
 }

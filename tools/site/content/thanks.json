@@ -1,0 +1,34 @@
+{
+  "slug": "thanks",
+  "title": "Thanks | Elite Nexus",
+  "description": "The commanders behind Elite Nexus: code contributors, sponsors, the bug reports and ideas from GitHub and the Frontier Forums, and the community knowledge the app is built on.",
+  "kicker": "Thank you, commanders",
+  "heading": "Made with commanders.",
+  "lead": "Elite Nexus is one commander's spare-time project, and most of what changed since launch started with someone else's report, idea or help. These are the people behind it.",
+  "hero_image": "dashboard.png",
+  "hero_alt": "Elite Nexus dashboard with commander details, ship status and location",
+  "hero_caption": "Every page here got better because someone wrote in.",
+  "toc": [
+    {
+      "id": "code",
+      "label": "Code"
+    },
+    {
+      "id": "sponsors",
+      "label": "Sponsors"
+    },
+    {
+      "id": "reports",
+      "label": "Reports & ideas"
+    },
+    {
+      "id": "knowledge",
+      "label": "Community knowledge"
+    }
+  ],
+  "next": {
+    "href": "https://github.com/uruskan/EliteNexus/issues",
+    "label": "Report a bug or an idea",
+    "description": "GitHub Issues and Discussions, or the release thread on the Frontier Forums. Most of what changed since launch started that way."
+  }
+}

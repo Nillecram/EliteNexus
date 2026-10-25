@@ -1,12 +1,12 @@
 {
   "slug": "exploration",
   "title": "Elite Dangerous Exploration, Road to Riches & Route Planning | Elite Nexus",
-  "description": "See scan and mapping values, plan valuable-body tours, follow neutron and carrier routes, map your travels and track unsold exploration data in Elite Nexus.",
+  "description": "See scan and mapping values, plan valuable-body tours, follow neutron, exact and fleet-carrier routes, map your travels and track unsold exploration data in Elite Nexus.",
   "kicker": "Exploration & navigation",
-  "heading": "Know what's worth the detour.",
+  "heading": "Know what’s worth the detour.",
   "lead": "See the value in the system around you, choose the next worlds to scan and follow the journey without losing track of your discoveries. Exploration, travel planning and your galaxy map work together.",
   "hero_image": "exploration.png",
-  "hero_alt": "Elite Nexus Exploration page listing a system's scanned bodies, current values, mapped values and notable discoveries.",
+  "hero_alt": "Elite Nexus Exploration page listing a system’s scanned bodies, current values, mapped values and notable discoveries.",
   "hero_caption": "Current system keeps your scanned worlds, mapping opportunities and discoveries in one view.",
   "toc": [
     {
@@ -30,21 +30,9 @@
       "label": "Unsold data & history"
     }
   ],
-  "related": [
-    {
-      "href": "exobiology.html",
-      "label": "Find life on the next world",
-      "description": "Compare bonus hunts and known-species tours, then follow your sampling progress on the surface."
-    },
-    {
-      "href": "trading.html#services",
-      "label": "Find Vista Genomics",
-      "description": "Search nearby services and plan the selling stop after your expedition."
-    },
-    {
-      "href": "odyssey-glare.html",
-      "label": "Adjust glare & exposure",
-      "description": "Tune Odyssey's glare and dark tones with presets and a way back to the game's defaults."
-    }
-  ]
+  "next": {
+    "href": "exobiology.html",
+    "label": "Next: Exobiology",
+    "description": "A live sampling radar, species predictions before you land, and two ways to find the next planet."
+  }
 }

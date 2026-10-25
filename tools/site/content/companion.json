@@ -1,13 +1,13 @@
 {
   "slug": "companion",
-  "title": "AI co-pilot, voice alerts & session tools | Elite Nexus",
-  "description": "Ask an AI co-pilot grounded in your commander data, track sessions, use voice alerts and a compact HUD, and choose how Elite Nexus shares data.",
-  "kicker": "Your everyday companion",
+  "title": "AI Co-pilot, Voice Alerts & Your Data | Elite Nexus",
+  "description": "Ask an AI co-pilot grounded in your commander data, hear spoken alerts, choose which community services receive live events, and keep your settings safe: Elite Nexus never silently resets them.",
+  "kicker": "AI, voice & your data",
   "heading": "A co-pilot with your next move in view.",
-  "lead": "Ask a question, check your session or keep an eye on the next star. Elite Nexus connects the everyday details of your flight, from a full dashboard to a compact panel beside the game.",
+  "lead": "Ask a question in plain words, hear what matters while you fly, and decide for yourself what leaves your PC.",
   "hero_image": "ask.png",
   "hero_alt": "Elite Nexus Ask page showing the AI co-pilot answering an exobiology question",
-  "hero_caption": "Ask in plain language, with tools that can query your commander state and galaxy data.",
+  "hero_caption": "Ask in plain language, with tools that query your commander state, the market database and Spansh.",
   "toc": [
     {
       "id": "ask",
@@ -18,33 +18,21 @@
       "label": "Model providers"
     },
     {
-      "id": "dashboard",
-      "label": "Dashboard & compact HUD"
-    },
-    {
-      "id": "history",
-      "label": "Voice & history"
+      "id": "voice",
+      "label": "Alerts & voice"
     },
     {
       "id": "privacy",
-      "label": "Privacy & sync"
+      "label": "Data & sync"
+    },
+    {
+      "id": "settings",
+      "label": "Settings & recovery"
     }
   ],
-  "related": [
-    {
-      "href": "exobiology.html",
-      "label": "Exobiology",
-      "description": "Find promising planets and follow your sampling progress."
-    },
-    {
-      "href": "trading.html",
-      "label": "Markets & trade routes",
-      "description": "See the market tools behind cargo and trade questions."
-    },
-    {
-      "href": "commander.html",
-      "label": "Commander tools",
-      "description": "Keep engineering, fleet and mission plans together."
-    }
-  ]
+  "next": {
+    "href": "index.html#download",
+    "label": "Get Elite Nexus",
+    "description": "One download for Windows, Linux or a Mac. Unpack, run, fly."
+  }
 }

@@ -1,50 +1,42 @@
 {
   "slug": "commander",
-  "title": "Engineering, fleet & commander tools | Elite Nexus",
-  "description": "Plan engineering upgrades, track ship loadouts and carriers, manage mission stacks, follow BGS activity and find colonisation supplies in Elite Nexus.",
+  "title": "Fleet, Engineering & Commander Tools | Elite Nexus",
+  "description": "Elite Nexus keeps your dashboard, ships and carriers with a live jump timer, engineering wishlist and shopping list, missions and massacre stacks, BGS activity, logbook, statistics and bindings in one place.",
   "kicker": "Commander tools",
   "heading": "Give every ambition a plan.",
-  "lead": "The next upgrade, the next mission stack, the next construction delivery. Bring your ships, materials and commitments together, with the details ready when you need them.",
+  "lead": "The next upgrade, the next mission stack, the next carrier jump. Your ships, materials and commitments together, with the details ready when you need them.",
   "hero_image": "engineering.png",
   "hero_alt": "Elite Nexus engineering page with blueprint wishlist and materials shopping list",
-  "hero_caption": "Turn a blueprint wishlist into a shopping list and a material trader plan.",
+  "hero_caption": "A blueprint wishlist becomes a shopping list and a material trader plan.",
   "toc": [
     {
+      "id": "dashboard",
+      "label": "Dashboard & compact HUD"
+    },
+    {
       "id": "engineering",
-      "label": "Engineering plans"
+      "label": "Engineering"
     },
     {
       "id": "fleet",
-      "label": "Ships & carrier"
+      "label": "Ships & carriers"
     },
     {
       "id": "missions",
-      "label": "Missions & factions"
+      "label": "Missions & BGS"
     },
     {
-      "id": "colonisation",
-      "label": "Colonisation supplies"
+      "id": "history",
+      "label": "Logbook & statistics"
     },
     {
       "id": "bindings",
-      "label": "Control bindings"
+      "label": "Bindings"
     }
   ],
-  "related": [
-    {
-      "href": "trading.html",
-      "label": "Trading & supply runs",
-      "description": "Find commodities, sell your cargo and plan trade routes."
-    },
-    {
-      "href": "companion.html",
-      "label": "Your everyday companion",
-      "description": "Ask the AI co-pilot, follow sessions and keep useful alerts close."
-    },
-    {
-      "href": "exploration.html",
-      "label": "Exploration & navigation",
-      "description": "Plan the journey and keep your discoveries in view."
-    }
-  ]
+  "next": {
+    "href": "companion.html",
+    "label": "Next: AI, voice & your data",
+    "description": "An AI co-pilot that knows your ship, spoken alerts, opt-in community sync and settings that are never silently reset."
+  }
 }

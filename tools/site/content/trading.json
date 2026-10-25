@@ -1,10 +1,10 @@
 {
   "slug": "trading",
   "title": "Elite Dangerous Trading Tools, Live Markets & Cargo Selling | Elite Nexus",
-  "description": "Find buyers for your cargo, look up any commodity, pin orders and plan a run, spot abnormal prices and set live market alerts. Mining and colonisation tools included.",
+  "description": "Find buyers for your cargo, look up any commodity, pin orders and plan a run, spot abnormal prices and set live price alerts from a local market database fed by EDDN. Mining and colonisation tools included.",
   "kicker": "Trading, mining & colonisation",
   "heading": "Make every tonne count.",
-  "lead": "Find a buyer for the hold you already have. Plan the next profitable run. Catch unusual prices as commanders report them. Elite Nexus puts your cargo, ship and market data together in dedicated trading tools.",
+  "lead": "Find a buyer for the hold you already have. Plan the next profitable run. Catch unusual prices as commanders report them. Your cargo, your ship and the community’s market data in one place.",
   "hero_image": "market.png",
   "hero_alt": "Elite Nexus Market page showing abnormal commodity prices, galactic-average comparisons, station distances and update ages.",
   "hero_caption": "Abnormal prices puts the offer, the galactic average, the distance and the age of the report in one view.",
@@ -19,7 +19,7 @@
     },
     {
       "id": "run-planner",
-      "label": "Run planner"
+      "label": "Pins & run planner"
     },
     {
       "id": "abnormal-prices",
@@ -38,21 +38,9 @@
       "label": "Nearest services"
     }
   ],
-  "related": [
-    {
-      "href": "exploration.html#navigation",
-      "label": "Navigation & routes",
-      "description": "Follow plotted journeys with fuel-star information and the next system on your clipboard."
-    },
-    {
-      "href": "commander.html",
-      "label": "Your ships & carrier",
-      "description": "Keep loadouts, engineering, carrier resources and commander activity together."
-    },
-    {
-      "href": "exobiology.html",
-      "label": "Exobiology",
-      "description": "Find promising planets, track samples and see the data waiting to be sold."
-    }
-  ]
+  "next": {
+    "href": "exploration.html",
+    "label": "Next: Exploration & navigation",
+    "description": "Know what’s worth the detour, plan a Road to Riches tour and follow every route in one place."
+  }
 }

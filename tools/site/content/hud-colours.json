@@ -1,13 +1,13 @@
 {
   "slug": "hud-colours",
   "title": "Elite Dangerous HUD Colour Editor — Elite Nexus",
-  "description": "Create your Elite Dangerous HUD theme with presets, colour controls and a live preview. Save and share themes, and keep hostile contacts red with an optional graphics hook.",
+  "description": "Create your Elite Dangerous HUD theme with community presets, colour controls and a live cockpit preview. Save and share themes, and keep hostile red, friendly green and shield blue with an optional graphics hook.",
   "kicker": "HUD colours",
   "heading": "A different colour. The same instincts.",
   "lead": "Make the HUD yours with community themes, precise colour controls and a live cockpit preview. Keep the cues you fly by: hostile red, friendly green and shield blue.",
   "hero_image": "hud-colours.png",
   "hero_alt": "Elite Nexus HUD colour editor showing the Empire blue theme, colour controls and an illustrative cockpit preview with red hostile and green friendly contacts.",
-  "hero_caption": "Empire blue in the live editor preview, with contact and shield colours preserved. Click to explore the full app screenshot.",
+  "hero_caption": "Empire blue in the live editor preview, with contact and shield colours preserved.",
   "toc": [
     {
       "id": "create",
@@ -15,32 +15,20 @@
     },
     {
       "id": "contact-colours",
-      "label": "Contact colour protection"
+      "label": "Keep hostile red"
     },
     {
       "id": "save-share",
-      "label": "Save & apply themes"
+      "label": "Save, share, apply"
     },
     {
       "id": "details",
-      "label": "Controls & compatibility"
+      "label": "Good to know"
     }
   ],
-  "related": [
-    {
-      "href": "cockpit-lights.html",
-      "label": "Cockpit lights",
-      "description": "Dim the cabin independently, with controls you can use while flying."
-    },
-    {
-      "href": "odyssey-glare.html",
-      "label": "Glare & exposure",
-      "description": "Tune bright lights, dark tones and Odyssey’s exposure settings."
-    },
-    {
-      "href": "commander.html",
-      "label": "Your commander",
-      "description": "Bring your ships, engineering plans and flight history together."
-    }
-  ]
+  "next": {
+    "href": "cockpit-lights.html",
+    "label": "Next: Cockpit lights",
+    "description": "Dim the cockpit's own lamps and glow, and nothing else, with keys you can use while flying."
+  }
 }

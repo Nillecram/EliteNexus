@@ -18,7 +18,10 @@ def escape(value):
     return html.escape(str(value), quote=True)
 
 def shot(filename, alt, caption, eager=False):
-    return f'''<figure class="screenshot"><a href="screenshots/{escape(filename)}" data-lightbox data-caption="{escape(caption)}" aria-label="Enlarge screenshot: {escape(alt)}"><img src="screenshots/{escape(filename)}" width="1480" height="920" alt="{escape(alt)}" loading="{'eager' if eager else 'lazy'}" decoding="async"></a><figcaption>{escape(caption)}<span class="enlarge-hint" aria-hidden="true">View full size ↗</span></figcaption></figure>'''
+    """A screenshot is a plain link to its full-size file: nothing to learn, nothing to break."""
+    return (f'<figure class="screenshot"><a href="screenshots/{escape(filename)}" aria-label="View the full-size screenshot: {escape(alt)}">'
+            f'<img src="screenshots/{escape(filename)}" width="1480" height="920" alt="{escape(alt)}" loading="{"eager" if eager else "lazy"}" decoding="async"></a>'
+            f'<figcaption>{escape(caption)}</figcaption></figure>')
 
 def header(slug):
     def link(href, label):
@@ -33,40 +36,55 @@ def header(slug):
 <details class="nav-dropdown"><summary>Cockpit <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel">{link('hud-colours.html', 'HUD colours')}{link('cockpit-lights.html', 'Cockpit lights')}{link('odyssey-glare.html', 'Glare &amp; exposure')}</div></details>
 {link('trading.html', 'Trading')}
 <details class="nav-dropdown"><summary>Explore <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel">{link('exploration.html', 'Exploration &amp; navigation')}{link('exobiology.html', 'Exobiology')}</div></details>
-<details class="nav-dropdown"><summary>Commander <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel">{link('commander.html', 'Fleet &amp; engineering')}{link('companion.html', 'AI &amp; everyday tools')}{link('alternatives.html', 'Why Elite Nexus')}</div></details>
+<details class="nav-dropdown"><summary>Commander <span aria-hidden="true">⌄</span></summary><div class="dropdown-panel">{link('commander.html', 'Fleet &amp; engineering')}{link('companion.html', 'AI, voice &amp; your data')}</div></details>
 <a class="nav-source" href="{REPO}">GitHub <span aria-hidden="true">↗</span></a>
-<a class="button button-small" href="{'#download' if slug == 'index' else 'index.html#download'}">Download <span aria-hidden="true">↓</span></a>
+<a class="button button-small" href="{DOWNLOAD}">Download <span aria-hidden="true">↓</span></a>
 </nav></div></header>'''
 
 def footer():
     return f'''<footer class="site-footer"><div class="container footer-grid">
 <div class="footer-brand"><a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span><span>Elite Nexus</span></a><p>One app. Your whole galaxy.</p><span class="small-label">Free software · Native app for Windows, Linux and macOS</span></div>
-<div><h2>Make it yours</h2><a href="hud-colours.html">HUD colours</a><a href="cockpit-lights.html">Cockpit lights</a><a href="odyssey-glare.html">Glare &amp; exposure</a></div>
-<div><h2>Find your next move</h2><a href="trading.html">Trading &amp; markets</a><a href="exploration.html">Exploration &amp; navigation</a><a href="exobiology.html">Exobiology</a><a href="commander.html">Fleet &amp; engineering</a><a href="companion.html">AI &amp; everyday tools</a></div>
-<div><h2>Get involved</h2><a href="{DOWNLOAD}">Download &amp; release notes</a><a href="{REPO}">Source on GitHub</a><a href="{SPONSOR}">Sponsor on GitHub</a><a href="{REPO}/blob/main/docs/USER_GUIDE.md">User guide</a><a href="{REPO}/issues">Report an issue</a><a href="{REPO}/blob/main/LICENSE">GPL-3.0 licence</a></div>
-</div><div class="container footer-bottom"><p>An independent community companion. Not affiliated with or endorsed by Frontier Developments.<br>Elite Dangerous is a trademark of Frontier Developments plc.</p><a href="#top">Back to top ↑</a></div></footer>
-<dialog class="lightbox" aria-labelledby="lightbox-caption"><div class="lightbox-layout"><div class="lightbox-toolbar"><p id="lightbox-caption"></p><div class="lightbox-actions"><button type="button" data-lightbox-prev aria-label="Previous screenshot">←</button><button type="button" data-lightbox-next aria-label="Next screenshot">→</button><button type="button" data-lightbox-zoom aria-pressed="false">Zoom in</button><a data-lightbox-original target="_blank" rel="noopener">Original ↗</a><button type="button" data-lightbox-close aria-label="Close screenshot">✕</button></div></div><div class="lightbox-stage"><img alt=""></div><p class="lightbox-help">Arrow keys to browse · Escape to close</p><p class="sr-only" aria-live="polite" data-lightbox-status></p></div></dialog>'''
+<div><h2>Features</h2><a href="hud-colours.html">HUD colours</a><a href="cockpit-lights.html">Cockpit lights</a><a href="odyssey-glare.html">Glare &amp; exposure</a><a href="trading.html">Trading &amp; markets</a><a href="exploration.html">Exploration &amp; navigation</a><a href="exobiology.html">Exobiology</a><a href="commander.html">Fleet &amp; engineering</a><a href="companion.html">AI, voice &amp; your data</a></div>
+<div><h2>Project</h2><a href="{DOWNLOAD}">Download</a><a href="{REPO}/releases">Release notes</a><a href="{REPO}/blob/main/docs/USER_GUIDE.md">User guide</a><a href="{REPO}">Source on GitHub</a><a href="{REPO}/issues">Report an issue</a><a href="{SPONSOR}">Sponsor on GitHub</a><a href="thanks.html">Thanks</a><a href="{REPO}/blob/main/LICENSE">GPL-3.0 licence</a></div>
+</div><div class="container footer-bottom"><p>An independent community companion. Not affiliated with or endorsed by Frontier Developments.<br>Elite Dangerous is a trademark of Frontier Developments plc.</p><a href="#top">Back to top ↑</a></div></footer>'''
 
 def page_body(page):
     if page['slug'] == 'index':
         return (CONTENT / 'index.html').read_text(encoding='utf-8')
     body = (CONTENT / (page['slug'] + '.html')).read_text(encoding='utf-8')
-    anchors = re.findall(r'<section\b[^>]*\bid=[\"\x27]([^\"\x27]+)[\"\x27][^>]*>(.*?)(?=<section\b|$)', body, re.S)
-    jump_links = []
-    for anchor, section in anchors:
-        heading = re.search(r'<h2\b[^>]*>(.*?)</h2>', section, re.S)
-        if heading:
-            label = re.sub('<[^>]+>', '', heading.group(1))
-            jump_links.append(f'<a href="#{escape(anchor)}">{label}</a>')
-    if page.get('toc'):
-        jump_links = [f'<a href="#{escape(item["id"])}">{escape(item["label"])}</a>' for item in page['toc']]
+    jump_links = [f'<a href="#{escape(item["id"])}">{escape(item["label"])}</a>' for item in page.get('toc', [])]
+    if not jump_links:
+        for anchor, section in re.findall(r'<section\b[^>]*\bid=["\x27]([^"\x27]+)["\x27][^>]*>(.*?)(?=<section\b|$)', body, re.S):
+            heading = re.search(r'<h2\b[^>]*>(.*?)</h2>', section, re.S)
+            if heading:
+                jump_links.append(f'<a href="#{escape(anchor)}">{re.sub("<[^>]+>", "", heading.group(1))}</a>')
     jumps = '<nav class="page-jump container" aria-label="On this page"><span>ON THIS PAGE</span>' + ''.join(jump_links) + '</nav>' if jump_links else ''
-    hero = f'''<section class="page-hero container"><div><a class="back-link" href="index.html#features">← All features</a><p class="eyebrow">{escape(page['kicker'])}</p><h1>{escape(page['heading'])}</h1><p class="lead">{escape(page['lead'])}</p><a class="button" href="{DOWNLOAD}">Download for Windows, Linux &amp; Mac <span aria-hidden="true">↓</span></a></div><div class="page-hero-image">{shot(page['hero_image'], page['hero_alt'], page['hero_caption'], True)}</div></section>'''
-    related = ''.join(f'<a class="related-link" href="{escape(item["href"])}"><h3>{escape(item["label"])} <span aria-hidden="true">↗</span></h3><p>{escape(item["description"])}</p></a>' for item in page.get('related', []))
-    closing = f'''<section class="section container"><div class="section-heading"><p class="eyebrow">Keep exploring</p><h2>More of your galaxy, connected.</h2></div><div class="related-grid">{related}</div></section><section class="container compact-cta"><div><p class="eyebrow">Ready when you are</p><h2>Your next session starts here.</h2><p>Free and open source. Windows 10/11, Linux or a Mac with Apple Silicon. Unpack and fly.</p></div><a class="button" href="{DOWNLOAD}">Get Elite Nexus <span aria-hidden="true">↓</span></a></section>'''
+    hero = f'''<section class="page-hero container"><div><a class="back-link" href="index.html#features">← All features</a><p class="eyebrow">{escape(page['kicker'])}</p><h1>{escape(page['heading'])}</h1><p class="lead">{escape(page['lead'])}</p></div><div class="page-hero-image">{shot(page['hero_image'], page['hero_alt'], page['hero_caption'], True)}</div></section>'''
+    # One next step per page, instead of a grid of related links that send readers round in circles.
+    following = page['next']
+    closing = f'''<section class="container page-next"><p class="eyebrow">Next</p><a class="next-link" href="{escape(following['href'])}"><h2>{escape(following['label'])} <span aria-hidden="true">→</span></h2><p>{escape(following['description'])}</p></a></section>'''
     return hero + jumps + body + closing
 
+def canonical(target):
+    """The canonical URL of a site-relative link such as 'index.html#features'."""
+    path = target.split('#')[0]
+    return BASE + ('' if path == 'index.html' else path)
+
+def render_redirect(page):
+    """A page that moved: the old URL keeps working and sends readers (and search engines) to the new place."""
+    target = page['redirect']
+    return f'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b0d10">
+<meta http-equiv="refresh" content="0; url={escape(target)}"><meta name="robots" content="noindex">
+<title>{escape(page['title'])}</title><meta name="description" content="{escape(page['description'])}"><link rel="canonical" href="{canonical(target)}">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"></head><body class="redirect-page">
+<main id="main" class="container"><h1>{escape(page['heading'])}</h1><p>{escape(page['lead'])} <a href="{escape(target)}">{escape(page['link_label'])}</a></p></main>
+</body></html>
+'''
+
 def render(page):
+    if 'redirect' in page:
+        return render_redirect(page)
     slug = page['slug']
     url = BASE if slug == 'index' else BASE + slug + '.html'
     schema = {'@context': 'https://schema.org', '@type': 'SoftwareApplication', 'name': 'Elite Nexus', 'applicationCategory': 'GameApplication', 'operatingSystem': 'Windows 10, Windows 11, Linux (64-bit), macOS 11 or later', 'description': page['description'], 'url': BASE, 'downloadUrl': DOWNLOAD, 'codeRepository': REPO, 'license': REPO + '/blob/main/LICENSE', 'offers': {'@type': 'Offer', 'price': '0', 'priceCurrency': 'USD'}}
@@ -97,9 +115,10 @@ def build(destination):
         shutil.copytree(source, target, dirs_exist_ok=True)
     shutil.copy2(ROOT / 'docs/social-preview.png', destination / 'social-preview.png')
     shutil.copy2(ROOT / 'docs/USER_GUIDE.md', destination / 'user-guide.md')
-    urls = ''.join(f'<url><loc>{BASE if p["slug"] == "index" else BASE + p["slug"] + ".html"}</loc></url>\n' for p in pages)
+    listed = [p for p in pages if 'redirect' not in p]
+    urls = ''.join(f'<url><loc>{BASE if p["slug"] == "index" else BASE + p["slug"] + ".html"}</loc></url>\n' for p in listed)
     (destination / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + '</urlset>\n', encoding='utf-8')
-    print(f'Built {len(pages)} pages in {destination}')
+    print(f'Built {len(pages)} pages in {destination} ({len(pages) - len(listed)} moved-page redirects)')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

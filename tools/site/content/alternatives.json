@@ -1,46 +1,9 @@
 {
   "slug": "alternatives",
-  "title": "Why one Elite Dangerous companion? | Elite Nexus",
-  "description": "See how Elite Nexus connects cockpit customisation, exploration, trading and commander tools in one native app for Windows, Linux and macOS, with clear scope and community credits.",
-  "kicker": "Why one companion",
-  "heading": "Less setup between you and the next jump.",
-  "lead": "An evening in Elite can move from a material trader to a mission stack to an unexplored system. Elite Nexus puts those everyday jobs in one app, with your current ship and location close at hand.",
-  "hero_image": "dashboard.png",
-  "hero_alt": "Elite Nexus dashboard with commander details, ship status and location",
-  "hero_caption": "A shared commander state connects the app's feature pages.",
-  "toc": [
-    {
-      "id": "connected",
-      "label": "Connected workflows"
-    },
-    {
-      "id": "coverage",
-      "label": "Feature coverage"
-    },
-    {
-      "id": "fit",
-      "label": "Setup & compatibility"
-    },
-    {
-      "id": "community",
-      "label": "Community & source"
-    }
-  ],
-  "related": [
-    {
-      "href": "hud-colours.html",
-      "label": "Start with the cockpit",
-      "description": "Choose HUD colours and understand colour protection."
-    },
-    {
-      "href": "companion.html",
-      "label": "Meet the co-pilot",
-      "description": "AI, alerts, session tools and choices about data sharing."
-    },
-    {
-      "href": "commander.html",
-      "label": "Plan your next upgrade",
-      "description": "Engineering, fleet, missions and colonisation."
-    }
-  ]
+  "redirect": "index.html#features",
+  "title": "This page has moved | Elite Nexus",
+  "description": "What the Why Elite Nexus page said is now on the Elite Nexus homepage: every feature page in one list, and the questions commanders ask before they download.",
+  "heading": "This page has moved.",
+  "lead": "What it said is now on the homepage.",
+  "link_label": "Continue to the features"
 }

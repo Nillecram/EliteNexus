@@ -6,8 +6,10 @@ analytics or package-install step.
 ## Edit and build
 
 - Edit the homepage body in `tools/site/content/index.html` and its metadata in `index.json`.
-- Feature-page copy lives in `tools/site/content/*.html`; the matching JSON files hold metadata and related links.
-- `tools/site/build.py` owns the shared head, navigation, page layout, related links and footer.
+- Feature-page copy lives in `tools/site/content/*.html`; the matching JSON files hold metadata, the "on this page"
+  links and the page's one `next` link. A JSON file with a `redirect` (such as `alternatives.json`) builds a small
+  page that sends an old URL to its new place, so links out there keep working; it is left out of the sitemap.
+- `tools/site/build.py` owns the shared head, navigation, page layout, the next link and the footer.
 - Design and interactions live in `site/style.css` and `site/site.js`.
 - `site/assets/` contains original website artwork and the diamond favicon.
 - App screenshots remain canonical in `docs/screenshots/`; Inter and its licence remain in `data/fonts/inter/`.
@@ -26,9 +28,10 @@ use `python tools/site/build.py --output PATH`. The GitHub Pages workflow uses `
 checker before publishing. All public URLs work under the `/EliteNexus/` project path.
 
 The checker catches broken pages, assets and anchors, duplicate IDs, missing metadata, incorrect production
-canonicals, and screenshot links without full-size viewing or meaningful alt text. Browser checks should also
-cover mobile navigation, all product-tour tabs, lightbox zoom/next/previous/Escape and keyboard focus restoration.
-Images remain ordinary full-size links and all product-tour panels remain visible when JavaScript is disabled.
+canonicals (a redirect page's canonical must be its destination, and it must say `noindex`), and screenshots that
+aren't plain links to their own full-size file or lack meaningful alt text. Browser checks should also cover the
+small-screen menu and keyboard focus. Every screenshot is an ordinary link to the image, with no viewer script: the
+only JavaScript on the site is the menu.
 
 ## Quote collage
 
@@ -40,13 +43,13 @@ shortened, and without usernames or avatars: the commanders wrote on a forum, no
 To redraw the image, run `python tools/site/testimonials.py` and open the URL it prints in a Chromium-based browser
 (`--open` uses your default browser). The page draws itself at 2× through the browser's own renderer and posts the
 PNG back; the script saves it to `docs/testimonials.png` (2800 × 2200) and exits. Headless `--screenshot` would be
-simpler, but it can't start inside an agent's command sandbox.
+simpler, but it can't start from a sandboxed shell.
 
 ## Artwork
 
-`galaxy-hero.webp` is original artwork made with the built-in image generation tool for this site. It is conceptual
-space imagery; it does not depict a game screenshot. Generation brief: a text-free, very wide charcoal space scene,
+`galaxy-hero.webp` is original artwork made for this site. It is conceptual space imagery; it does not depict a game
+screenshot. Brief: a text-free, very wide charcoal space scene,
 planetary horizon at lower right, blue atmospheric rim, restrained amber sunrise and orbital routes, an almost
 empty left half for legible headings, no ships, official logos or fabricated interface. Exported to WebP quality 86.
 
-`social-preview.jpg` is the approved feature-rich Elite Nexus artwork from this chat, exported at 1280 × 640.
+`social-preview.jpg` is the Elite Nexus artwork used for link previews, exported at 1280 × 640.

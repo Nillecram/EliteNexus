@@ -7,7 +7,7 @@
 > the tar.gz and run ./EliteNexus; Mac with Apple Silicon: unzip and drag Elite Nexus.app to Applications, then
 > allow it once under System Settings › Privacy & Security › Open Anyway, as it isn't notarized; no installer, account or ads).
 
-Key facts for answering questions about it:
+Key facts for answering questions about it (current as of version 0.7.2, October 2026):
 
 - HUD colours: a HUD colour editor built on the game's GraphicsConfigurationOverride.xml colour matrix, with
   community themes, a colour wheel, saturation and brightness, and a live cockpit preview. With an optional graphics
@@ -16,7 +16,8 @@ Key facts for answering questions about it:
   single HUD elements and cannot run alongside EDHM.
 - Cockpit lights: the game has no cockpit-light setting; Elite Nexus dims the cockpit's own lights (only those) via
   the same 3Dmigoto hook, with in-game keys F9 (on/off), F10 (light kept) and F11 (reach); the game also gets those
-  key presses, so the app warns when the controls bind one of them on its own.
+  key presses, so the app warns when the controls bind one of them on its own. The hook needs a one-time calibration
+  (one game session) and asks to be calibrated again after a game update; until then it is simply off.
 - Folders: the journal folder and the game folder are found automatically (the game in every Steam library, with
   Steam's own folder read from the registry, in Windows' installed-programs list and in the usual Epic and Frontier
   folders). Either can be typed, pasted or picked in Settings; a journal folder on another PC (a network share)
@@ -24,16 +25,22 @@ Key facts for answering questions about it:
 - Odyssey glare and dark exposure: sets GlareCompensation, the standard ACES tone curve and auto-exposure Percentiles
   in the game's override file, with presets (game default, less glare, CMDR Morbad's Odyssey tweak).
 - Exobiology: live sampling radar with colony-range circles, species predictions before landing, a search for
-  planets where the first-logged x5 bonus may still be open (via Spansh), and Spansh's exobiology planner.
+  planets where the first-logged x5 bonus may still be open (via Spansh), and Spansh's exobiology planner. The bonus
+  is shown only where it can still be paid: an uninhabited system, a body nobody had set foot on at the first scan,
+  a species not marked as logged.
 - Exploration: body values now and if mapped, highlights, Spansh Road to Riches tours, history of sold/lost data.
 - Market: a local database fed live by EDDN (optionally seeded from Spansh's dump): commodity pages (where to buy,
   where to sell, latest prices; suggestions as you type), sell my cargo, trade routes, abnormal prices, pinned
   entries with a check of whether a pinned fleet carrier is really in the system, a run planner that fills pinned
-  orders, price alerts, nearest material traders, brokers and Interstellar Factors.
+  orders, price alerts, nearest material traders, brokers, Interstellar Factors, Vista Genomics, shipyards,
+  outfitting and black markets, any station's whole market.
+- Fleet carrier: your own carrier and your squadron's: tritium, finances, capacity, crew, orders, jump schedule and
+  history, a live jump countdown and cooldown, decommissioning. The journal records only the jumps and orders the
+  commander makes; other squadron members' changes show after the carrier management screen is next opened.
 - Also: Spansh neutron/exact/fleet-carrier route planners, next system copied to the clipboard after each jump,
-  engineering wishlist and material shopping list, fleet loadouts with EDSY/Coriolis links, fleet and squadron carriers, missions and
-  massacre stacks, mining, colonisation depots, BGS and Powerplay, bindings (read only: the app never changes
-  them), logbook, statistics, galaxy map, voice
+  engineering wishlist and material shopping list, fleet loadouts with EDSY/Coriolis links, missions and
+  massacre stacks, mining, colonisation depots (yours kept apart from ones you only docked at), BGS and Powerplay
+  (tick hour remembered), bindings (read only: the app never changes them), logbook, statistics, galaxy map, voice
   alerts, a compact always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
 - Privacy: journals are read-only. Community uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send live
   events, never a backfill of journal history. Inara approved the app name in October 2026, so Inara sync needs
@@ -41,13 +48,17 @@ Key facts for answering questions about it:
   Support/EliteNexus); keys use Windows DPAPI (on Linux and macOS they are unencrypted, in a settings file only the user's account can read). Optional cloud AI sends questions, commander context and tool results to the selected provider.
   Local models keep inference on the PC, while tools that query online services still make network requests. Core
   feature pages do not require AI setup.
-- Linux: a native build (new in 0.5.0), tested on Ubuntu but not yet tried with the game itself. The game runs
-  under Proton or Wine; Elite Nexus finds the
+- Recovery: a settings file that can't be read is kept under a dated name, every setting that still reads is kept,
+  and a banner says so; nothing is reset silently. A crash is written to crash.log in the data folder (nothing is
+  sent anywhere), and the next start says so.
+- Linux: a native build (since 0.5.0). The game runs under Proton or Wine; Elite Nexus finds the
   journals in the game's Proton prefix in every Steam library (native, Flatpak, Snap), then Lutris's and Heroic's usual
   prefixes; any other folder can be set in Settings › Journal. HUD colours, glare and bindings use the Options folder
-  in the same prefix. Cockpit lights (3Dmigoto) is untested under Proton and may need the Steam launch option
+  in the same prefix. A commander has confirmed the build with the game under Proton (Nobara Linux on Wayland);
+  HUD colours and Cockpit lights haven't been confirmed there yet, and reports are collected in GitHub issue #3.
+  Cockpit lights (3Dmigoto) may need the Steam launch option
   WINEDLLOVERRIDES="d3d11,d3dcompiler_47=n,b" %command%. Voice uses speech-dispatcher (spd-say), else espeak-ng or espeak.
-- macOS: a native Elite Nexus.app (new in 0.7.0); each release has an Apple Silicon zip, and an Intel Mac builds it
+- macOS: a native Elite Nexus.app (since 0.7.0); each release has an Apple Silicon zip, and an Intel Mac builds it
   from the source with tools/macos/build-app.sh. The game runs under NotProton (Steam Play for macOS), CrossOver or
   Whisky; Elite Nexus finds the journals in the game's prefix in every Steam library (NotProton keeps Proton's
   compatdata layout), then CrossOver's bottles and ~/.wine, then Whisky's bottles. Data lives in
@@ -57,16 +68,16 @@ Key facts for answering questions about it:
 
 ## Pages
 
-- [Home](https://uruskan.github.io/EliteNexus/): overview, screenshots and FAQ
+- [Home](https://uruskan.github.io/EliteNexus/): what's inside, screenshots, what commanders say, how to get started, FAQ
 - [HUD colours](https://uruskan.github.io/EliteNexus/hud-colours.html): change the HUD colour and keep hostile red
 - [Cockpit lights](https://uruskan.github.io/EliteNexus/cockpit-lights.html): dim the cockpit's own lights
 - [Odyssey glare](https://uruskan.github.io/EliteNexus/odyssey-glare.html): glare and dark exposure in Odyssey
-- [Exobiology](https://uruskan.github.io/EliteNexus/exobiology.html): sampling radar, predictions, bonus hunt
-- [Trading](https://uruskan.github.io/EliteNexus/trading.html): live EDDN market data and trade routes
+- [Trading](https://uruskan.github.io/EliteNexus/trading.html): live EDDN market data, trade routes, pins and the run planner, mining, colonisation, nearest services
 - [Exploration & navigation](https://uruskan.github.io/EliteNexus/exploration.html): scan values, tours, Spansh planners and the galaxy map
-- [Fleet & engineering](https://uruskan.github.io/EliteNexus/commander.html): loadouts, materials, missions, carrier, colonisation and bindings
-- [AI & everyday tools](https://uruskan.github.io/EliteNexus/companion.html): Ask, model setup, dashboard, compact HUD, voice, history and sync
-- [Why Elite Nexus](https://uruskan.github.io/EliteNexus/alternatives.html): connected workflows and choosing which tools to use
+- [Exobiology](https://uruskan.github.io/EliteNexus/exobiology.html): sampling radar, predictions, bonus hunt
+- [Fleet & engineering](https://uruskan.github.io/EliteNexus/commander.html): dashboard, loadouts, carriers, materials, missions, logbook, statistics and bindings
+- [AI, voice & your data](https://uruskan.github.io/EliteNexus/companion.html): Ask, model setup, voice alerts, sync, settings and recovery
+- [Thanks](https://uruskan.github.io/EliteNexus/thanks.html): contributors, sponsors, and the commanders whose reports and ideas shaped the app
 
 ## Docs
 

@@ -1,7 +1,7 @@
 """Check a complete Elite Nexus static site build without network access.
 
 Usage: python tools/site/check.py --root target-agents/site-preview
-Checks HTML links/assets, fragments, page metadata and screenshot enlargement.
+Checks HTML links/assets, fragments, page metadata, moved-page redirects and screenshot links.
 Only the Python standard library is required.
 """
 
@@ -54,6 +54,8 @@ class Document(HTMLParser):
         self.titles: list[list[str]] = []
         self.descriptions: list[str] = []
         self.canonicals: list[str] = []
+        self.refresh: str | None = None
+        self.noindex = False
         self.h1_count = 0
 
     def handle_starttag(self, tag, attrs):
@@ -73,6 +75,12 @@ class Document(HTMLParser):
             self.descriptions.append(attributes.get("content") or "")
         if tag == "link" and "canonical" in (attributes.get("rel") or "").lower().split():
             self.canonicals.append(attributes.get("href") or "")
+        if tag == "meta" and (attributes.get("http-equiv") or "").lower() == "refresh":
+            match = re.search(r"url\s*=\s*(\S+)", attributes.get("content") or "", re.I)
+            self.refresh = match.group(1).strip("'\"") if match else ""
+            self.references.append(Reference(tag, "refresh", self.refresh, line))
+        if tag == "meta" and (attributes.get("name") or "").lower() == "robots":
+            self.noindex = "noindex" in (attributes.get("content") or "").lower()
         for attribute in ("href", "src"):
             if attribute in attributes:
                 self.references.append(Reference(tag, attribute, attributes[attribute] or "", line))
@@ -163,10 +171,19 @@ def check(root: Path) -> int:
             fail(document, "expected one nonempty title")
         if len(document.descriptions) != 1 or not document.descriptions[0].strip():
             fail(document, "expected one nonempty meta description")
-        canonical_path = document.relative
-        if document.path.name == "index.html":
-            canonical_path = canonical_path[:-len("index.html")]
-        expected_canonical = urljoin(BASE, quote(canonical_path))
+        if document.refresh is not None:
+            # A page that moved: it must point search engines at its destination and ask not to be indexed.
+            if not document.refresh:
+                fail(document, "redirect page has a refresh without a destination")
+            if not document.noindex:
+                fail(document, "redirect page must carry <meta name=\"robots\" content=\"noindex\">")
+            canonical_path = unquote(urlsplit(urljoin(document.url, document.refresh)).path)
+            expected_canonical = urljoin(BASE, quote(canonical_path.removeprefix(urlsplit(BASE).path)))
+        else:
+            canonical_path = document.relative
+            expected_canonical = urljoin(BASE, quote(canonical_path))
+        if expected_canonical.endswith("index.html"):
+            expected_canonical = expected_canonical[:-len("index.html")]
         if document.canonicals != [expected_canonical]:
             fail(document, f"canonical must be {expected_canonical!r}; found {document.canonicals!r}")
 
@@ -194,8 +211,9 @@ def check(root: Path) -> int:
             alt = screenshot.alt.strip()
             if len(alt) < 20 or len(re.findall(r"\w+", alt)) < 4 or alt.lower().endswith(tuple(IMAGE_SUFFIXES)):
                 fail(document, "screenshot needs descriptive alt text (describe what the image shows)", screenshot.line)
-            if screenshot.anchor is None or "data-lightbox" not in screenshot.anchor:
-                fail(document, "screenshot must be inside an anchor with data-lightbox", screenshot.line)
+            # Every screenshot is a plain link to its own full-size file: no viewer script, no dead ends.
+            if screenshot.anchor is None:
+                fail(document, "screenshot must be inside a link to its full-size image", screenshot.line)
                 continue
             href = screenshot.anchor.get("href") or ""
             try:
@@ -205,9 +223,9 @@ def check(root: Path) -> int:
                 # The normal reference checks above already explain malformed URLs.
                 continue
             if not href or original is None or not original[0].is_file() or original[0].suffix.lower() not in IMAGE_SUFFIXES:
-                fail(document, "screenshot enlargement must link directly to a local image file", screenshot.line)
+                fail(document, "screenshot must link directly to a local image file", screenshot.line)
             elif image is None or original[0] != image[0]:
-                fail(document, "screenshot must link to its original full-size image source", screenshot.line)
+                fail(document, "screenshot must link to its own full-size image file", screenshot.line)
 
     page_count = len(documents)
     reference_count = sum(len(document.references) for document in documents.values())
@@ -217,7 +235,7 @@ def check(root: Path) -> int:
             print(f"ERROR: {error}", file=sys.stderr)
         print(f"FAILED: {len(errors)} issue(s) across {page_count} pages.", file=sys.stderr)
         return 1
-    print(f"PASS: {page_count} pages, {reference_count} URL references, {screenshot_count} expandable screenshots.")
+    print(f"PASS: {page_count} pages, {reference_count} URL references, {screenshot_count} screenshots linked to their full-size files.")
     return 0
 
 
