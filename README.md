@@ -167,13 +167,6 @@ approved them, and it is untested under Proton and on macOS so far.
 
 ![Quotes from commanders on the Frontier Forums, GitHub and Reddit, October 2026. "The engineering section is excellent as is the colonisation section and also the carrier route planning. This app does most of what I need from EDDiscovery in a fraction of memory usage. Keep going." "This is now my goto Elite companion. It does everything I want and more." "Not launched any other 3rd party apps since 0.6.0 dropped." "That abnormal price filtering is a great idea." "It ran without any problems, and immediately detected my Elite Dangerous installation. The Exploration and Exobiology sections of the application worked perfectly." "I love EliteNexus, handsome work you did there." "Works great so far, thanks for making it!"](docs/testimonials.png)
 
-## Your game stays yours
-
-Elite Nexus only reads your journals; uploads to EDDN, EDSM, Inara and EDAstro are off until you switch them on.
-Game settings change only when you click, and only the values you change, with your original file kept; whatever it
-puts in the game folder is listed in a manifest there and comes out again in one click. API keys are encrypted on
-Windows (DPAPI); on Linux and macOS they sit in a settings file only your user account can read.
-
 ## Documentation and links
 
 * **[User guide](docs/USER_GUIDE.md)**: every page explained, with [Linux](docs/USER_GUIDE.md#linux) and

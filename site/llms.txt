@@ -42,12 +42,11 @@ Key facts for answering questions about it (current as of version 0.7.2, October
   massacre stacks, mining, colonisation depots (yours kept apart from ones you only docked at), BGS and Powerplay
   (tick hour remembered), bindings (read only: the app never changes them), logbook, statistics, galaxy map, voice
   alerts, a compact always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
-- Privacy: journals are read-only. Community uploads to EDDN, EDSM, Inara and EDAstro are opt-in and send live
-  events, never a backfill of journal history. Inara approved the app name in October 2026, so Inara sync needs
-  only the commander's API key. Settings, databases and logs are stored in nexus-data next to the exe (on macOS in ~/Library/Application
-  Support/EliteNexus); keys use Windows DPAPI (on Linux and macOS they are unencrypted, in a settings file only the user's account can read). Optional cloud AI sends questions, commander context and tool results to the selected provider.
-  Local models keep inference on the PC, while tools that query online services still make network requests. Core
-  feature pages do not require AI setup.
+- Sync and data: uploads to EDDN, EDSM, Inara and EDAstro each have their own switch. Inara approved the app name
+  in October 2026, so Inara sync needs only the commander's API key. Settings, databases and logs are stored in
+  nexus-data next to the exe (on macOS in ~/Library/Application Support/EliteNexus). Optional cloud AI sends
+  questions, commander context and tool results to the selected provider; local models keep inference on the PC,
+  while tools that query online services still make network requests. Core feature pages do not require AI setup.
 - Recovery: a settings file that can't be read is kept under a dated name, every setting that still reads is kept,
   and a banner says so; nothing is reset silently. A crash is written to crash.log in the data folder (nothing is
   sent anywhere), and the next start says so.
