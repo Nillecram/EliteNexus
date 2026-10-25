@@ -5,6 +5,11 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+## [0.7.3-beta.1] - 2026-10-25
+
+A beta of 0.7.3: Rhino surface mining remembers the mining locations you worked, with the number to pick in the
+navigation panel to go back, and a surface radar finds their deposits again.
+
 ### Added
 - **Mining › Surface mining sites** (an idea from Chequers2): every planetary mining location the Rhino refined at, with
   its system, its body and the number the game's navigation panel shows for it (Planetary Mining Location 4), what
