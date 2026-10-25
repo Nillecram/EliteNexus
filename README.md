@@ -46,6 +46,13 @@ Mac, in `~/Library/Application Support/EliteNexus`). Every page, and the Linux a
 **[user guide](docs/USER_GUIDE.md)**. Linux reports are collected in
 [issue #3](https://github.com/uruskan/EliteNexus/issues/3).
 
+## Support Elite Nexus
+
+Elite Nexus is made by one commander, with no company behind it, no ads and no subscription. If it has saved you an
+evening of alt-tabbing, found you a payday or kept hostile contacts red in your favourite HUD, you can
+**[sponsor it on GitHub](https://github.com/sponsors/uruskan)** or **[buy me a coffee](https://buymeacoffee.com/uruskan)**.
+Nothing in the app depends on it. o7
+
 ## Thanks
 
 Elite Nexus is one commander's spare-time project, and most of what changed since launch started with someone
@@ -189,13 +196,6 @@ keeps the advanced settings one click away under Options. Here is every page in 
 * **Accounts you may want**: an [EDSM API key](https://www.edsm.net/en/settings/api) and an
   [Inara API key](https://inara.cz/elite/cmdr-settings-api/) for sync. The Frontier Companion API isn't supported
   yet; the journal already provides almost everything.
-
-## Support Elite Nexus
-
-Elite Nexus is made by one commander, with no company behind it, no ads and no subscription. If it has saved you an
-evening of alt-tabbing, found you a payday or kept hostile contacts red in your favourite HUD, you can
-**[sponsor it on GitHub](https://github.com/sponsors/uruskan)** or **[buy me a coffee](https://buymeacoffee.com/uruskan)**.
-Nothing in the app depends on it. o7
 
 ## For developers
 
