@@ -488,3 +488,125 @@ fn jump_off_the_route_keeps_it() {
     assert_eq!(route_names(&m), ["Beta", "Gamma"]);
     assert_eq!(ahead(&m), ["Beta", "Gamma"]);
 }
+
+/// Touchdown or Liftoff on Alpha 1, by planetary mining location `index`.
+fn landing(event: &str, ts: &str, index: u32, lat: f64, lon: f64, player: bool) -> String {
+    format!(
+        r#"{{ "timestamp":"{ts}", "event":"{event}", "PlayerControlled":{player}, "Taxi":false, "Multicrew":false, "StarSystem":"Alpha", "SystemAddress":100, "Body":"Alpha 1", "BodyID":1, "OnStation":false, "OnPlanet":true, "Latitude":{lat:.6}, "Longitude":{lon:.6}, "NearestDestination":"$SAA_Unknown_Signal:#type=$PlanetaryMiningLocation_Name;:#index={index};" }}"#
+    )
+}
+
+fn refined(ts: &str, symbol: &str, name: &str) -> String {
+    format!(r#"{{ "timestamp":"{ts}", "event":"MiningRefined", "Type":"${symbol}_name;", "Type_Localised":"{name}" }}"#)
+}
+
+/// Status.json in the Rhino on Alpha 1 (a 1,000 km body), as the game rewrites it while driving.
+fn rhino_at(m: &mut Model, lat: f64, lon: f64) {
+    let text = format!(
+        r#"{{ "timestamp":"2026-10-01T10:05:00Z", "event":"Status", "Flags":69206016, "Flags2":0, "Latitude":{lat:.6}, "Longitude":{lon:.6}, "Heading":90, "Altitude":0, "BodyName":"Alpha 1", "PlanetRadius":1000000.0 }}"#
+    );
+    let status = nexus_journal::Companion::parse(nexus_journal::CompanionKind::Status, &text).expect("Status.json");
+    m.apply_companion(&status, true, &mut Alerts::live());
+}
+
+const RHINO_OUT: &str = r#"{ "timestamp":"2026-10-01T10:04:00Z", "event":"LaunchSRV", "SRVType":"mev_rhino", "SRVType_Localised":"Rhino MEV", "Loadout":"default", "ID":53, "PlayerControlled":true }"#;
+const RHINO_IN: &str = r#"{ "timestamp":"2026-10-01T10:30:00Z", "event":"DockSRV", "SRVType":"mev_rhino", "SRVType_Localised":"Rhino MEV", "ID":53 }"#;
+
+/// Chequers2's request (discussion 5): remember the body and the numbered mining location the Rhino worked, with
+/// what came out, so the commander can go back. The number comes from the journal (Touchdown/Liftoff), the
+/// deposits' positions only from a live Status.json.
+#[test]
+fn surface_mining_remembers_the_location() {
+    use nexus_model::mining::SiteKey;
+    let mut m = Model::default();
+    feed(&mut m, LOGIN);
+    let touchdown = landing("Touchdown", "2026-10-01T10:03:00Z", 4, 10.0, 20.0, true);
+    feed(
+        &mut m,
+        &[
+            r#"{ "timestamp":"2026-10-01T10:01:00Z", "event":"FSSBodySignals", "BodyName":"Alpha 1", "BodyID":1, "SystemAddress":100, "Signals":[ { "Type":"$PlanetaryMiningLocation_Name;", "Type_Localised":"Planetary Mining Location", "Count":13 } ] }"#,
+            r#"{ "timestamp":"2026-10-01T10:02:00Z", "event":"ApproachBody", "StarSystem":"Alpha", "SystemAddress":100, "Body":"Alpha 1", "BodyID":1 }"#,
+            touchdown.as_str(),
+            RHINO_OUT,
+        ],
+    );
+    // Two tonnes of Iridium and a by-product at one deposit, then another deposit 2 km away.
+    rhino_at(&mut m, 10.01, 20.0);
+    feed(&mut m, &[refined("2026-10-01T10:10:00Z", "iridium", "Iridium").as_str(), refined("2026-10-01T10:11:00Z", "iridium", "Iridium").as_str()]);
+    rhino_at(&mut m, 10.0103, 20.0);
+    feed(&mut m, &[refined("2026-10-01T10:12:00Z", "platinum", "Platinum").as_str()]);
+    rhino_at(&mut m, 10.13, 20.0);
+    feed(&mut m, &[refined("2026-10-01T10:20:00Z", "iridium", "Iridium").as_str()]);
+    let liftoff = landing("Liftoff", "2026-10-01T10:31:00Z", 4, 10.0, 20.0, true);
+    feed(&mut m, &[RHINO_IN, liftoff.as_str()]);
+
+    let gs = m.active().unwrap();
+    let key = SiteKey { system_address: 100, body_id: 1, location: Some(4) };
+    let site = &gs.mining.sites[&key];
+    assert_eq!((site.system.as_str(), site.body.as_str(), site.short_body()), ("Alpha", "Alpha 1", "1"));
+    assert_eq!(site.by_tonnes(), [("Iridium", 3), ("Platinum", 1)]);
+    assert_eq!((site.visits, site.landings.as_slice()), (1, [(10.0, 20.0)].as_slice()));
+    assert_eq!(site.spots.len(), 2, "one deposit per place, within 200 m");
+    assert_eq!(site.spots[0].refined.len(), 2, "the by-product counts at the deposit it came from");
+    assert_eq!(gs.mining.spots_rev, 3, "two deposits and one new commodity: saved three times, not per tonne");
+    assert_eq!(gs.mining.session.as_ref().unwrap().sites, [key]);
+    assert_eq!(gs.exploration.systems[&100].bodies[&1].mining_locations, 13);
+
+    // The ship's refinery (not in the Rhino) is ring mining: no surface site.
+    feed(&mut m, &[r#"{ "timestamp":"2026-10-01T10:40:00Z", "event":"SupercruiseEntry", "StarSystem":"Alpha", "SystemAddress":100 }"#]);
+    feed(&mut m, &[refined("2026-10-01T10:50:00Z", "painite", "Painite").as_str()]);
+    let gs = m.active().unwrap();
+    assert!(gs.mining.here.is_none(), "supercruise forgets the location");
+    assert_eq!(gs.mining.sites.len(), 1);
+
+    // Days later: landing by location 4 again says so (quietly), and the run counts as a second visit.
+    feed(&mut m, &[jump("2026-10-02T09:00:00Z", "Beta", 200, 10.0).as_str(), jump("2026-10-05T09:00:00Z", "Alpha", 100, 0.0).as_str()]);
+    let alerts = feed(&mut m, &[landing("Touchdown", "2026-10-05T09:10:00Z", 4, 10.2, 20.1, true).as_str()]);
+    let back = alerts.iter().find(|a| a.title == "Back at mining location 4").expect("reminder");
+    assert_eq!(back.priority, nexus_model::Priority::Low, "a banner, not spoken unless the voice threshold is Low");
+    assert!(back.detail.contains("3 t Iridium, 1 t Platinum"), "{}", back.detail);
+    feed(&mut m, &[RHINO_OUT, refined("2026-10-05T09:20:00Z", "iridium", "Iridium").as_str()]);
+    let site = &m.active().unwrap().mining.sites[&key];
+    assert_eq!((site.visits, site.landings.len()), (2, 2));
+    assert_eq!(site.spots.len(), 2, "refined at the second deposit again: no new one");
+
+    // A landing by a location never worked raises nothing; the ship landing itself (recalled) neither.
+    let alerts = feed(&mut m, &[landing("Touchdown", "2026-10-05T10:00:00Z", 7, 11.0, 21.0, true).as_str()]);
+    assert!(alerts.is_empty());
+    let alerts = feed(&mut m, &[landing("Touchdown", "2026-10-05T10:05:00Z", 4, 10.2, 20.1, false).as_str()]);
+    assert!(alerts.is_empty(), "the ship landing itself (recalled), in the session that worked it");
+}
+
+/// Logging out in the Rhino and back in keeps the location the landing named; logging in on another body drops it.
+#[test]
+fn surface_mining_location_survives_a_relog_on_the_same_body() {
+    let mut m = Model::default();
+    feed(&mut m, LOGIN);
+    let relog = |body: &str, id: u32| {
+        format!(r#"{{ "timestamp":"2026-10-01T11:00:00Z", "event":"Location", "Docked":false, "InSRV":true, "StarSystem":"Alpha", "SystemAddress":100, "StarPos":[0.0,0.0,0.0], "Population":0, "Body":"{body}", "BodyID":{id}, "BodyType":"Planet", "Latitude":10.0, "Longitude":20.0 }}"#)
+    };
+    feed(&mut m, &[landing("Touchdown", "2026-10-01T10:03:00Z", 4, 10.0, 20.0, true).as_str(), RHINO_OUT, relog("Alpha 1", 1).as_str()]);
+    assert_eq!(m.active().unwrap().mining.here.as_ref().and_then(|h| h.key.location), Some(4));
+    feed(&mut m, &[relog("Alpha 2", 2).as_str()]);
+    assert!(m.active().unwrap().mining.here.is_none());
+}
+
+/// Replayed journals (start-up) rebuild the locations and tonnes but never invent positions.
+#[test]
+fn surface_mining_from_history_has_no_positions() {
+    let mut m = Model::default();
+    let touchdown = landing("Touchdown", "2026-10-01T10:03:00Z", 4, 10.0, 20.0, true);
+    let iridium = refined("2026-10-01T10:10:00Z", "iridium", "Iridium");
+    let mut quiet = Alerts::disabled();
+    let lines: Vec<&str> = LOGIN.iter().copied().chain([touchdown.as_str(), RHINO_OUT, iridium.as_str()]).collect();
+    for line in lines {
+        let (ts, name) = scan_line(line).expect("valid journal line");
+        let ev = Event::parse(name, line).expect("typed parse");
+        m.apply(&EventCtx { ts, name, line, live: false }, &ev, &mut quiet);
+    }
+    let gs = m.active().unwrap();
+    let site = gs.mining.sites.values().next().expect("site from the journal");
+    assert_eq!((site.key.location, site.total()), (Some(4), 1));
+    assert!(site.spots.is_empty());
+    assert_eq!(gs.mining.spots_rev, 0);
+}

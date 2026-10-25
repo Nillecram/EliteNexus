@@ -7,7 +7,7 @@ use egui_phosphor::regular as icon;
 use nexus_data::exploration::{is_scoopable, star_description};
 use nexus_model::{Alert, GameState};
 
-pub fn show(ui: &mut Ui, gs: &GameState, alerts: &[Alert]) {
+pub fn show(ui: &mut Ui, gs: &GameState, alerts: &[Alert], mining: &crate::pages::mining::MiningPrefs) {
     let l = &gs.location;
     card(ui, "", |ui| {
         ui.label(RichText::new(&l.system).font(display(20.0)).color(pal::TEXT));
@@ -36,6 +36,10 @@ pub fn show(ui: &mut Ui, gs: &GameState, alerts: &[Alert]) {
             let heading = gs.status.as_ref().and_then(|s| s.heading);
             crate::pages::exobio::sampling(ui, cur, pos, radius, heading);
         });
+        ui.add_space(6.0);
+    }
+    if let Some(v) = crate::pages::mining::radar_view(gs, mining) {
+        card(ui, "Surface radar", |ui| crate::pages::mining::surface_radar(ui, &v));
         ui.add_space(6.0);
     }
     if let Some(sys) = gs.exploration.current_system() {

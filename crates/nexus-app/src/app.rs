@@ -107,6 +107,8 @@ pub struct NexusApp {
     /// When this frame's work began, and when a slow frame was last logged.
     frame_started: Option<Instant>,
     slow_frame_logged: Option<Instant>,
+    /// The commander and their model's `mining.spots_rev` when the Rhino's deposits were last copied into the settings.
+    deposits_rev: (String, u64),
 }
 
 impl NexusApp {
@@ -193,6 +195,20 @@ impl NexusApp {
             frame_started: None,
             // The first frames load fonts and textures: nothing is logged in the first 10 seconds.
             slow_frame_logged: Some(Instant::now()),
+            deposits_rev: (String::new(), 0),
+        }
+    }
+
+    /// Keeps the deposits the Rhino refined at: their positions come from Status.json, so only a live run has them.
+    fn remember_deposits(&mut self) {
+        let model = self.core.model.read();
+        let Some(gs) = model.active() else { return };
+        if self.deposits_rev.0 == gs.cmdr.fid && self.deposits_rev.1 == gs.mining.spots_rev {
+            return;
+        }
+        self.deposits_rev = (gs.cmdr.fid.clone(), gs.mining.spots_rev);
+        if pages::mining::remember(gs, &mut self.settings.mining) {
+            self.settings_dirty = Some(Instant::now());
         }
     }
 
@@ -508,7 +524,13 @@ impl NexusApp {
                 None => {}
             },
             Page::GalaxyMap => map_action = pages::galaxy_map::show(ui, gs, &mut self.map, &route),
-            Page::Mining => pages::mining::show(ui, gs),
+            Page::Mining => {
+                let (changed, action) = pages::mining::show(ui, gs, &mut self.settings.mining);
+                settings_changed |= changed;
+                if action.is_some() {
+                    map_action = action;
+                }
+            }
             Page::Colonisation => settings_changed |= pages::colonisation::show(ui, gs, &self.market, &mut self.colo, &mut self.settings.colonisation),
             Page::Ask => match pages::ask::show(ui, &mut self.assistant, &mut self.ask_ui, &mut self.settings.ai) {
                 pages::ask::AskAction::Ask(question) => {
@@ -698,7 +720,7 @@ impl NexusApp {
             match model.active() {
                 Some(gs) => {
                     let alerts: Vec<Alert> = self.alert_log.iter().cloned().collect();
-                    egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| pages::compact::show(ui, gs, &alerts));
+                    egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| pages::compact::show(ui, gs, &alerts, &self.settings.mining));
                 }
                 None => {
                     ui.label(RichText::new("Waiting for journal data…").color(pal::DIM));
@@ -971,6 +993,7 @@ impl eframe::App for NexusApp {
             self.nav.planned = Some(route);
         }
         self.auto_copy_next();
+        self.remember_deposits();
         let here = self.core.model.read().active().and_then(|g| g.location.star_pos);
         self.market.set_origin(here);
         // egui's Ctrl +/−/0 zoom changes the factor directly; keep the setting in step with it.

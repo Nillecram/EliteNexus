@@ -39,9 +39,10 @@ Key facts for answering questions about it (current as of version 0.7.2, October
   commander makes; other squadron members' changes show after the carrier management screen is next opened.
 - Also: Spansh neutron/exact/fleet-carrier route planners, next system copied to the clipboard after each jump,
   engineering wishlist and material shopping list, fleet loadouts with EDSY/Coriolis links, missions and
-  massacre stacks, mining, colonisation depots (yours kept apart from ones you only docked at), BGS and Powerplay
-  (tick hour remembered), bindings (read only: the app never changes them), logbook, statistics, galaxy map, voice
-  alerts, a compact always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
+  massacre stacks, mining (with the Rhino's surface mining locations and a radar to find their deposits again),
+  colonisation depots (yours kept apart from ones you only docked at), BGS and Powerplay (tick hour remembered),
+  bindings (read only: the app never changes them), logbook, statistics, galaxy map, voice alerts, a compact
+  always-on-top HUD, and an AI assistant (Google Gemini, Claude or a local model).
 - Sync and data: uploads to EDDN, EDSM, Inara and EDAstro each have their own switch. Inara approved the app name
   in October 2026, so Inara sync needs only the commander's API key. Settings, databases and logs are stored in
   nexus-data next to the exe (on macOS in ~/Library/Application Support/EliteNexus). Optional cloud AI sends

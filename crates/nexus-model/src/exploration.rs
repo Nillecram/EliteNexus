@@ -101,6 +101,8 @@ pub struct Body {
     pub signals: Vec<(String, u32)>,
     pub bio_signals: u32,
     pub geo_signals: u32,
+    /// Planetary mining locations (Rhino surface mining), from the FSS or DSS.
+    pub mining_locations: u32,
     pub genuses: Vec<String>,
     pub organics: Vec<OrganicSpecies>,
     pub footfall: bool,
@@ -158,6 +160,7 @@ impl Body {
             signals: Vec::new(),
             bio_signals: 0,
             geo_signals: 0,
+            mining_locations: 0,
             genuses: Vec::new(),
             organics: Vec::new(),
             footfall: false,
@@ -692,6 +695,8 @@ impl Exploration {
                 body.bio_signals = s.count;
             } else if k.contains("geological") {
                 body.geo_signals = s.count;
+            } else if k.contains("planetarymininglocation") {
+                body.mining_locations = s.count;
             }
         }
         let (addr, id) = (b.system_address, b.body_id);

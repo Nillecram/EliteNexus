@@ -58,7 +58,7 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
 
 * `app.rs` owns the services: `Core` (journal → model), `SyncService` (sync.rs → nexus-uplink),
   `MarketService` (market.rs → nexus-galaxy + nexus-eddn, price alerts, Spansh import), `AssistantService`
-  (assistant.rs → nexus-ai on a worker thread; `ai_tools.rs` implements its 15 tools over the model, galaxy DB,
+  (assistant.rs → nexus-ai on a worker thread; `ai_tools.rs` implements its 16 tools over the model, galaxy DB,
   journal and Spansh), Spansh client, TTS. `finder.rs` holds market lookups shared by pages and tools (sell plan,
   colonisation suppliers).
 * Routes and tours: Navigation holds one `PlannedRoute` (pages/navigation.rs) that drives the "next system →

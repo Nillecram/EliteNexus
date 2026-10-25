@@ -136,6 +136,7 @@ Events that only exist in the manual or EDD are listed at the end.
 - **ApproachBody** / **LeaveBody** — StarSystem, SystemAddress, Body, BodyID
 - **ApproachSettlement** — Name, MarketID?, SystemAddress, BodyID, BodyName, Latitude?, Longitude?, StationFaction?{Name, FactionState?}, StationGovernment?, StationAllegiance?, StationServices?[], StationEconomy?, StationEconomies?[Name, Proportion]
 - **Touchdown** / **Liftoff** — PlayerControlled, Taxi?, Multicrew?, StarSystem?, SystemAddress?, Body?, BodyID?, OnStation?, OnPlanet?, Latitude?, Longitude?, NearestDestination?
+  - **(community, Rhino 2026)** `NearestDestination` names the planetary mining location nearest the ship: `"$SAA_Unknown_Signal:#type=$PlanetaryMiningLocation_Name;:#index=4;"` is the one the navigation panel numbers 4. A settlement, another surface signal (`#type=$SAA_SignalType_Geological;` and so on) or `""` when nothing is near. Seen in real journals by EDSMT and ED-Outrider.
 - **DockingRequested** — MarketID, StationName, StationType, LandingPads?{Small, Medium, Large}
 - **DockingGranted** — LandingPad, MarketID, StationName, StationType
 - **DockingDenied** — Reason (FDevIDs `dockingdeniedreasons.csv`: ActiveFighter, Distance, Hostile, NoSpace, Offences, TooLarge, RestrictedAccess), MarketID, StationName, StationType
@@ -560,7 +561,11 @@ EDD also synthesises its own `EDD*` events; ignore them.
 * **`MiningRefined{Type "$painite_name;", Type_Localised}`** — one ton refined.
 * `LaunchDrone{Type}` for prospector and collector limpets.
 * `Statistics.Mining{Mining_Profits, Quantity_Mined, Materials_Collected}`.
-* **Rhino (Sept 2026):** the MEV Rhino SRV adds surface mining (modules `int_miningrigdeployment`, `int_refinerysrv_size1_class3`, deposit scanner). New commodities are listed in §4 and in `commodity.csv` ids 129046165–129046177. No new dedicated mining event appears in the schemas yet; expect `MiningRefined`/`CollectCargo` with the new types.
+* **Rhino (Sept 2026):** the MEV Rhino SRV adds surface mining (modules `int_miningrigdeployment`, `int_refinerysrv_size1_class3`, deposit scanner). New commodities are listed in §4 and in `commodity.csv` ids 129046165–129046177. **(community, checked against real journals by EDSMT, EDLD and ED-Outrider, 4.4.1.x)**
+  * No new mining event: the Rhino's refinery writes `MiningRefined`, one per tonne, into the SRV's hold, by-products each under their own name. It names what came out, not the deposit, and carries no position.
+  * A body's mining locations: `FSSBodySignals`/`SAASignalsFound` signal `$PlanetaryMiningLocation_Name;` with a `Count` (e.g. 13); the DSS lists them, numbered, in the navigation panel.
+  * Which location: `Touchdown`/`Liftoff` `NearestDestination` (see §3), the location nearest the ship, not necessarily the one targeted. Status.json `Destination.Name` names a targeted one, seen both as `"$SAA_Unknown_Signal:#type=$PlanetaryMiningLocation_Name;:#index=3;"` and `"$SAA_Unknown_Signal:#index=15;"`; it's written only for targets locked from the ship (a rig or deposit picked from the SRV writes nothing) and isn't in the journal.
+  * Not written anywhere: deposits (position, commodity, amount, density) and rigs. Tools take positions from Status.json while the Rhino refines. The game warns at 4 km from a rig and destroys it at 5 km (EDSMT).
 
 ### 5.8 Exploration
 
@@ -746,7 +751,7 @@ GuiFocus disappears in some landed states; treat a missing value as 0.
 | `BodyName` | string | near a body / on foot in station | e.g. "Harow A 1" or the station name |
 | `PlanetRadius` | f64 | near planet | m |
 | `Balance` | i64 | in game | credits (since v32) |
-| `Destination` | {System, Body, Name, Name_Localised?} | when a destination is selected | `System` = SystemAddress, `Body` = BodyID, `Name` = target name (may be a `$…;` symbol) |
+| `Destination` | {System, Body, Name, Name_Localised?} | when a destination is selected | `System` = SystemAddress, `Body` = BodyID, `Name` = target name (may be a `$…;` symbol; a planetary mining location is `$SAA_Unknown_Signal:…#index=N;`, see §5.7) |
 | `Oxygen` | f64 0..1 | on foot | |
 | `Health` | f64 0..1 | on foot | |
 | `Temperature` | f64 | on foot | kelvin |

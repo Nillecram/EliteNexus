@@ -1,8 +1,14 @@
-//! Mining sessions: prospector results, refined tonnage, rates.
+//! Mining sessions: prospector results, refined tonnage, rates. And Rhino surface mining: the planetary mining
+//! locations the commander refined at, with the number the game's navigation panel shows, so they can go back.
 
+use crate::location::surface_distance;
 use nexus_journal::events as ev;
 use nexus_journal::Timestamp;
 use std::collections::BTreeMap;
+
+/// Refines this close to a deposit already on record count as that deposit: the rigs on one deposit stand a little
+/// apart, and the Rhino collects from each.
+pub const SPOT_RADIUS_M: f64 = 200.0;
 
 #[derive(Debug, Clone, Default)]
 pub struct ProspectResult {
@@ -28,6 +34,8 @@ pub struct MiningSession {
     pub motherlodes: BTreeMap<String, u32>,
     /// Best proportion seen per material (percent).
     pub best_proportion: BTreeMap<String, f64>,
+    /// The planetary mining locations the Rhino refined at during the session, in order.
+    pub sites: Vec<SiteKey>,
 }
 
 impl MiningSession {
@@ -56,10 +64,120 @@ impl MiningSession {
     }
 }
 
+/// A planetary mining location: the body, and the number the game's navigation panel shows for it (Planetary Mining
+/// Location 4). `location` is None when the game named none: the ship set down far from every location.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct SiteKey {
+    pub system_address: u64,
+    pub body_id: u32,
+    pub location: Option<u32>,
+}
+
+/// A deposit the Rhino refined at: where the first tonne came out, and everything that came out near it.
+#[derive(Debug, Clone, Default)]
+pub struct Spot {
+    pub lat: f64,
+    pub lon: f64,
+    /// Tonnes refined here while Elite Nexus was running, by commodity.
+    pub refined: BTreeMap<String, u32>,
+    pub found: Timestamp,
+}
+
+/// A planetary mining location the Rhino refined at. Everything but the deposits comes from the journal, so past
+/// runs are here too; the deposits' positions come from Status.json, which only a running Elite Nexus reads.
+#[derive(Debug, Clone, Default)]
+pub struct SurfaceSite {
+    pub key: SiteKey,
+    pub system: String,
+    pub body: String,
+    /// Tonnes refined by commodity: the deposit's mineral and its by-products, as the refinery named them.
+    pub refined: BTreeMap<String, u32>,
+    pub first: Timestamp,
+    pub last: Timestamp,
+    /// Mining sessions that refined here.
+    pub visits: u32,
+    /// Where the ship set down by it (Touchdown), oldest first.
+    pub landings: Vec<(f64, f64)>,
+    /// Deposits, recorded live (the journal has no positions).
+    pub spots: Vec<Spot>,
+    /// The body's radius in metres when the deposits were recorded.
+    pub radius_m: Option<f64>,
+    /// The session that refined here last, so each counts as one visit.
+    session: Timestamp,
+}
+
+impl SurfaceSite {
+    pub fn new(key: SiteKey, system: &str, body: &str) -> Self {
+        SurfaceSite { key, system: system.to_string(), body: body.to_string(), ..Default::default() }
+    }
+
+    pub fn total(&self) -> u32 {
+        self.refined.values().sum()
+    }
+
+    /// What came out, most tonnes first.
+    pub fn by_tonnes(&self) -> Vec<(&str, u32)> {
+        let mut v: Vec<(&str, u32)> = self.refined.iter().map(|(k, n)| (k.as_str(), *n)).collect();
+        v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+        v
+    }
+
+    /// The body's name without the system's: "1" for "Hyades Sector NC-V c2-15 1".
+    pub fn short_body(&self) -> &str {
+        self.body.strip_prefix(&self.system).map(str::trim).filter(|s| !s.is_empty()).unwrap_or(&self.body)
+    }
+}
+
+/// The mining location the last landing or lift-off named, on the body the commander is at.
+#[derive(Debug, Clone, Default)]
+pub struct Here {
+    pub key: SiteKey,
+    /// Where the ship set down (the last Touchdown), until it lifts off.
+    pub ship: Option<(f64, f64)>,
+}
+
+/// Where the commander is when the Rhino refines.
+pub struct Place<'a> {
+    pub system: &'a str,
+    pub system_address: u64,
+    pub body: &'a str,
+    pub body_id: u32,
+}
+
+/// A live position on a body (Status.json): latitude, longitude and the body's radius in metres.
+#[derive(Debug, Clone, Copy)]
+pub struct Fix {
+    pub lat: f64,
+    pub lon: f64,
+    pub radius_m: f64,
+}
+
+/// The number of a planetary mining location in a `NearestDestination` (Touchdown, Liftoff) or a Status.json
+/// destination: `$SAA_Unknown_Signal:#type=$PlanetaryMiningLocation_Name;:#index=4;` is location 4. A settlement, a
+/// geological or biological signal, or nothing at all is None. The symbol is the same in every game language.
+pub fn mining_location(name: &str) -> Option<u32> {
+    let name = name.to_ascii_lowercase();
+    if !name.contains("planetarymininglocation") {
+        return None;
+    }
+    let rest = &name[name.find("#index=")? + "#index=".len()..];
+    let digits = &rest[..rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len())];
+    digits.parse().ok()
+}
+
+fn refined_name(r: &ev::MiningRefined) -> String {
+    r.kind_localised.clone().unwrap_or_else(|| nexus_data::names::humanize_symbol(&r.kind))
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Mining {
     pub session: Option<MiningSession>,
     pub history: Vec<MiningSession>,
+    /// The planetary mining locations the Rhino refined at.
+    pub sites: BTreeMap<SiteKey, SurfaceSite>,
+    pub here: Option<Here>,
+    /// Goes up when a deposit is added or gives a new commodity: the app saves the deposits then.
+    pub spots_rev: u64,
 }
 
 impl Mining {
@@ -104,8 +222,81 @@ impl Mining {
 
     pub fn on_refined(&mut self, r: &ev::MiningRefined, ts: Timestamp, system: &str, body: Option<&str>) {
         let s = self.session_mut(ts, system, body);
-        let name = r.kind_localised.clone().unwrap_or_else(|| nexus_data::names::humanize_symbol(&r.kind));
-        *s.refined.entry(name).or_default() += 1;
+        *s.refined.entry(refined_name(r)).or_default() += 1;
+    }
+
+    /// One tonne the Rhino refined (MiningRefined while in an SRV), credited to the mining location the last landing
+    /// named on this body. `fix` is where it happened, live only. Call after [`Mining::on_refined`].
+    pub fn on_surface_refined(&mut self, r: &ev::MiningRefined, ts: Timestamp, place: Place<'_>, fix: Option<Fix>) {
+        let name = refined_name(r);
+        let here = self.here.as_ref().filter(|h| h.key.system_address == place.system_address && h.key.body_id == place.body_id);
+        let key = here.map_or(SiteKey { system_address: place.system_address, body_id: place.body_id, location: None }, |h| h.key);
+        let ship = here.and_then(|h| h.ship);
+        let session = self.session.as_ref().map_or(ts, |s| s.start);
+        let site = self.sites.entry(key).or_insert_with(|| SurfaceSite { first: ts, ..SurfaceSite::new(key, place.system, place.body) });
+        *site.refined.entry(name.clone()).or_default() += 1;
+        site.last = ts;
+        if site.session != session {
+            site.session = session;
+            site.visits += 1;
+        }
+        if let Some(s) = ship && site.landings.last() != Some(&s) {
+            site.landings.push(s);
+        }
+        if let Some(f) = fix {
+            site.radius_m = Some(f.radius_m);
+            let near = site.spots.iter_mut().find(|s| surface_distance((s.lat, s.lon), (f.lat, f.lon), f.radius_m) <= SPOT_RADIUS_M);
+            let added = match near {
+                Some(s) => {
+                    let new = !s.refined.contains_key(&name);
+                    *s.refined.entry(name.clone()).or_default() += 1;
+                    new
+                }
+                None => {
+                    site.spots.push(Spot { lat: f.lat, lon: f.lon, refined: BTreeMap::from([(name.clone(), 1)]), found: ts });
+                    true
+                }
+            };
+            if added {
+                self.spots_rev += 1;
+            }
+        }
+        if let Some(s) = self.session.as_mut() && !s.sites.contains(&key) {
+            s.sites.push(key);
+        }
+    }
+
+    /// Touchdown or Liftoff: the game names the mining location nearest the ship. A landing that names none leaves
+    /// the location unknown, rather than keeping one from before.
+    pub fn on_landing(&mut self, l: &ev::Landing, touchdown: bool) {
+        let key = SiteKey {
+            system_address: l.system_address,
+            body_id: l.body_id,
+            location: l.nearest_destination.as_deref().and_then(mining_location),
+        };
+        let ship = if touchdown { l.latitude.zip(l.longitude) } else { None };
+        self.here = Some(Here { key, ship });
+    }
+
+    /// The location the ship just set down by, when the Rhino refined there in an earlier session.
+    pub fn returning(&self) -> Option<&SurfaceSite> {
+        let h = self.here.as_ref()?;
+        h.key.location?;
+        let site = self.sites.get(&h.key)?;
+        let now = self.session.as_ref().map(|s| s.start);
+        (Some(site.session) != now).then_some(site)
+    }
+
+    /// Supercruise, a jump, leaving the body: the next landing names the location again.
+    pub fn leave_body(&mut self) {
+        self.here = None;
+    }
+
+    /// Location (login, respawn) and ApproachBody: the named location holds only while still at the same body.
+    pub fn at_body(&mut self, system_address: u64, body_id: Option<u32>) {
+        if self.here.as_ref().is_some_and(|h| h.key.system_address != system_address || Some(h.key.body_id) != body_id) {
+            self.here = None;
+        }
     }
 
     pub fn on_cracked(&mut self, ts: Timestamp, system: &str, body: Option<&str>) {
@@ -129,5 +320,22 @@ impl Mining {
             && (s.prospected > 0 || s.total_refined() > 0) {
                 self.history.push(s);
             }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mining_location_number() {
+        assert_eq!(mining_location("$SAA_Unknown_Signal:#type=$PlanetaryMiningLocation_Name;:#index=4;"), Some(4));
+        assert_eq!(mining_location("$SAA_Unknown_Signal:#type=$PlanetaryMiningLocation_Name;:#index=15;"), Some(15));
+        // Other surface signals and places carry an index too, but aren't mining locations.
+        assert_eq!(mining_location("$SAA_Unknown_Signal:#type=$SAA_SignalType_Geological;:#index=9;"), None);
+        assert_eq!(mining_location("$SAA_Unknown_Signal:#type=$SAA_SignalType_Human;:#index=0;"), None);
+        assert_eq!(mining_location("Uutoni Extraction Platform"), None);
+        assert_eq!(mining_location(""), None);
+        assert_eq!(mining_location("$SAA_Unknown_Signal:#type=$PlanetaryMiningLocation_Name;:#index=;"), None);
     }
 }

@@ -5,6 +5,22 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Added
+- **Mining › Surface mining sites** (an idea from Chequers2): every planetary mining location the Rhino refined at, with
+  its system, its body and the number the game's navigation panel shows for it (Planetary Mining Location 4), what
+  came out there by commodity (by-products included), visits and the last visit. To go back, jump to the system,
+  target the body and pick that location. The number is the location the game names nearest to where your ship lands
+  or lifts off, read from the journal, so runs from before this version are listed too. Pick a commodity to see only
+  the locations that gave it; copy the system or plot a route there; see how many mining locations your scans found
+  on that body; keep a note on each. The live session and earlier ones say where they were.
+- **Surface radar** on the Mining page and in the compact view, near a body you've mined: the deposits the Rhino refined
+  at, your ship and where it landed last time, with distance and compass bearing, "up" the way you're facing. It
+  works from orbit and in glide too. Deposit positions come from Status.json while Elite Nexus is running (the journal
+  records none) and are kept between runs; rigs aren't in the journal, so they aren't shown.
+- A quiet reminder when your ship lands by a mining location you worked before: what you got there and when. It's a
+  banner, spoken only if the voice threshold is set to Low.
+- **Ask** knows your surface mining sites ("Where did I mine Iridium?") and the basics of Rhino surface mining.
+
 ## [0.7.2] - 2026-10-24
 
 A hotfix: Exobiology no longer promises the first-logged bonus (×5) for species that won't get it.

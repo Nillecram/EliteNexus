@@ -341,6 +341,16 @@ pub fn surface_distance(a: (f64, f64), b: (f64, f64), radius_m: f64) -> f64 {
     2.0 * radius_m * h.sqrt().min(1.0).asin()
 }
 
+/// Compass bearing in degrees (0 = north, 90 = east) to set off from `a` towards `b` (both in degrees), as the
+/// game's heading counts it.
+pub fn surface_bearing(a: (f64, f64), b: (f64, f64)) -> f64 {
+    let (lat1, lat2) = (a.0.to_radians(), b.0.to_radians());
+    let dlon = (b.1 - a.1).to_radians();
+    let y = dlon.sin() * lat2.cos();
+    let x = lat1.cos() * lat2.sin() - lat1.sin() * lat2.cos() * dlon.cos();
+    y.atan2(x).to_degrees().rem_euclid(360.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -351,6 +361,15 @@ mod tests {
         let d = surface_distance((0.0, 0.0), (0.0, 90.0), 1_000_000.0);
         assert!((d - std::f64::consts::FRAC_PI_2 * 1_000_000.0).abs() < 1.0);
         assert!(surface_distance((10.0, 20.0), (10.0, 20.0), 5e6) < 1e-6);
+    }
+
+    #[test]
+    fn bearings() {
+        let b = |to: (f64, f64)| surface_bearing((0.0, 0.0), to).round();
+        assert_eq!(b((1.0, 0.0)), 0.0, "north");
+        assert_eq!(b((0.0, 1.0)), 90.0, "east");
+        assert_eq!(b((-1.0, 0.0)), 180.0, "south");
+        assert_eq!(b((0.0, -1.0)), 270.0, "west");
     }
 
     #[test]

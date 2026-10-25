@@ -257,6 +257,7 @@ impl GameState {
                 self.location.on_arrival(a, ts, ArrivalKind::Location);
                 self.history.visit(a.system_address, &a.star_system, a.star_pos, ts);
                 self.exobio.on_system(a.system_address);
+                self.mining.at_body(a.system_address, a.body_id);
                 self.exploration.enter_system(a.system_address, &a.star_system, a.star_pos, ts);
                 self.feed(ts, "Location", format!("In {} — {}", a.star_system, self.location.situation()));
             }
@@ -281,6 +282,7 @@ impl GameState {
                 self.exobio.on_system(a.system_address);
                 self.exploration.enter_system(a.system_address, &a.star_system, a.star_pos, ts);
                 self.mining.end_session();
+                self.mining.leave_body();
                 // Arriving on the route leaves everything up to here behind, the system it was plotted from too.
                 if let Some(i) = self.nav_route.iter().position(|h| h.system_address == a.system_address) {
                     self.nav_route.drain(..=i);
@@ -313,6 +315,7 @@ impl GameState {
                 self.exploration.enter_system(a.system_address, &a.star_system, a.star_pos, ts);
                 self.carrier.on_carrier_jump(a, ts);
                 self.squadron_carrier.on_carrier_jump(a, ts);
+                self.mining.leave_body();
                 self.feed(ts, "CarrierJump", format!("Carrier jumped to {}", a.star_system));
             }
             Event::StartJump(s) => {
@@ -332,7 +335,10 @@ impl GameState {
                     remaining_jumps: t.remaining_jumps_in_route,
                 });
             }
-            Event::SupercruiseEntry(_) => self.location.on_supercruise_entry(),
+            Event::SupercruiseEntry(_) => {
+                self.location.on_supercruise_entry();
+                self.mining.leave_body();
+            }
             Event::SupercruiseExit(s) => self.location.on_supercruise_exit(s),
             Event::Docked(d) => {
                 self.location.on_docked(d);
@@ -361,9 +367,11 @@ impl GameState {
                 self.location.body = Some(b.body.clone());
                 self.location.body_id = Some(b.body_id);
                 self.location.body_type = Some("Planet".into());
+                self.mining.at_body(b.system_address, Some(b.body_id));
             }
             Event::LeaveBody(_) => {
                 self.location.lat_lon = None;
+                self.mining.leave_body();
             }
             Event::Touchdown(t) => {
                 self.location.landed = true;
@@ -372,8 +380,23 @@ impl GameState {
                 if let (Some(lat), Some(lon)) = (t.latitude, t.longitude) {
                     self.location.lat_lon = Some((lat, lon));
                 }
+                self.mining.on_landing(t, true);
+                // Back at a mining location the Rhino worked before (not when the ship lands itself, recalled).
+                if t.player_controlled != Some(false) && let Some(site) = self.mining.returning() {
+                    alerts.push_with(|| {
+                        let n = site.key.location.unwrap_or_default();
+                        let mined: Vec<String> = site.by_tonnes().iter().take(2).map(|(c, tonnes)| format!("{tonnes} t {c}")).collect();
+                        let mined = mined.join(", ");
+                        Alert::new(ts, AlertKind::Mining, Priority::Low, format!("Back at mining location {n}"))
+                            .detail(format!("You refined {mined} here ({})", site.last.to_local_string("%d %b")))
+                            .speak(format!("Mining location {n}. You refined {mined} here before."))
+                    });
+                }
             }
-            Event::Liftoff(_) => self.location.landed = false,
+            Event::Liftoff(t) => {
+                self.location.landed = false;
+                self.mining.on_landing(t, false);
+            }
             Event::ApproachSettlement(s) => {
                 self.location.settlement = Some(s.name_localised.clone().unwrap_or_else(|| s.name.clone()));
             }
@@ -632,6 +655,13 @@ impl GameState {
             Event::MiningRefined(r) => {
                 let (sys, body) = (self.location.system.clone(), self.location.body.clone());
                 self.mining.on_refined(r, ts, &sys, body.as_deref());
+                // The Rhino's refinery: the tonne goes to the mining location this landing named. Where it came out is
+                // only known live (Status.json); a replayed journal has no positions.
+                if self.location.in_srv && let Some(body_id) = self.location.body_id {
+                    let fix = if ctx.live { self.surface_fix() } else { None };
+                    let place = crate::mining::Place { system: &sys, system_address: self.location.system_address, body: body.as_deref().unwrap_or_default(), body_id };
+                    self.mining.on_surface_refined(r, ts, place, fix);
+                }
                 self.inventory.cargo.adjust(&r.kind, r.kind_localised.as_deref(), 1, None);
             }
             Event::AsteroidCracked(_) => {
@@ -1186,6 +1216,18 @@ impl GameState {
 
     pub fn current_body_radius(&self) -> Option<f64> {
         self.status.as_ref().and_then(|s| s.planet_radius)
+    }
+
+    /// Where the commander is on the body right now (Status.json), with its radius; None away from a body, or when
+    /// Status.json is about another body than the journal's.
+    fn surface_fix(&self) -> Option<crate::mining::Fix> {
+        let st = self.status.as_ref()?;
+        let (lat, lon) = st.lat_lon()?;
+        let radius_m = st.planet_radius.filter(|r| *r > 0.0)?;
+        if let (Some(a), Some(b)) = (&st.body_name, &self.location.body) && a != b {
+            return None;
+        }
+        Some(crate::mining::Fix { lat, lon, radius_m })
     }
 
     /// Distance from the current position to `pos` (ly), if we know where we are.

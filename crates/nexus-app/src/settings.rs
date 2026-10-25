@@ -42,6 +42,8 @@ pub struct Settings {
     pub colonisation: crate::pages::colonisation::ColonisationPrefs,
     /// BGS & Powerplay: the period shown and the tick hour.
     pub bgs: crate::pages::bgs::BgsPrefs,
+    /// Mining: the deposits the Rhino refined at (positions exist only live), notes on mining locations.
+    pub mining: crate::pages::mining::MiningPrefs,
 }
 
 /// A named HUD colour matrix.
@@ -156,6 +158,7 @@ impl Default for Settings {
             carrier: Default::default(),
             colonisation: Default::default(),
             bgs: Default::default(),
+            mining: Default::default(),
         }
     }
 }

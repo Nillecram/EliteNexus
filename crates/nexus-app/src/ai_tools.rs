@@ -333,6 +333,23 @@ impl NexusTools {
         }))
     }
 
+    fn mining_sites(&self, a: &Value) -> Result<Value, String> {
+        let model = self.model.read();
+        let gs: &GameState = model.active().ok_or("No commander loaded yet.")?;
+        let want = arg_str(a, "commodity").map(|c| c.to_lowercase());
+        let limit = arg_f64(a, "limit").map(|v| v as usize).unwrap_or(10).clamp(1, 50);
+        let mut sites: Vec<_> =
+            gs.mining.sites.values().filter(|s| want.as_ref().is_none_or(|w| s.refined.keys().any(|k| k.to_lowercase().contains(w.as_str())))).collect();
+        sites.sort_by_key(|s| std::cmp::Reverse(s.last));
+        Ok(json!({
+            "sites": sites.iter().take(limit).map(|s| json!({
+                "system": s.system, "body": s.body, "mining_location": s.key.location,
+                "refined_t": s.refined, "visits": s.visits, "last_visit": s.last.to_iso(),
+            })).collect::<Vec<_>>(),
+            "note": "mining_location is the number the game's navigation panel shows (Planetary Mining Location N): the location the game named nearest to where the ship landed or lifted off; null when it named none. To go back: jump to the system, target the body, then pick that location in the navigation panel; the Mining page's radar shows the deposits. Rigs and deposit sizes aren't in the journal.",
+        }))
+    }
+
     fn mining_hotspots(&self, a: &Value) -> Result<Value, String> {
         let me = self.me()?;
         let (origin, near) = self.origin(a, &me)?;
@@ -1413,6 +1430,7 @@ impl ToolHost for NexusTools {
             "trade_routes" => self.trade_routes(args),
             "nearest_service" => self.nearest_service(args),
             "mining_hotspots" => self.mining_hotspots(args),
+            "mining_sites" => self.mining_sites(args),
             "system_info" => self.system_info(args),
             "system_bodies" => self.system_bodies(args),
             "plan_route" => self.plan_route(args),
@@ -1525,6 +1543,17 @@ pub fn specs() -> Vec<ToolSpec> {
                     "limit": { "type": "integer" }
                 }),
                 &["commodity"],
+            ),
+        },
+        ToolSpec {
+            name: "mining_sites",
+            description: "Planetary mining locations the commander worked with the Rhino SRV (surface mining), newest first: system, body, the location's number as the game's navigation panel shows it, tonnes refined per commodity (by-products included), visits and the last visit. Use for \"where did I mine …\" or \"where was that site\" questions.",
+            parameters: schema(
+                json!({
+                    "commodity": { "type": "string", "description": "Only locations that gave this, e.g. Iridium." },
+                    "limit": { "type": "integer", "description": "Default 10." }
+                }),
+                &[],
             ),
         },
         ToolSpec {
@@ -1682,13 +1711,13 @@ mod tests {
         assert!(tools.call("journal_search", &json!({ "query": "gold" })).unwrap()["matches_newest_first"].as_array().unwrap().is_empty());
         assert!(tools.call("nope", &json!({})).is_err());
         assert!(tools.call("find_commodity", &json!({})).is_err(), "missing required argument is an error, not a panic");
-        assert_eq!(specs().len(), 15);
+        assert_eq!(specs().len(), 16);
 
         // The full loop with a scripted model: one tool call, then an answer.
         struct Script(parking_lot::Mutex<Vec<nexus_ai::Reply>>);
         impl nexus_ai::Backend for Script {
             fn complete(&self, _s: &str, tools: &[ToolSpec], turns: &[nexus_ai::Turn]) -> Result<nexus_ai::Reply, nexus_ai::AiError> {
-                assert_eq!(tools.len(), 15);
+                assert_eq!(tools.len(), 16);
                 if turns.len() > 1 {
                     assert!(matches!(&turns[2], nexus_ai::Turn::ToolResult { content, is_error: false, .. } if content.contains("Beta Hub")));
                 }
@@ -1704,6 +1733,37 @@ mod tests {
         let ans = nexus_ai::ask(&script, nexus_ai::SYSTEM_PROMPT, &tools, &mut conv, "Where should I sell my cargo?".into(), |_| {}).unwrap();
         assert!(ans.text.contains("Beta Hub"));
         assert_eq!(ans.tools_used, vec!["sell_my_cargo"]);
+    }
+
+    /// "Where did I mine Iridium?": the Rhino's mining locations, from the journal.
+    #[test]
+    fn mining_sites_answers_where_the_rhino_worked() {
+        let mut m = commander();
+        let lines = [
+            r#"{ "timestamp":"2026-10-20T10:03:00Z", "event":"Touchdown", "PlayerControlled":true, "StarSystem":"Alpha", "SystemAddress":1001, "Body":"Alpha 1", "BodyID":1, "OnStation":false, "OnPlanet":true, "Latitude":-12.5, "Longitude":44.1, "NearestDestination":"$SAA_Unknown_Signal:#type=$PlanetaryMiningLocation_Name;:#index=4;" }"#,
+            r#"{ "timestamp":"2026-10-20T10:04:00Z", "event":"LaunchSRV", "SRVType":"mev_rhino", "Loadout":"default", "ID":53, "PlayerControlled":true }"#,
+            r#"{ "timestamp":"2026-10-20T10:10:00Z", "event":"MiningRefined", "Type":"$iridium_name;", "Type_Localised":"Iridium" }"#,
+        ];
+        let mut quiet = Alerts::disabled();
+        for line in lines {
+            let (ts, name) = scan_line(line).expect("line");
+            let ev = Event::parse(name, line).expect("event");
+            m.apply(&EventCtx { ts, name, line, live: false }, &ev, &mut quiet);
+        }
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let tools = NexusTools {
+            model: Arc::new(RwLock::new(m)),
+            db: None,
+            index: Arc::new(RwLock::new(JournalIndex::default())),
+            spansh: Spansh::new(),
+            rt: rt.handle().clone(),
+            routes: Arc::new(Mutex::new(None)),
+        };
+        let found = tools.call("mining_sites", &json!({ "commodity": "iridium" })).unwrap();
+        assert_eq!(found["sites"][0]["body"], "Alpha 1");
+        assert_eq!(found["sites"][0]["mining_location"], 4);
+        assert_eq!(found["sites"][0]["refined_t"]["Iridium"], 1);
+        assert!(tools.call("mining_sites", &json!({ "commodity": "Painite" })).unwrap()["sites"].as_array().unwrap().is_empty());
     }
 
     fn eddn(schema: &str, message: Value) -> Value {
