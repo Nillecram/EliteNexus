@@ -104,6 +104,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          SPONSORS_TOKEN: ${{ secrets.SPONSORS_TOKEN }}
         run: |
           # This version's "## [x.y.z]" section of CHANGELOG.md, up to the next "## " heading.
           $version = "${{ github.ref_name }}".TrimStart('v')
@@ -133,10 +134,21 @@ jobs:
           $notes += 'Elite Nexus is free, with no ads. If it helps you, you can sponsor it; nothing in the app depends on it.'
           $notes += ''
           $notes += '<a href="https://github.com/sponsors/uruskan"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a> <a href="https://buymeacoffee.com/uruskan"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-ffdd00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>'
-          # Under them, the commanders the README's Thanks section links to a GitHub profile, in its order: those
-          # under its "**Sponsors**" line first and apart, with larger avatars, then everyone else (code, bug
-          # reports and ideas). Whoever is added there shows up on the next release page.
+          # Under them, the supporters, first and apart with larger avatars: the public GitHub sponsors (private
+          # ones never; the first 100), read with the SPONSORS_TOKEN secret if there is one, else this run's token,
+          # then the README's Thanks section under its "**Sponsors**" line, where supporters from elsewhere (Buy Me
+          # a Coffee) are added by hand: a GitHub profile link brings an avatar, an item starting with a bold name
+          # and no link is thanked by name. Then everyone else Thanks links to a GitHub profile (code, bug reports
+          # and ideas), in its order.
           $sponsors = @()
+          try {
+            $token = if ($env:SPONSORS_TOKEN) { $env:SPONSORS_TOKEN } else { $env:GH_TOKEN }
+            $query = 'query { user(login: "uruskan") { sponsorshipsAsMaintainer(first: 100, activeOnly: false, includePrivate: false, orderBy: {field: CREATED_AT, direction: ASC}) { nodes { sponsorEntity { ... on User { login } ... on Organization { login } } } } } }'
+            $r = Invoke-RestMethod -Method Post -Uri 'https://api.github.com/graphql' -Headers @{ Authorization = "bearer $token" } -ContentType 'application/json' -Body (@{ query = $query } | ConvertTo-Json)
+            if ($r.errors) { throw (($r.errors | ForEach-Object { $_.message }) -join ' ') }
+            $sponsors = @($r.data.user.sponsorshipsAsMaintainer.nodes | ForEach-Object { $_.sponsorEntity.login } | Where-Object { $_ })
+          } catch { Write-Warning "GitHub sponsors couldn't be read, so only the README's are listed: $_" }
+          $named = @()
           $others = @()
           $group = ''
           $inThanks = $false
@@ -144,19 +156,23 @@ jobs:
             if ($l -match '^## ') { if ($inThanks) { break }; $inThanks = $l -match '^## Thanks'; continue }
             if (-not $inThanks) { continue }
             if ($l -match '^\*\*([^*\[]+)\*\*\s*$') { $group = $Matches[1]; continue }
-            foreach ($m in [regex]::Matches($l, '\]\(https://github\.com/([A-Za-z0-9-]+)\)')) {
-              if ($group -like 'Sponsor*') { $sponsors += $m.Groups[1].Value } else { $others += $m.Groups[1].Value }
-            }
+            $logins = @([regex]::Matches($l, '\]\(https://github\.com/([A-Za-z0-9-]+)\)') | ForEach-Object { $_.Groups[1].Value })
+            if ($group -like 'Sponsor*') {
+              $sponsors += $logins
+              if ($l -match '^\s*[-*]\s+\*\*([^*\[\]]+)\*\*') { $named += $Matches[1] }
+            } else { $others += $logins }
           }
-          $sponsors = @($sponsors | Select-Object -Unique)
-          $others = @($others | Where-Object { $sponsors -notcontains $_ } | Select-Object -Unique)
+          # Each name once (logins ignore case), and a sponsor only among the sponsors.
+          $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+          $sponsors = @($sponsors | Where-Object { $seen.Add($_) })
+          $named = @($named | Where-Object { $seen.Add($_) })
+          $others = @($others | Where-Object { $seen.Add($_) })
           $avatar = '<a href="https://github.com/{0}"><img src="https://avatars.githubusercontent.com/{0}?s={1}" width="{2}" height="{2}" alt="{0}" title="{0}"></a>'
-          if ($sponsors) {
-            $names = ($sponsors | ForEach-Object { '[{0}](https://github.com/{0})' -f $_ }) -join ', '
+          if ($sponsors -or $named) {
+            $names = @($sponsors | ForEach-Object { '[{0}](https://github.com/{0})' -f $_ }) + $named
             $notes += ''
-            $notes += "**Elite Nexus is possible because of its supporters**: thank you, $names, and everyone who sponsors anonymously or bought a coffee!"
-            $notes += ''
-            $notes += ($sponsors | ForEach-Object { $avatar -f $_, 128, 64 }) -join ' '
+            $notes += "**Elite Nexus is possible because of its supporters**: thank you, $($names -join ', '), and everyone who sponsors anonymously or bought a coffee!"
+            if ($sponsors) { $notes += ''; $notes += ($sponsors | ForEach-Object { $avatar -f $_, 128, 64 }) -join ' ' }
           }
           if ($others) {
             $notes += ''

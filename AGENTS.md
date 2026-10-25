@@ -160,8 +160,11 @@ egui 0.36 layout lessons learned here:
    `ubuntu-22.04` (an older glibc, so the binary starts on older distributions) and `macos-latest` (Apple Silicon),
    packs the exe and the Linux binary with the README, NOTICE, user guide and Inter licence (a zip and a tar.gz) and
    the Mac app with `tools/macos/build-app.sh` (a zip of the ad-hoc signed `Elite Nexus.app`), and publishes the
-   GitHub Release with that version's CHANGELOG section as notes. Windows and Linux must build; if only the macOS
-   job fails, the release still goes out, without the Mac zip.
+   GitHub Release with that version's CHANGELOG section as notes, GitHub's list of merged pull requests under it,
+   and the support buttons and supporters at the end: the public GitHub sponsors, read from GitHub's API, and
+   README › Thanks, where Buy Me a Coffee supporters are added by hand under **Sponsors**. If the run's own token
+   can't read sponsors (the log warns), a `SPONSORS_TOKEN` secret holding a classic token with no scopes can.
+   Windows and Linux must build; if only the macOS job fails, the release still goes out, without the Mac zip.
 6. Check it without credentials (the repo is public):
    `https://api.github.com/repos/uruskan/EliteNexus/releases/latest`.
 
