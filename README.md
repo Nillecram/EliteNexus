@@ -42,10 +42,9 @@ the older tools need.
    the game. Community sync, the AI co-pilot and the cockpit tools are optional and wait until you set them up.
 
 Everything it keeps (settings, the galaxy database, logs) lives in a `nexus-data` folder next to the program (on a
-Mac, in `~/Library/Application Support/EliteNexus`). The user guide has notes for [Linux](docs/USER_GUIDE.md#linux)
-and [macOS](docs/USER_GUIDE.md#macos): where the journals are found under Proton, Wine, CrossOver or Whisky, voice,
-and what hasn't been confirmed there yet. The Linux build is tested on Ubuntu, and a commander has confirmed it with
-the game under Proton; reports are collected in [issue #3](https://github.com/uruskan/EliteNexus/issues/3).
+Mac, in `~/Library/Application Support/EliteNexus`). Every page, and the Linux and macOS notes, are in the
+**[user guide](docs/USER_GUIDE.md)**. Linux reports are collected in
+[issue #3](https://github.com/uruskan/EliteNexus/issues/3).
 
 ## Thanks
 
@@ -98,37 +97,6 @@ else's report, idea or help. Thank you, commanders.
   formulae; the services Spansh, EDSM, Inara, EDDN and EDAstro; 3Dmigoto (bo3b); the Inter typeface and Phosphor
   icons. Sources and licences: [NOTICE.md](NOTICE.md).
 
-## What it does
-
-Each page shows the one thing you usually need, with your current system, ship and landing pad as defaults, and
-keeps the advanced settings one click away under Options. Here is every page in one line; the
-**[user guide](docs/USER_GUIDE.md)** explains them in full.
-
-| Page | What you get |
-|---|---|
-| **Dashboard** | Commander, ranks and progress, credits and legal state, ship (fuel, hull, cargo, jump range, rebuy), location and system politics, session earnings, the current system's exploration value, holdings, your fleet carrier and your squadron's with their jump countdowns, colonisation, and an activity feed. |
-| **Exploration** | The current system as a tree (stars, planets, moons) with each body's value now and if mapped (first discovery and mapping, Odyssey bonus, efficiency), gravity, temperature, atmosphere, materials, rings and hotspots, biology and geology signals, footfall; Observatory-style highlights (Earth-likes, water and ammonia worlds, terraformables, landable atmospheres, close and wide rings, shepherd and nested moons, fast rotation, jumponium…); **Find valuable bodies**, Spansh's Road to Riches, which widens the search out of the bubble by itself; **Unsold data**; a **History** of every system you scanned and whether its data was sold, refused or lost with your ship; the codex. |
-| **Exobiology** | A live **sampling radar** turned to your heading, with every previous sample's colony-range circle and a big "OK to sample / too close" readout; the bio bodies and the genera found on them; species **predictions** from a body's atmosphere, gravity, temperature, volcanism and stars before you land, with the expected value; unsold Vista Genomics data, with the first-logged bonus (×5) only where it can still be paid; **Find planets** two ways: a **bonus hunt** for planets where a valuable species should grow and nobody has a record of sampling it (every exclusion counted and explained), or **sure value**, Spansh's exobiology planner; **Tour the best 15** plans the route. |
-| **Navigation** | Your in-game route with scoopable, neutron and white-dwarf stars flagged and the longest non-scoopable streak; the **next system copied to the clipboard** after every jump; Spansh's **neutron**, **exact** (your ship's real jump range) and **fleet-carrier** planners, the carrier one with its tritium, jump timer and an arrival estimate; tours and routes the assistant plans land here too and tick off as you arrive. |
-| **Galaxy map** | The Milky Way with everywhere you've been, your travel path, the active route, your carriers, parked ships and landmarks; search any visited system; click one to copy its name or plot a route to it. |
-| **Market** | A local galaxy database fed live by EDDN, your journal and, if you like, Spansh's daily dump (every station known from day one). **Commodity pages** with where to buy, where to sell, latest prices and price history, filtered by distance (up to the whole galaxy), pad, price age, stock or demand and carriers; **sell my cargo**, the best single stop for your hold, re-planned after every jump; **trade routes** for your ship and credits; **abnormal prices**, stations and carriers paying far above or selling far below the galactic average; **pins** and a **run planner** that buys and sells your pinned orders on the shortest trip; **price alerts** spoken seconds after any commander's update; the nearest material traders, brokers, Interstellar Factors and Vista Genomics; mining hotspots with their best sell prices; any station's whole market, including the one you're docked at; and the live feed, with a pause. |
-| **Mining** | Live sessions: tonnes per hour, prospector quality, motherlodes. |
-| **Colonisation** | Construction depots with the remaining tonnage per commodity, what you already carry, and **where to buy** each commodity near the site with enough stock for a full hold; stale depots marked, other commanders' depots kept apart. |
-| **Fleet carrier** | Your fleet carrier and your squadron's: tritium, finances, capacity, crew and services, orders, jump schedule and history, a live jump countdown and cooldown, decommissioning. |
-| **Engineering** | A blueprint **wishlist** (or quick-add "upgrade to G5" from your ship) that becomes a **shopping list** and a **trader plan**, exactly what to trade at which material trader; engineers, unlocked first then by distance; Odyssey suits and weapons; synthesis; your materials and ship locker. |
-| **Fleet** | Every ship and where it is, in transit included, with its full loadout, engineering and modifier deltas; one-click **Open in EDSY / Coriolis** with the exact build. |
-| **Missions** | Active missions with expiry and cargo or kill progress, and a **massacre-stack tracker** that counts a kill once per issuing faction, so you see the true kills remaining. |
-| **BGS & Powerplay** | What you did for which faction and power since the tick, with your tick hour and period remembered. |
-| **Logbook** | Activity, every journal event with its JSON and full-text search, travel, docking, and a credit ledger. |
-| **Statistics** | Credits over time (with a log scale), income and spending by category, jumps and distance per day, deaths, and the game's own statistics, over 7, 30 or 90 days or all time. |
-| **Bindings** | Your active presets per category, conflicts, missing essentials, a searchable list of every bound action and a printable reference card. Read-only: the app never changes your bindings. |
-| **HUD & cockpit** | **HUD colours**, **Glare and exposure** and **Cockpit lights**: see [Make the cockpit yours](#make-the-cockpit-yours). |
-| **Ask** | The AI co-pilot: plain questions ("where can I make the most money in the next hour?") answered from your ship, cargo, journal, the market database and Spansh, with tools for price deals, selling your cargo, trade routes, commodities, nearest services, mining hotspots, systems and their planets (and who has set foot on them), untouched biology, route and money-route planning, exobiology here and journal search, plus a built-in knowledge base. Google Gemini by default (one pasted key); Claude or a local model (Ollama, LM Studio) optional. Nothing else in the app needs it. |
-| **Accounts & sync** | EDDN (schema-checked, with a test mode), EDSM journal sync, Inara profile sync (the app name is approved, so your personal key is enough) and EDAstro, each opt-in, with retry queues that respect the service's limits. |
-| **Alerts & voice** | Toasts plus speech (Windows speech, speech-dispatcher on Linux, `say` on macOS) for high-value bodies, likely valuable biology, sample spacing, motherlodes, a non-scoopable star when fuel is low, interdictions, hull critical, mission completion, carrier jumps and more, down to the priority you choose. |
-| **Compact HUD** | One click turns the window into a small always-on-top panel for a second screen: location, fuel, the next star and whether it scoops, the sampling radar, system value, the last alerts. |
-| **Settings** | Journal and game folders found by themselves (every Steam library, Epic and Frontier folders; Proton, Wine, CrossOver and Whisky prefixes) or set by hand, even on a network share; voice, toasts and alert thresholds; text size in fixed steps; the app-menu entry on Linux; a settings file that can't be read or a crash is kept and explained, never silently reset. |
-
 ## Make the cockpit yours
 
 ![Elite Dangerous HUD colour editor: an Empire blue theme in the live cockpit preview, with hostile contacts still red and friendly ones still green](docs/screenshots/hud-colours.png)
@@ -166,6 +134,37 @@ approved them, and it is untested under Proton and on macOS so far.
 | ![Galaxy map: everywhere you've been, with your ship and carrier](docs/screenshots/galaxy-map.png) **Galaxy map** — your travels, ship and carrier | ![Statistics: credits over time, income by category, jumps per day](docs/screenshots/statistics.png) **Statistics** — credits, income, jumps |
 | ![Logbook: every journal event, searchable](docs/screenshots/logbook.png) **Logbook** — every journal event, searchable | ![Bindings: active presets, conflicts and every bound action](docs/screenshots/bindings.png) **Bindings** — presets, conflicts, reference card |
 | ![Accounts & sync: EDDN, EDSM, Inara and EDAstro, all opt-in](docs/screenshots/accounts.png) **Accounts & sync** — EDDN, EDSM, Inara, EDAstro | |
+
+## What it does
+
+Each page shows the one thing you usually need, with your current system, ship and landing pad as defaults, and
+keeps the advanced settings one click away under Options. Here is every page in one line; the
+**[user guide](docs/USER_GUIDE.md)** explains them in full.
+
+| Page | What you get |
+|---|---|
+| **Dashboard** | Commander, ranks and progress, credits and legal state, ship (fuel, hull, cargo, jump range, rebuy), location and system politics, session earnings, the current system's exploration value, holdings, your fleet carrier and your squadron's with their jump countdowns, colonisation, and an activity feed. |
+| **Exploration** | The current system as a tree (stars, planets, moons) with each body's value now and if mapped (first discovery and mapping, Odyssey bonus, efficiency), gravity, temperature, atmosphere, materials, rings and hotspots, biology and geology signals, footfall; Observatory-style highlights (Earth-likes, water and ammonia worlds, terraformables, landable atmospheres, close and wide rings, shepherd and nested moons, fast rotation, jumponium…); **Find valuable bodies**, Spansh's Road to Riches, which widens the search out of the bubble by itself; **Unsold data**; a **History** of every system you scanned and whether its data was sold, refused or lost with your ship; the codex. |
+| **Exobiology** | A live **sampling radar** turned to your heading, with every previous sample's colony-range circle and a big "OK to sample / too close" readout; the bio bodies and the genera found on them; species **predictions** from a body's atmosphere, gravity, temperature, volcanism and stars before you land, with the expected value; unsold Vista Genomics data, with the first-logged bonus (×5) only where it can still be paid; **Find planets** two ways: a **bonus hunt** for planets where a valuable species should grow and nobody has a record of sampling it (every exclusion counted and explained), or **sure value**, Spansh's exobiology planner; **Tour the best 15** plans the route. |
+| **Navigation** | Your in-game route with scoopable, neutron and white-dwarf stars flagged and the longest non-scoopable streak; the **next system copied to the clipboard** after every jump; Spansh's **neutron**, **exact** (your ship's real jump range) and **fleet-carrier** planners, the carrier one with its tritium, jump timer and an arrival estimate; tours and routes the assistant plans land here too and tick off as you arrive. |
+| **Galaxy map** | The Milky Way with everywhere you've been, your travel path, the active route, your carriers, parked ships and landmarks; search any visited system; click one to copy its name or plot a route to it. |
+| **Market** | A local galaxy database fed live by EDDN, your journal and, if you like, Spansh's daily dump (every station known from day one). **Commodity pages** with where to buy, where to sell, latest prices and price history, filtered by distance (up to the whole galaxy), pad, price age, stock or demand and carriers; **sell my cargo**, the best single stop for your hold, re-planned after every jump; **trade routes** for your ship and credits; **abnormal prices**, stations and carriers paying far above or selling far below the galactic average; **pins** and a **run planner** that buys and sells your pinned orders on the shortest trip; **price alerts** spoken seconds after any commander's update; the nearest material traders, brokers, Interstellar Factors and Vista Genomics; mining hotspots with their best sell prices; any station's whole market, including the one you're docked at; and the live feed, with a pause. |
+| **Mining** | Live sessions: tonnes per hour, prospector quality, motherlodes. |
+| **Colonisation** | Construction depots with the remaining tonnage per commodity, what you already carry, and **where to buy** each commodity near the site with enough stock for a full hold; stale depots marked, other commanders' depots kept apart. |
+| **Fleet carrier** | Your fleet carrier and your squadron's: tritium, finances, capacity, crew and services, orders, jump schedule and history, a live jump countdown and cooldown, decommissioning. |
+| **Engineering** | A blueprint **wishlist** (or quick-add "upgrade to G5" from your ship) that becomes a **shopping list** and a **trader plan**, exactly what to trade at which material trader; engineers, unlocked first then by distance; Odyssey suits and weapons; synthesis; your materials and ship locker. |
+| **Fleet** | Every ship and where it is, in transit included, with its full loadout, engineering and modifier deltas; one-click **Open in EDSY / Coriolis** with the exact build. |
+| **Missions** | Active missions with expiry and cargo or kill progress, and a **massacre-stack tracker** that counts a kill once per issuing faction, so you see the true kills remaining. |
+| **BGS & Powerplay** | What you did for which faction and power since the tick, with your tick hour and period remembered. |
+| **Logbook** | Activity, every journal event with its JSON and full-text search, travel, docking, and a credit ledger. |
+| **Statistics** | Credits over time (with a log scale), income and spending by category, jumps and distance per day, deaths, and the game's own statistics, over 7, 30 or 90 days or all time. |
+| **Bindings** | Your active presets per category, conflicts, missing essentials, a searchable list of every bound action and a printable reference card. Read-only: the app never changes your bindings. |
+| **HUD & cockpit** | **HUD colours**, **Glare and exposure** and **Cockpit lights**: see [Make the cockpit yours](#make-the-cockpit-yours). |
+| **Ask** | The AI co-pilot: plain questions ("where can I make the most money in the next hour?") answered from your ship, cargo, journal, the market database and Spansh, with tools for price deals, selling your cargo, trade routes, commodities, nearest services, mining hotspots, systems and their planets (and who has set foot on them), untouched biology, route and money-route planning, exobiology here and journal search, plus a built-in knowledge base. Google Gemini by default (one pasted key); Claude or a local model (Ollama, LM Studio) optional. Nothing else in the app needs it. |
+| **Accounts & sync** | EDDN (schema-checked, with a test mode), EDSM journal sync, Inara profile sync (the app name is approved, so your personal key is enough) and EDAstro, each opt-in, with retry queues that respect the service's limits. |
+| **Alerts & voice** | Toasts plus speech (Windows speech, speech-dispatcher on Linux, `say` on macOS) for high-value bodies, likely valuable biology, sample spacing, motherlodes, a non-scoopable star when fuel is low, interdictions, hull critical, mission completion, carrier jumps and more, down to the priority you choose. |
+| **Compact HUD** | One click turns the window into a small always-on-top panel for a second screen: location, fuel, the next star and whether it scoops, the sampling radar, system value, the last alerts. |
+| **Settings** | Journal and game folders found by themselves (every Steam library, Epic and Frontier folders; Proton, Wine, CrossOver and Whisky prefixes) or set by hand, even on a network share; voice, toasts and alert thresholds; text size in fixed steps; the app-menu entry on Linux; a settings file that can't be read or a crash is kept and explained, never silently reset. |
 
 ## Documentation and links
 
