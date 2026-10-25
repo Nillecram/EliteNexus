@@ -133,6 +133,37 @@ jobs:
           $notes += 'Elite Nexus is free, with no ads. If it helps you, you can sponsor it; nothing in the app depends on it.'
           $notes += ''
           $notes += '<a href="https://github.com/sponsors/uruskan"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a> <a href="https://buymeacoffee.com/uruskan"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-ffdd00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>'
+          # Under them, the commanders the README's Thanks section links to a GitHub profile, in its order: those
+          # under its "**Sponsors**" line first and apart, with larger avatars, then everyone else (code, bug
+          # reports and ideas). Whoever is added there shows up on the next release page.
+          $sponsors = @()
+          $others = @()
+          $group = ''
+          $inThanks = $false
+          foreach ($l in Get-Content README.md) {
+            if ($l -match '^## ') { if ($inThanks) { break }; $inThanks = $l -match '^## Thanks'; continue }
+            if (-not $inThanks) { continue }
+            if ($l -match '^\*\*([^*\[]+)\*\*\s*$') { $group = $Matches[1]; continue }
+            foreach ($m in [regex]::Matches($l, '\]\(https://github\.com/([A-Za-z0-9-]+)\)')) {
+              if ($group -like 'Sponsor*') { $sponsors += $m.Groups[1].Value } else { $others += $m.Groups[1].Value }
+            }
+          }
+          $sponsors = @($sponsors | Select-Object -Unique)
+          $others = @($others | Where-Object { $sponsors -notcontains $_ } | Select-Object -Unique)
+          $avatar = '<a href="https://github.com/{0}"><img src="https://avatars.githubusercontent.com/{0}?s={1}" width="{2}" height="{2}" alt="{0}" title="{0}"></a>'
+          if ($sponsors) {
+            $names = ($sponsors | ForEach-Object { '[{0}](https://github.com/{0})' -f $_ }) -join ', '
+            $notes += ''
+            $notes += "**Elite Nexus is possible because of its supporters**: thank you, $names, and everyone who sponsors anonymously or bought a coffee!"
+            $notes += ''
+            $notes += ($sponsors | ForEach-Object { $avatar -f $_, 128, 64 }) -join ' '
+          }
+          if ($others) {
+            $notes += ''
+            $notes += 'Thanks also to these commanders for code, bug reports and ideas, and to many more on the Frontier Forums ([who did what](https://github.com/uruskan/EliteNexus#thanks)):'
+            $notes += ''
+            $notes += ($others | ForEach-Object { $avatar -f $_, 80, 40 }) -join ' '
+          }
           $notes | Set-Content out/notes.md -Encoding utf8NoBOM
       - uses: softprops/action-gh-release@v2
         with:
