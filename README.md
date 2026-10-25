@@ -57,6 +57,44 @@ Nothing in the app depends on it. o7
   <a href="https://buymeacoffee.com/uruskan"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-ffdd00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+## Make the cockpit yours
+
+![Elite Dangerous HUD colour editor: an Empire blue theme in the live cockpit preview, with hostile contacts still red and friendly ones still green](docs/screenshots/hud-colours.png)
+
+* **HUD colours**: an editor built on the game's own setting, with community themes (credited to their authors), a
+  colour wheel, saturation and brightness, and a live cockpit preview that warns when friend and foe would look
+  alike. Applying writes only the three colour lines of `GraphicsConfigurationOverride.xml` and keeps your original
+  file.
+* **Keep hostile red, friendly green and shield blue.** The game's setting moves every HUD colour together, so a blue
+  theme turns hostile contacts blue too. Switch this on and your theme colours only the HUD's orange.
+* **Cockpit lights.** The game has no setting for them: Elite Nexus dims the cockpit's own lamps and glow and nothing
+  else, with in-game keys for on/off (F9), how much light stays (F10) and reach (F11).
+* **Glare and exposure.** Odyssey's auto-exposure darkens everything outside when the dashboard is bright; tame the
+  glare and lift the darks with the game's own tone-mapping values, starting from community presets.
+
+HUD colours and glare use the game's own settings file. Keeping friend-and-foe colours and dimming the cockpit lights
+need an optional graphics hook, [3Dmigoto](https://github.com/bo3b/3Dmigoto) (open source), downloaded from its
+official release, checked against pinned checksums, and installed or removed in one click from the Cockpit lights
+tab. No game file is changed and Elite Nexus never ships the game's code: its patterns adjust the light and HUD
+shaders as the game loads them. The hook can't run alongside EDHM, Frontier tolerates mods like this without having
+approved them, and it is untested under Proton and on macOS so far.
+
+| | |
+|---|---|
+| ![Elite Dangerous cockpit lights dimmer: installed, with light kept, reach and the in-game keys](docs/screenshots/cockpit-lights.png) **Cockpit lights** — dim the cockpit's own lights | ![Elite Dangerous Odyssey glare and auto-exposure fix: Morbad's Odyssey tweak applied, with less glare and the standard ACES curve](docs/screenshots/glare.png) **Glare and exposure** — less glare, brighter darks |
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Exobiology: live sampling radar with two samples, colony-range circles and "OK to sample"](docs/screenshots/exobiology.png) **Exobiology** — live sampling radar, colony range, species value | ![Exploration: every body in the system with value, mapped value and highlights](docs/screenshots/exploration.png) **Exploration** — every body, value now vs. mapped, highlights |
+| ![Ask: the AI co-pilot answering an exobiology question](docs/screenshots/ask.png) **Ask** — the AI co-pilot | ![Market: stations paying far above the galactic average](docs/screenshots/market.png) **Market** — abnormal prices across the galaxy |
+| ![Navigation: the plotted route with star classes, scoopable stars and jump distances](docs/screenshots/navigation.png) **Navigation** — route, fuel stars, next system to the clipboard | ![Engineering: blueprint wishlist and the materials shopping list](docs/screenshots/engineering.png) **Engineering** — wishlist and shopping list |
+| ![Fleet: every ship with its full engineered loadout](docs/screenshots/fleet.png) **Fleet** — loadouts, engineering, one-click EDSY/Coriolis | ![Fleet carrier: tritium, finances, capacity and crew](docs/screenshots/carrier.png) **Fleet carrier** — tritium, finances, crew |
+| ![Galaxy map: everywhere you've been, with your ship and carrier](docs/screenshots/galaxy-map.png) **Galaxy map** — your travels, ship and carrier | ![Statistics: credits over time, income by category, jumps per day](docs/screenshots/statistics.png) **Statistics** — credits, income, jumps |
+| ![Logbook: every journal event, searchable](docs/screenshots/logbook.png) **Logbook** — every journal event, searchable | ![Bindings: active presets, conflicts and every bound action](docs/screenshots/bindings.png) **Bindings** — presets, conflicts, reference card |
+| ![Accounts & sync: EDDN, EDSM, Inara and EDAstro, all opt-in](docs/screenshots/accounts.png) **Accounts & sync** — EDDN, EDSM, Inara, EDAstro | |
+
 ## Thanks
 
 Elite Nexus is one commander's spare-time project, and most of what changed since launch started with someone
@@ -107,44 +145,6 @@ else's report, idea or help. Thank you, commanders.
   EDRefCard, the exobiology research of Canonn, EDMC-BioScan, SrvSurvey and EDAstro, and MattG's exploration value
   formulae; the services Spansh, EDSM, Inara, EDDN and EDAstro; 3Dmigoto (bo3b); the Inter typeface and Phosphor
   icons. Sources and licences: [NOTICE.md](NOTICE.md).
-
-## Make the cockpit yours
-
-![Elite Dangerous HUD colour editor: an Empire blue theme in the live cockpit preview, with hostile contacts still red and friendly ones still green](docs/screenshots/hud-colours.png)
-
-* **HUD colours**: an editor built on the game's own setting, with community themes (credited to their authors), a
-  colour wheel, saturation and brightness, and a live cockpit preview that warns when friend and foe would look
-  alike. Applying writes only the three colour lines of `GraphicsConfigurationOverride.xml` and keeps your original
-  file.
-* **Keep hostile red, friendly green and shield blue.** The game's setting moves every HUD colour together, so a blue
-  theme turns hostile contacts blue too. Switch this on and your theme colours only the HUD's orange.
-* **Cockpit lights.** The game has no setting for them: Elite Nexus dims the cockpit's own lamps and glow and nothing
-  else, with in-game keys for on/off (F9), how much light stays (F10) and reach (F11).
-* **Glare and exposure.** Odyssey's auto-exposure darkens everything outside when the dashboard is bright; tame the
-  glare and lift the darks with the game's own tone-mapping values, starting from community presets.
-
-HUD colours and glare use the game's own settings file. Keeping friend-and-foe colours and dimming the cockpit lights
-need an optional graphics hook, [3Dmigoto](https://github.com/bo3b/3Dmigoto) (open source), downloaded from its
-official release, checked against pinned checksums, and installed or removed in one click from the Cockpit lights
-tab. No game file is changed and Elite Nexus never ships the game's code: its patterns adjust the light and HUD
-shaders as the game loads them. The hook can't run alongside EDHM, Frontier tolerates mods like this without having
-approved them, and it is untested under Proton and on macOS so far.
-
-| | |
-|---|---|
-| ![Elite Dangerous cockpit lights dimmer: installed, with light kept, reach and the in-game keys](docs/screenshots/cockpit-lights.png) **Cockpit lights** — dim the cockpit's own lights | ![Elite Dangerous Odyssey glare and auto-exposure fix: Morbad's Odyssey tweak applied, with less glare and the standard ACES curve](docs/screenshots/glare.png) **Glare and exposure** — less glare, brighter darks |
-
-## Screenshots
-
-| | |
-|---|---|
-| ![Exobiology: live sampling radar with two samples, colony-range circles and "OK to sample"](docs/screenshots/exobiology.png) **Exobiology** — live sampling radar, colony range, species value | ![Exploration: every body in the system with value, mapped value and highlights](docs/screenshots/exploration.png) **Exploration** — every body, value now vs. mapped, highlights |
-| ![Ask: the AI co-pilot answering an exobiology question](docs/screenshots/ask.png) **Ask** — the AI co-pilot | ![Market: stations paying far above the galactic average](docs/screenshots/market.png) **Market** — abnormal prices across the galaxy |
-| ![Navigation: the plotted route with star classes, scoopable stars and jump distances](docs/screenshots/navigation.png) **Navigation** — route, fuel stars, next system to the clipboard | ![Engineering: blueprint wishlist and the materials shopping list](docs/screenshots/engineering.png) **Engineering** — wishlist and shopping list |
-| ![Fleet: every ship with its full engineered loadout](docs/screenshots/fleet.png) **Fleet** — loadouts, engineering, one-click EDSY/Coriolis | ![Fleet carrier: tritium, finances, capacity and crew](docs/screenshots/carrier.png) **Fleet carrier** — tritium, finances, crew |
-| ![Galaxy map: everywhere you've been, with your ship and carrier](docs/screenshots/galaxy-map.png) **Galaxy map** — your travels, ship and carrier | ![Statistics: credits over time, income by category, jumps per day](docs/screenshots/statistics.png) **Statistics** — credits, income, jumps |
-| ![Logbook: every journal event, searchable](docs/screenshots/logbook.png) **Logbook** — every journal event, searchable | ![Bindings: active presets, conflicts and every bound action](docs/screenshots/bindings.png) **Bindings** — presets, conflicts, reference card |
-| ![Accounts & sync: EDDN, EDSM, Inara and EDAstro, all opt-in](docs/screenshots/accounts.png) **Accounts & sync** — EDDN, EDSM, Inara, EDAstro | |
 
 ## What it does
 
