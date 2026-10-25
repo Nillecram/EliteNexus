@@ -27,6 +27,10 @@ the older tools need.
 
 ![Elite Nexus, an Elite Dangerous companion app: dashboard with commander ranks, active ship, location and session stats](docs/screenshots/dashboard.png)
 
+## What commanders are saying
+
+![Quotes from commanders on the Frontier Forums, GitHub and Reddit, October 2026. "The engineering section is excellent as is the colonisation section and also the carrier route planning. This app does most of what I need from EDDiscovery in a fraction of memory usage. Keep going." "This is now my goto Elite companion. It does everything I want and more." "Not launched any other 3rd party apps since 0.6.0 dropped." "That abnormal price filtering is a great idea." "It ran without any problems, and immediately detected my Elite Dangerous installation. The Exploration and Exobiology sections of the application worked perfectly." "I love EliteNexus, handsome work you did there." "Works great so far, thanks for making it!"](docs/testimonials.png)
+
 ## Get started
 
 1. **[Download the latest release](https://github.com/uruskan/EliteNexus/releases/latest)**:
@@ -162,10 +166,6 @@ approved them, and it is untested under Proton and on macOS so far.
 | ![Galaxy map: everywhere you've been, with your ship and carrier](docs/screenshots/galaxy-map.png) **Galaxy map** — your travels, ship and carrier | ![Statistics: credits over time, income by category, jumps per day](docs/screenshots/statistics.png) **Statistics** — credits, income, jumps |
 | ![Logbook: every journal event, searchable](docs/screenshots/logbook.png) **Logbook** — every journal event, searchable | ![Bindings: active presets, conflicts and every bound action](docs/screenshots/bindings.png) **Bindings** — presets, conflicts, reference card |
 | ![Accounts & sync: EDDN, EDSM, Inara and EDAstro, all opt-in](docs/screenshots/accounts.png) **Accounts & sync** — EDDN, EDSM, Inara, EDAstro | |
-
-## What commanders are saying
-
-![Quotes from commanders on the Frontier Forums, GitHub and Reddit, October 2026. "The engineering section is excellent as is the colonisation section and also the carrier route planning. This app does most of what I need from EDDiscovery in a fraction of memory usage. Keep going." "This is now my goto Elite companion. It does everything I want and more." "Not launched any other 3rd party apps since 0.6.0 dropped." "That abnormal price filtering is a great idea." "It ran without any problems, and immediately detected my Elite Dangerous installation. The Exploration and Exobiology sections of the application worked perfectly." "I love EliteNexus, handsome work you did there." "Works great so far, thanks for making it!"](docs/testimonials.png)
 
 ## Documentation and links
 
