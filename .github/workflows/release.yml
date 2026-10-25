@@ -102,6 +102,8 @@ jobs:
           merge-multiple: true
       - name: Release notes
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # This version's "## [x.y.z]" section of CHANGELOG.md, up to the next "## " heading.
           $version = "${{ github.ref_name }}".TrimStart('v')
@@ -118,6 +120,12 @@ jobs:
             if ($continues) { $notes[-1] = $notes[-1] + ' ' + $l.Trim() } else { $notes += $l }
           }
           if (-not ($notes -join '').Trim()) { $notes = @('See CHANGELOG.md for what changed.') }
+          # Then GitHub's own notes (merged pull requests, new contributors, the compare link), generated here: the
+          # release action would add them at the very end, under the support buttons. If the API fails, the release
+          # goes out without them; the exit code is cleared because Actions fails a pwsh step on the last one.
+          $generated = @(gh api "repos/${{ github.repository }}/releases/generate-notes" -f "tag_name=${{ github.ref_name }}" --jq .body)
+          if ($LASTEXITCODE -ne 0) { Write-Warning "GitHub's generated notes are left out"; $generated = @(); $global:LASTEXITCODE = 0 }
+          if (($generated -join '').Trim()) { $notes += ''; $notes += $generated }
           # Every release page ends with the support buttons: the app is free, sponsoring is optional.
           $notes += ''
           $notes += '---'
@@ -134,6 +142,5 @@ jobs:
             out/*.tar.gz
             out/*.tar.gz.sha256
           body_path: out/notes.md
-          generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           make_latest: ${{ !contains(github.ref_name, '-') }}
