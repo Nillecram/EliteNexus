@@ -372,11 +372,11 @@ pub fn radar_view(gs: &GameState, prefs: &MiningPrefs) -> Option<RadarView> {
     (!marks.is_empty()).then(|| RadarView { heading: st.heading.unwrap_or(0.0), marks })
 }
 
-/// The radar and the distances and bearings under it (Mining page and the compact view).
+/// The radar and the distances and bearings under it (Mining page).
 pub fn surface_radar(ui: &mut Ui, v: &RadarView) {
-    radar(ui, v);
+    radar(ui, v, 320.0);
     ui.add_space(6.0);
-    radar_list(ui, v);
+    radar_list(ui, v, 8);
     footnote(
         ui,
         "Up is the way you're facing; turn until your heading shows the bearing. Deposits are where the Rhino refined while Elite Nexus was running \
@@ -384,9 +384,17 @@ pub fn surface_radar(ui: &mut Ui, v: &RadarView) {
     );
 }
 
-/// Top-down radar centred on you, "up" = the way you're facing (like the exobiology radar).
-fn radar(ui: &mut Ui, v: &RadarView) {
-    let side = ui.available_width().min(320.0);
+/// The compact view's radar: smaller, with the three nearest marks, so it fits beside the other cards. The note stays
+/// on the Mining page.
+pub fn surface_radar_compact(ui: &mut Ui, v: &RadarView) {
+    radar(ui, v, 220.0);
+    ui.add_space(6.0);
+    radar_list(ui, v, 3);
+}
+
+/// Top-down radar centred on you, "up" = the way you're facing (like the exobiology radar), at most `max_side` wide.
+fn radar(ui: &mut Ui, v: &RadarView, max_side: f32) {
+    let side = ui.available_width().min(max_side);
     let (rect, _) = ui.allocate_exact_size(Vec2::splat(side), Sense::hover());
     let p = ui.painter_at(rect);
     let c = rect.center();
@@ -435,11 +443,11 @@ fn radar(ui: &mut Ui, v: &RadarView) {
     );
 }
 
-/// Nearest first: what each mark is, how far, and the compass bearing to drive or fly.
-fn radar_list(ui: &mut Ui, v: &RadarView) {
+/// Nearest first, at most `rows`: what each mark is, how far, and the compass bearing to drive or fly.
+fn radar_list(ui: &mut Ui, v: &RadarView, rows: usize) {
     let mut marks: Vec<&Mark> = v.marks.iter().collect();
     marks.sort_by(|a, b| a.dist_m.total_cmp(&b.dist_m));
-    for m in marks.iter().take(8) {
+    for m in marks.iter().take(rows) {
         let (glyph, col) = match m.kind {
             MarkKind::Deposit => (icon::DIAMOND, pal::ACCENT),
             MarkKind::Ship => (icon::ROCKET, pal::CYAN),

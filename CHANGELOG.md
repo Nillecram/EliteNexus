@@ -5,6 +5,10 @@ release time that section becomes the new version and the release workflow publi
 
 ## Unreleased
 
+### Changed
+- The compact view's **Surface radar** is smaller (at most 220 pt, with the three nearest marks), so a mining session
+  fits the window without scrolling. The Mining page keeps the full radar and its note.
+
 ## [0.7.3-beta.1] - 2026-10-25
 
 A beta of 0.7.3: Rhino surface mining remembers the mining locations you worked, with the number to pick in the
