@@ -16,6 +16,11 @@ release time that section becomes the new version and the release workflow publi
   leaves you alone; docked, in an SRV or on foot inside it changes nothing, and it reacts only to what happens while
   the game runs, never to the journals read at start.
 
+### Fixed
+- Navigation: once every stop of a planned route was reached, the page kept showing "Route complete" and hid the
+  route plotted in the game afterwards (so did "Copy the next system" and the auto-copy after a jump). The game's
+  route now takes over, under the finished tour's summary.
+
 ## [0.7.3-beta.2] - 2026-10-25
 
 A second beta of 0.7.3: the compact view becomes the **overlay**, a small island at the top of the game's screen
