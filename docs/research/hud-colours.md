@@ -125,7 +125,7 @@ draw call's render targets and the shaders used) or hunting mode, with the game 
 
 3Dmigoto 1.4.9 (`3Dmigoto_v1.4.9.7z`, the official release; loads fine with `load_library_redirect=2`, no
 `nvapi64.dll`), `analyse_options = dump_rt jpg mono clear_rt`, `export_shaders=1`. The frame and 614 exported
-shaders are kept outside git in `target-agents\cockpit-capture-2026-10-13\` (Frontier's code: never commit it).
+shaders are kept outside git (Frontier's code: never commit it).
 - JPEG dumps skip floating-point targets (R16G16B16A16_FLOAT HDR buffers), so draws ~206-1450 (shadow maps and
   HDR passes) left no images. A follow-up should dump only chosen draws/targets with `dds` (a full DDS dump of
   every draw would take tens of GB at this resolution).
@@ -162,8 +162,8 @@ shaders are kept outside git in `target-agents\cockpit-capture-2026-10-13\` (Fro
   `dcl_resource_texture1d (float,float,float,float) t120`, `dcl_temps 11` and, before the final
   `mul o0.xyz, r0.xyzx, cb2[0].xxxx`: load IniParams (`ld_indexable(texture1d)… t120`), `dp3` of `v0.xyz` with
   itself, compare with reach², `movc` the strength or 1, multiply `r0.xyz` (colour) and `r1.xyz` (luminance
-  source). `[Constants] x = 0.35, y = 5, z = 1`; keys F9 toggle `z`, F10 cycle `x`, F11 cycle `y`. The owner
-  confirmed: only the cockpit lights dim, strength and on/off behave, nothing else changes. A 3 m reach let
+  source). `[Constants] x = 0.35, y = 5, z = 1`; keys F9 toggle `z`, F10 cycle `x`, F11 cycle `y`. Confirmed in
+  the game: only the cockpit lights dim, strength and on/off behave, nothing else changes. A 3 m reach let
   some of this ship's cockpit lights back (they sit up to ~5 m away), so the reach should not go below ~5 m
   by default and should be adjustable per ship.
 - **In Elite Nexus** (`nexus_hud::dimmer`, HUD & cockpit › Cockpit lights): the test's hash-named fix held the

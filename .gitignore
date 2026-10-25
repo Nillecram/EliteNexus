@@ -11,6 +11,10 @@
 *.log
 *.pdb
 
+# Local notes and toolchain paths for one machine
+/CLAUDE.local.md
+/tools/env.local.ps1
+
 # Editors / OS
 .vs/
 .vscode/

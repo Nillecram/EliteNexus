@@ -4,7 +4,7 @@ Research date: **2026-10-12**. Status: implementation-ready, with the unverified
 
 ## 0. Sources and how they were verified
 
-The live documentation pages on `www.edsm.net/en/...` return a Cloudflare "managed challenge" (HTTP 403 plus an interactive Turnstile) to scripted clients and to the agent browser. **The API endpoints themselves are not challenged.** I did not solve the challenge, so the documentation text was read from Internet Archive snapshots of the official pages:
+The live documentation pages on `www.edsm.net/en/...` return a Cloudflare "managed challenge" (HTTP 403 plus an interactive Turnstile) to scripted clients and automated browsers. **The API endpoints themselves are not challenged.** I did not solve the challenge, so the documentation text was read from Internet Archive snapshots of the official pages:
 
 | Official page | Snapshot used | "Last Revision" shown on page |
 |---|---|---|

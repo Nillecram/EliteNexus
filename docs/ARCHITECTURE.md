@@ -8,15 +8,14 @@ with one fast app.
 ## Build
 
 ```powershell
-. .\tools\env.ps1                     # puts the D:\GameDev\Tools\Rust toolchain on PATH (nothing global changed)
 cargo run -p nexus-app                # debug build (deps optimised, fast enough)
 cargo build --release -p nexus-app    # → target\release\EliteNexus.exe
 cargo test --workspace
 ```
 
-On the dev machine the game is often running: build through `tools\dev\cargo.ps1` (BelowNormal priority, logs in
-`target\cc\`) and check the UI with `tools\dev\shot.ps1`; `AGENTS.md` has the rules for agents and contributors.
-Agents/parallel builds: set your own `CARGO_TARGET_DIR` (e.g. `target-agents\<name>`) to avoid lock contention.
+On Windows, `tools\dev\cargo.ps1` runs cargo at BelowNormal priority (logs in `target\cc\`) so a game on the same PC
+isn't slowed, and `tools\dev\shot.ps1` checks the UI with off-screen screenshots; `AGENTS.md` has the working rules.
+Parallel builds: set your own `CARGO_TARGET_DIR` (e.g. `target-agents\<name>`) to avoid lock contention.
 `EliteNexus.exe --page Exploration --screenshot out.png` renders a page after loading and saves a PNG (used for UI checks;
 the window is placed off-screen and never takes focus). `--size 1000x700` tests responsive layouts, `--tab <name>` opens
 a Market section (`abnormal`, `database`, …), the whole-galaxy map (`galaxy`), an Exploration tab (`find`, `history`,
@@ -25,7 +24,7 @@ screenshot run), HUD & cockpit's tabs (`glare`, `cockpit`) or a HUD colours pres
 `royalpurple`, …), `--demo` adds a sample Ask conversation and an alert banner, `--shot-delay 8` waits longer (the
 galaxy image paints in the background, Spansh searches take 5–20 s). `ELITE_NEXUS_GAME_DIR` points HUD & cockpit at
 another game folder (one holding `EliteDangerous64.exe`): test the Cockpit lights installer against a copy, never
-the owner's game.
+a real install.
 
 ## Crates
 
@@ -82,7 +81,7 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
 * History is folded with alerts **disabled**; only live events raise alerts or get uploaded. Never upload history.
   Test runs (`--journal-dir`, `--screenshot`) never upload at all.
 * The UI never blocks: long work (DB queries, HTTP) runs off-thread and results are polled each frame.
-* Data dir: `nexus-data\` next to the exe (portable; the C: drive is nearly full) — fallback `%LOCALAPPDATA%\EliteNexus`, override `ELITE_NEXUS_HOME`.
+* Data dir: `nexus-data\` next to the exe (portable) — fallback `%LOCALAPPDATA%\EliteNexus`, override `ELITE_NEXUS_HOME`.
   Contents: `settings.json` (API keys DPAPI-sealed), `galaxy.db` (+ WAL), `uplink\` queues and caches.
 * The galaxy DB only keeps what queries use: EDDN jumps into unpopulated systems are dropped (populated systems,
   carrier jumps, docked arrivals, stations, markets and ring hotspots are kept); the commander's own journal is kept whole.

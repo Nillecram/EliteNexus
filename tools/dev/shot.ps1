@@ -11,7 +11,7 @@
 #        game folder instead of the real one (AGENTS.md says how to fake the installed hook).
 #        With -Page Navigation: carrier opens the fleet carrier planner (and its jump timer).
 # -JournalDir: read a test journal folder instead of the real one (test runs never upload).
-# -Demo: a sample Ask conversation and an alert banner. -Exe: another build (e.g. an agent's own
+# -Demo: a sample Ask conversation and an alert banner. -Exe: another build (e.g. one from your own
 #        CARGO_TARGET_DIR). The data folder is the build's own (target\debug\nexus-data).
 param(
     [string]$Page = "Dashboard",

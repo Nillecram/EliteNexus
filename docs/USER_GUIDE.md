@@ -1,6 +1,6 @@
 # Elite Nexus — user guide
 
-Start `Start-EliteNexus.cmd` (or `dist\EliteNexus\EliteNexus.exe`). It finds your journal folder automatically
+Unzip the release and run `EliteNexus.exe`. It finds your journal folder automatically
 (Saved Games\Frontier Developments\Elite Dangerous), reads your whole history in well under a second, then follows
 the game live. Run it before or after the game — order doesn't matter. On Linux, run `./EliteNexus`: it finds the
 journals in the game's Proton prefix (see [Linux](#linux)). On a Mac, open `Elite Nexus.app`: it finds them in the

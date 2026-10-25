@@ -1,8 +1,7 @@
 """Render the quote collage, tools/site/testimonials.html, to docs/testimonials.png (2800 x 2200).
 
 Usage: python tools/site/testimonials.py [--port 4174] [--open]
-Starts a local server and prints a URL. Open it in any Chromium-based browser (Edge, Chrome, Brave, or an agent's
-browser pane): the page draws itself at 2x onto a canvas and posts the PNG back, the server saves it and exits.
+Starts a local server and prints a URL. Open it in any Chromium-based browser (Edge, Chrome or Brave): the page draws itself at 2x onto a canvas and posts the PNG back, the server saves it and exits.
 --open opens the URL in your default browser. Only the page and its fonts are served, on 127.0.0.1.
 Python standard library only.
 """

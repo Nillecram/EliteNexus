@@ -68,7 +68,7 @@ Each crate ships examples that work on your own journals and database:
 ## How it stays fast
 
 Elite Nexus is pure Rust: no Python, no Node.js, no browser engine, one executable with a GPU-rendered interface
-(egui/wgpu). Measured on the development machine:
+(egui/wgpu). Measured on one development PC:
 
 | | Elite Nexus |
 |---|---|
@@ -95,10 +95,9 @@ What works on Linux and what doesn't yet is collected in [issue #3](https://gith
 
 ## Sending changes
 
-* Read [AGENTS.md](AGENTS.md) before your first change. Its rules protect users' games and data: never upload history,
-  uploads stay opt-in, never panic on external data, be honest in the UI about where data comes from and what it
-  can't show, and never invent limits. It also describes the build and UI checks, working in parallel, commits and
-  releases.
+* Read [AGENTS.md](AGENTS.md) first: the conventions (no `unwrap()` on external data, `#[serde(default)]` on external
+  structs, UI text that says where data comes from and what it can't show, limits that are real, uploads that stay
+  opt-in), the build and UI checks, commits and releases.
 * Keep pull requests to one logical change. Commit subjects are imperative and about 70 characters, often "Area: what
   changed"; the body says what and why in plain words.
 * When behaviour changes, update `docs/USER_GUIDE.md` and `CHANGELOG.md` (under "Unreleased") in the same commit. The

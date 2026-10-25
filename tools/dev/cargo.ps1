@@ -1,5 +1,5 @@
-# Runs cargo at BelowNormal priority with the project toolchain: the game is often running on this
-# machine, so builds must never take the CPU from it. Output goes to target\cc\<Log>.log.
+# Runs cargo at BelowNormal priority with the project toolchain, so a game running on the same PC
+# keeps its frame rate. Output goes to target\cc\<Log>.log.
 #   powershell -File tools\dev\cargo.ps1 -Log build -CargoArgs "build -p nexus-app -j 4"
 #   powershell -File tools\dev\cargo.ps1 -Log test -TargetDir target-agents\me -CargoArgs "test --workspace -j 4"
 param(

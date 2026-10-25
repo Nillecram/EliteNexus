@@ -1,5 +1,5 @@
 #!/bin/bash
-# Elite Nexus on Linux, from this Windows PC: runs inside the EliteNexusLinux WSL distro (AGENTS.md > This machine).
+# Elite Nexus on Linux, from a Windows PC: runs inside a WSL distro with Rust, Xvfb and Mesa (AGENTS.md > Linux).
 # Run from the repository root in PowerShell:
 #   wsl -d EliteNexusLinux -u root -- bash tools/dev/linux.sh cargo clippy --workspace --all-targets -j 4 -- -D warnings
 #   wsl -d EliteNexusLinux -u root -- bash tools/dev/linux.sh cargo test --workspace -j 4
