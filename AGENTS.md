@@ -92,7 +92,7 @@ Output goes to `target\cc\<Log>.log`. CI (`.github/workflows/ci.yml`) runs the s
 
 * Tests that need the internet are `#[ignore]`d, e.g. `cargo test -p nexus-app untouched -- --ignored --nocapture`.
 * Spansh planners, live: `cargo run -p nexus-spansh --example smoke -- --only riches,exobio` (all steps: no `--only`).
-* More dev tools (journal stats, model summary, replay, EDDN upload validation) are listed in the README.
+* More dev tools (journal stats, model summary, replay, EDDN upload validation) are listed in `CONTRIBUTING.md`.
 
 ## Checking the UI
 

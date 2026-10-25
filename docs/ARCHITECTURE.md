@@ -101,7 +101,8 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
 
 ## Licensing notes
 
-* The repository and its GitHub releases are public, but there is no `LICENSE` yet: the owner's decision.
+* Elite Nexus is free software under GPL-3.0-or-later (`LICENSE`); third-party data and fonts are listed in `NOTICE.md`
+  with their licences.
 * EDCD/FDevIDs CSVs (data/fdevids) have **no licence file**; releases now distribute binaries, so ask EDCD.
 * EDGalaxyData (online footfall lookups, `ai_tools::ONLINE_FOOTFALL_LOOKUP`) publishes no terms: ask its operator.
 * EDEngineer data (MIT), EDDiscovery sources (Apache-2.0), ed-journal-schemas (Apache-2.0): attribution in data/*/SOURCE.txt.

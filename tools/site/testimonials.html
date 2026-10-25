@@ -10,7 +10,7 @@
 :root { --bg: #0b0d10; --text: #f3f4f5; --muted: #a4abb6; --subtle: #7e8794; --line: #282d35; --amber: #ffad2b; --amber-light: #ffc269; }
 * { box-sizing: border-box; }
 html, body { width: 1400px; height: 1100px; margin: 0; overflow: hidden; background: var(--bg); }
-body { color: var(--text); font: 400 20px/1.6 Inter, sans-serif; }
+body { color: var(--text); font: 400 18px/1.6 Inter, sans-serif; }
 p, figure { margin: 0; }
 .frame { display: flex; flex-direction: column; width: 1400px; height: 1100px; padding: 52px 56px 40px;
   background: radial-gradient(ellipse 900px 520px at 0 0, #ffad2b17, transparent 70%), radial-gradient(ellipse 700px 500px at 100% 100%, #5bb6ff0c, transparent 70%), var(--bg); }
@@ -21,39 +21,39 @@ h1 { margin: 0 0 10px; font-size: 56px; font-weight: 600; line-height: 1.05; let
 .brand { display: flex; align-items: center; gap: 14px; flex-shrink: 0; padding-bottom: 6px; font-size: 26px; font-weight: 700; letter-spacing: -.025em; }
 .brand-mark { position: relative; width: 42px; height: 42px; border-radius: 11px; background: var(--amber); }
 .brand-mark::after { content: ''; position: absolute; top: 13px; left: 13px; width: 14px; height: 14px; border: 2px solid #21170b; transform: rotate(45deg); }
-main { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; flex: 1; min-height: 0; margin-bottom: 30px; }
-.col { display: flex; flex-direction: column; gap: 22px; }
+main { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; flex: 1; min-height: 0; margin-bottom: 30px; }
+.col { display: flex; flex-direction: column; gap: 20px; }
 .col .quote:last-child { flex: 1; }
-.quote { display: flex; flex-direction: column; gap: 14px; padding: 24px 28px 22px; border: 1px solid var(--line); border-radius: 14px; background: #111419; }
+.quote { display: flex; flex-direction: column; gap: 12px; padding: 22px 26px 20px; border: 1px solid var(--line); border-radius: 14px; background: #111419; }
 blockquote { margin: 0; color: #dfe2e7; }
 blockquote::before { content: '“'; display: block; height: 28px; color: var(--amber); font: 700 54px/1 Georgia, serif; }
 blockquote p + p { margin-top: 10px; }
 .who { margin-top: auto; color: var(--subtle); font-size: 15px; }
-.lead { gap: 22px; padding: 34px 34px 30px; border-color: #4b3b25; background: radial-gradient(ellipse at 0 0, #ffad2b14, transparent 70%), #111419; }
-.lead blockquote { color: var(--text); font-size: 28px; line-height: 1.5; letter-spacing: -.015em; }
+.lead { gap: 20px; padding: 30px 32px 28px; border-color: #4b3b25; background: radial-gradient(ellipse at 0 0, #ffad2b14, transparent 70%), #111419; }
+.lead blockquote { color: var(--text); font-size: 26px; line-height: 1.5; letter-spacing: -.015em; }
 .lead blockquote::before { height: 38px; font-size: 76px; }
 .lead blockquote p + p { margin-top: 16px; }
 footer { display: flex; justify-content: space-between; gap: 30px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--subtle); font-size: 16px; }
 footer strong { color: var(--amber-light); font-weight: 600; }
 </style></head><body><div class="frame">
 <header>
-  <div><p class="eyebrow">From the launch threads · October 2026</p><h1>What commanders are saying</h1><p class="sub">Frontier Forums and Reddit, in their own words. “…” marks a cut. Names left out.</p></div>
+  <div><p class="eyebrow">From the launch threads and the weeks after · October 2026</p><h1>What commanders are saying</h1><p class="sub">Frontier Forums, GitHub and Reddit, in their own words. “…” marks a cut. Names left out.</p></div>
   <div class="brand"><span class="brand-mark"></span>Elite Nexus</div>
 </header>
 <main>
   <figure class="quote lead"><blockquote><p>I have been using it a lot today working through the various sections, the engineering section is excellent as is the colonisation section and also the carrier route planning. …</p><p>This app does most of what I need from EDDiscovery in a fraction of memory usage.</p><p>Keep going.</p></blockquote><figcaption class="who">A commander on the Frontier Forums</figcaption></figure>
   <div class="col">
+    <figure class="quote"><blockquote><p>This is now my goto Elite companion.</p><p>It does everything I want and more, in fact I am still exploring the app. …</p><p>Thank you for using your skills to better the Elite community.</p></blockquote><figcaption class="who">A commander on the Frontier Forums</figcaption></figure>
+    <figure class="quote"><blockquote><p>Everything else is working really well for me here, not launched any other 3rd party apps since 0.6.0 dropped.</p></blockquote><figcaption class="who">A commander on GitHub</figcaption></figure>
     <figure class="quote"><blockquote><p>I earned my FC this way hauling composites during the early days of colonization.</p><p>That abnormal price filtering is a great idea.</p></blockquote><figcaption class="who">A commander on Reddit</figcaption></figure>
-    <figure class="quote"><blockquote><p>I use a bunch of the usual companion apps at the moment but this looks interesting (I like the HUD and cockpit light controls)</p><p>I think I will give this a try.</p></blockquote><figcaption class="who">A commander on Reddit</figcaption></figure>
-    <figure class="quote"><blockquote><p>OP, this looks super impressive.</p></blockquote><figcaption class="who">A commander on Reddit</figcaption></figure>
   </div>
   <div class="col">
-    <figure class="quote"><blockquote><p>First looks are highly positive. Will say more when I have had time to kick more of its tyres.</p></blockquote><figcaption class="who">A commander on the Frontier Forums</figcaption></figure>
-    <figure class="quote"><blockquote><p>Thanks for re-posting this, I saw it briefly yesterday at work and was struggling to find it today. I had to fire up my work computer to check the browsing history …</p></blockquote><figcaption class="who">A commander on Reddit</figcaption></figure>
-    <figure class="quote"><blockquote><p>Love the look of your tool, will give it a try.</p></blockquote><figcaption class="who">A commander on Reddit</figcaption></figure>
+    <figure class="quote"><blockquote><p>It ran without any problems, and immediately detected my Elite Dangerous installation. …</p><p>… the Exploration and Exobiology sections of the application worked perfectly.</p></blockquote><figcaption class="who">A commander on GitHub, on Linux</figcaption></figure>
+    <figure class="quote"><blockquote><p>I just started the game 10 days ago and tried different companion tool for exploration.</p><p>I love EliteNexus, handsome work you did there.</p></blockquote><figcaption class="who">A commander on GitHub</figcaption></figure>
+    <figure class="quote"><blockquote><p>used the app for exploration around the community goal today. works great so far, thanks for making it!</p></blockquote><figcaption class="who">A commander on the Frontier Forums</figcaption></figure>
   </div>
 </main>
-<footer><span><strong>Elite Nexus</strong> · the free, open-source Elite Dangerous companion for Windows and Linux</span><span>uruskan.github.io/EliteNexus</span></footer>
+<footer><span><strong>Elite Nexus</strong> · the free, open-source Elite Dangerous companion for Windows, Linux and macOS</span><span>uruskan.github.io/EliteNexus</span></footer>
 </div>
 <script>
 // Opened from tools/site/testimonials.py (?save): draw this page at 2x through an SVG foreignObject, so the browser's own
