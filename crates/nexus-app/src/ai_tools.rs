@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 use tokio::runtime::Handle;
 
 mod cmdr;
+mod outfit;
 
 pub struct NexusTools {
     pub model: Arc<RwLock<Model>>,
@@ -1446,6 +1447,9 @@ impl ToolHost for NexusTools {
             "credit_history" => self.credit_history(args),
             "system_factions" => self.system_factions(args),
             "game_files" => self.game_files(args),
+            "find_ship" => self.find_ship(args),
+            "find_module" => self.find_module(args),
+            "find_material_body" => self.find_material_body(args),
             "knowledge" => {
                 let q = arg_str(args, "query").ok_or("query is required")?;
                 let hits = nexus_ai::knowledge::search(&q, 4);
@@ -1677,6 +1681,45 @@ pub fn specs() -> Vec<ToolSpec> {
                     "files": { "type": "array", "items": { "type": "string", "enum": cmdr::GAME_FILES }, "description": "Which files to read. Default: Status and NavRoute. Ask for big ones (Market, Outfitting, Shipyard) one at a time." }
                 }),
                 &[],
+            ),
+        },
+        ToolSpec {
+            name: "find_ship",
+            description: "Nearest stations whose shipyard lists a ship type, from Spansh (EDDN data): price and when the shipyard was last reported. It is the station's catalogue, not its stock: a listed ship can be sold out. Never call it in stock.",
+            parameters: schema(
+                json!({
+                    "ship": { "type": "string", "description": "Ship type, e.g. Asp Explorer, Diamondback Explorer, Mandalay, Krait Mk II (Mk II, MkII and mk2 all work)." },
+                    "near_system": { "type": "string", "description": NEAR },
+                    "limit": { "type": "integer", "description": "How many stations. Default 10, at most 25." }
+                }),
+                &["ship"],
+            ),
+        },
+        ToolSpec {
+            name: "find_module",
+            description: "Nearest stations whose outfitting lists a module (English name, e.g. Fuel Scoop, Frame Shift Drive), optionally of a class (1-8) and rating (A-I), from Spansh (EDDN data): the catalogue, not the stock.",
+            parameters: schema(
+                json!({
+                    "module": { "type": "string", "description": "Module name in English, e.g. Fuel Scoop, Frame Shift Drive, Detailed Surface Scanner, Auto Field-Maintenance Unit." },
+                    "class": { "type": "integer", "description": "Class (size) 1-8. Default: any." },
+                    "rating": { "type": "string", "description": "Rating A-I. Default: any." },
+                    "near_system": { "type": "string", "description": NEAR },
+                    "limit": { "type": "integer", "description": "How many stations. Default 10, at most 25." }
+                }),
+                &["module"],
+            ),
+        },
+        ToolSpec {
+            name: "find_material_body",
+            description: "Landable bodies near a system that hold a raw material (e.g. Polonium), richest first, from Spansh. Searches the 500 nearest landable bodies at most (a cap that keeps the answer quick); max_gravity_g defaults to 1.0.",
+            parameters: schema(
+                json!({
+                    "material": { "type": "string", "description": "A raw material, e.g. Polonium, Tellurium, Niobium, Arsenic." },
+                    "near_system": { "type": "string", "description": NEAR },
+                    "max_gravity_g": { "type": "number", "description": "Highest surface gravity in g. Default 1.0." },
+                    "max_distance_ls": { "type": "number", "description": "Farthest from the arrival star, in ls. Default: any." }
+                }),
+                &["material"],
             ),
         },
     ]
@@ -2743,6 +2786,83 @@ mod tests {
         assert_eq!(short_name("Earth", "Sol"), "Earth");
         assert!(body_matches("Swoilz MH-W c17-3 A 4", "Swoilz MH-W c17-3", "A 4"));
         assert!(!body_matches("Swoilz MH-W c17-3 A 4 a", "Swoilz MH-W c17-3", "A 4"));
+    }
+
+    #[test]
+    fn resolve_ship_normalises_spelling() {
+        for s in ["krait mk2", "Krait MkII", "krait mk ii"] {
+            assert_eq!(outfit::resolve_ship(s), Ok("Krait Mk II".to_string()), "{s}");
+        }
+        let maybe = outfit::resolve_ship("asp x").unwrap_err();
+        assert!(maybe.iter().any(|n| n == "Asp Explorer"), "{maybe:?}");
+    }
+
+    #[test]
+    fn find_material_body_rejects_non_raw() {
+        let rt = runtime();
+        let tools = model_tools(commander(), &rt);
+        let e = tools.call("find_material_body", &json!({ "material": "Biotech Conductors" })).unwrap_err();
+        assert!(e.contains("raw"), "{e}");
+        assert!(tools.call("find_material_body", &json!({ "material": "Unobtainium" })).is_err());
+        assert!(tools.call("find_material_body", &json!({})).is_err());
+    }
+
+    #[test]
+    fn find_tools_check_their_arguments_before_asking_spansh() {
+        let rt = runtime();
+        let tools = model_tools(commander(), &rt);
+        assert!(tools.call("find_ship", &json!({ "ship": "Flying Brick" })).is_err());
+        assert!(tools.call("find_ship", &json!({})).is_err());
+        assert!(tools.call("find_module", &json!({ "module": "Fuel Scoop", "class": 9 })).unwrap_err().contains("class"));
+        assert!(tools.call("find_module", &json!({ "module": "Fuel Scoop", "rating": "Z" })).unwrap_err().contains("rating"));
+        assert!(tools.call("find_module", &json!({})).is_err());
+    }
+
+    /// A runtime that drives network I/O for `Handle::block_on` (a current-thread one only does inside its own `block_on`).
+    fn live_runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_multi_thread().worker_threads(1).enable_all().build().unwrap()
+    }
+
+    /// Live: `cargo test -p nexus-app live_find -- --ignored --nocapture` (needs the internet; reads Spansh only).
+    #[test]
+    #[ignore]
+    fn live_find_ship_and_module() {
+        let rt = live_runtime();
+        let tools = model_tools(commander(), &rt);
+        let ship = tools.call("find_ship", &json!({ "ship": "krait mk2", "near_system": "Deciat", "limit": 5 })).unwrap();
+        println!("{ship:#}");
+        assert!(!ship["stations"].as_array().unwrap().is_empty());
+        assert!(ship["note"].as_str().unwrap().contains("catalogue"));
+        assert_eq!(ship["ship"], "Krait MkII", "Spansh's own spelling");
+        let kestrel = tools.call("find_ship", &json!({ "ship": "Kestrel Mk II", "near_system": "Deciat", "limit": 3 })).unwrap();
+        assert!(!kestrel["stations"].as_array().unwrap().is_empty(), "{kestrel}");
+        let module = tools.call("find_module", &json!({ "module": "fuel scoop", "class": 5, "rating": "A", "near_system": "Deciat" })).unwrap();
+        println!("{module:#}");
+        let stations = module["stations"].as_array().unwrap();
+        assert!(!stations.is_empty());
+        assert!(stations.iter().all(|s| !s["matches"].as_array().unwrap().is_empty()));
+        assert_eq!(stations[0]["matches"][0]["class"], 5);
+        assert_eq!(stations[0]["matches"][0]["rating"], "A");
+        let all = tools.call("find_module", &json!({ "module": "Fuel Scoop", "near_system": "Deciat", "limit": 25 })).unwrap();
+        assert!(all.to_string().len() < nexus_ai::agent::MAX_RESULT_CHARS, "{} chars", all.to_string().len());
+        let e = tools.call("find_module", &json!({ "module": "Warp Core", "near_system": "Deciat" })).unwrap_err();
+        println!("{e}");
+    }
+
+    /// Live: see `live_find_ship_and_module`.
+    #[test]
+    #[ignore]
+    fn live_find_material_body() {
+        let rt = live_runtime();
+        let tools = model_tools(commander(), &rt);
+        let v = tools.call("find_material_body", &json!({ "material": "Polonium", "near_system": "Deciat" })).unwrap();
+        println!("{v:#}");
+        let bodies = v["bodies"].as_array().unwrap();
+        assert!(!bodies.is_empty(), "{v}");
+        let shares: Vec<f64> = bodies.iter().map(|b| b["share_pct"].as_f64().unwrap()).collect();
+        assert!(shares.windows(2).all(|w| w[0] >= w[1]), "richest first: {shares:?}");
+        assert!(bodies.iter().all(|b| b["system"].is_string() && b["gravity_g"].is_number()));
+        assert!(v["searched_bodies"].as_u64().unwrap() <= 500);
     }
 }
 
