@@ -2593,6 +2593,7 @@ dependencies = [
 name = "nexus-mcp"
 version = "0.7.3-beta.2"
 dependencies = [
+ "base64 0.23.1",
  "getrandom 0.3.4",
  "nexus-ai",
  "parking_lot",

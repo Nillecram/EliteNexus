@@ -3,3 +3,6 @@
 //! checks who is asking and answers JSON-RPC; the app implements the tools and starts the server.
 
 pub mod http;
+pub mod rpc;
+
+pub use rpc::ServerInfo;
