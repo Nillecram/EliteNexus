@@ -34,12 +34,20 @@ pub type Host = Arc<dyn ToolHost + Send + Sync>;
 pub type HostSlot = Arc<RwLock<Host>>;
 
 /// How the server listens.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Config {
     pub port: u16,
     /// Listen on every interface instead of loopback only; every non-loopback peer then needs `key`.
     pub lan: bool,
     pub key: String,
+}
+
+/// Written by hand so that logging a `Config` never prints the access key.
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let key = if self.key.is_empty() { "<empty>" } else { "<set>" };
+        f.debug_struct("Config").field("port", &self.port).field("lan", &self.lan).field("key", &format_args!("{key}")).finish()
+    }
 }
 
 /// What a connection needs, shared by all of them.
@@ -50,6 +58,10 @@ struct Ctx {
 }
 
 /// A running server. Dropping it stops accepting and frees the port.
+///
+/// Drop it from a thread that is not a runtime thread (the UI thread is fine): `Drop` then waits until the port is
+/// free, so starting again on the same port right away works. Dropped from a runtime or `spawn_blocking` thread, the
+/// wait is skipped (blocking there could stall the runtime) and an immediate restart on the same port may fail.
 pub struct Server {
     addr: SocketAddr,
     task: tokio::task::JoinHandle<()>,
@@ -376,6 +388,57 @@ mod tests {
         assert_eq!(send(addr, b"garbage\r\n\r\n").status, 400);
         // A page served from localhost is welcome.
         assert_eq!(post(addr, &json!({"jsonrpc": "2.0", "method": "notifications/initialized"}).to_string(), &[("Origin", "http://localhost:3000")]).0, 202);
+    }
+
+    #[test]
+    fn config_debug_never_shows_the_key() {
+        let secret = "0123456789abcdef-the-secret";
+        let shown = format!("{:?}", Config { port: 47561, lan: true, key: secret.to_string() });
+        assert!(!shown.contains(secret), "{shown}");
+        assert!(shown.contains("<set>") && shown.contains("47561"), "{shown}");
+        assert!(format!("{:?}", cfg(1)).contains("<empty>"));
+    }
+
+    /// A `Ctx` built the way `start` builds it, with a LAN key.
+    fn lan_ctx(rt: &Runtime) -> Ctx {
+        Ctx { key: "k3y".to_string(), host: slot(rt), info: Arc::new(info()) }
+    }
+
+    fn route_req(headers: &[(&str, &str)]) -> Request {
+        let body = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string().into_bytes();
+        Request { method: "POST".into(), path: "/mcp".into(), headers: headers.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(), body }
+    }
+
+    fn lan_route(rt: &Runtime, headers: &[(&str, &str)]) -> (u16, String) {
+        let peer: IpAddr = "192.168.1.5".parse().unwrap();
+        let bytes = rt.block_on(route(route_req(headers), peer, &lan_ctx(rt)));
+        let text = String::from_utf8_lossy(&bytes).into_owned();
+        let status = text.split(' ').nth(1).and_then(|c| c.parse().ok()).unwrap_or(0);
+        (status, text)
+    }
+
+    #[test]
+    fn lan_peer_without_the_key_gets_401() {
+        let rt = runtime();
+        let (status, text) = lan_route(&rt, &[]);
+        assert_eq!(status, 401, "{text}");
+        assert!(text.contains("WWW-Authenticate: Bearer\r\n"), "{text}");
+        assert_eq!(lan_route(&rt, &[("authorization", "Bearer wrong")]).0, 401);
+    }
+
+    #[test]
+    fn lan_peer_with_the_key_is_served() {
+        let rt = runtime();
+        let (status, text) = lan_route(&rt, &[("authorization", "Bearer k3y")]);
+        assert_eq!(status, 200, "{text}");
+        assert!(text.contains("\"tools\""), "{text}");
+    }
+
+    #[test]
+    fn foreign_origin_is_refused_even_with_the_key() {
+        let rt = runtime();
+        let (status, text) = lan_route(&rt, &[("authorization", "Bearer k3y"), ("origin", "http://evil.example")]);
+        assert_eq!(status, 403, "{text}");
     }
 
     #[test]
