@@ -120,29 +120,52 @@ fn page_budget(elapsed: Duration) -> Option<Duration> {
     Some(left.min(SPANSH_TIMEOUT))
 }
 
+/// What came of checking a name against Spansh's list of names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NameCheck {
+    /// Spansh's own spelling is used.
+    Checked,
+    /// Spansh's list could not be loaded.
+    ListMissing,
+    /// Spansh's list loaded but doesn't hold the name.
+    NotInList,
+}
+
 /// Spansh's own spelling of a ship the game files name `resolved`, and whether it could be checked against Spansh's
-/// list of ship names (`false`: the list is missing, or doesn't hold that ship).
-fn spansh_ship_name(resolved: String, catalogue: &[String]) -> (String, bool) {
+/// list of ship names.
+fn spansh_ship_name(resolved: String, catalogue: &[String]) -> (String, NameCheck) {
     let names: Vec<&str> = catalogue.iter().map(String::as_str).collect();
     match pick(&resolved, &names, ship_key) {
-        Ok(name) => (name, true),
-        Err(_) => (resolved, false),
+        Ok(name) => (name, NameCheck::Checked),
+        Err(_) if catalogue.is_empty() => (resolved, NameCheck::ListMissing),
+        Err(_) => (resolved, NameCheck::NotInList),
     }
 }
 
-/// The module name to search for and whether it was checked against Spansh's list of module names. A name that list
-/// doesn't hold is an error with suggestions.
-fn spansh_module_name(asked: &str, catalogue: &[String]) -> Result<(String, bool), String> {
+/// The module name to search for and whether it was checked against Spansh's list of module names. A name a loaded
+/// list doesn't hold is an error with suggestions.
+fn spansh_module_name(asked: &str, catalogue: &[String]) -> Result<(String, NameCheck), String> {
     if catalogue.is_empty() {
-        return Ok((asked.to_string(), false));
+        return Ok((asked.to_string(), NameCheck::ListMissing));
     }
     let names: Vec<&str> = catalogue.iter().map(String::as_str).collect();
-    pick(asked, &names, plain_key).map(|n| (n, true)).map_err(|maybe| unknown("module", asked, "English names, e.g. Fuel Scoop, Frame Shift Drive", &maybe))
+    pick(asked, &names, plain_key).map(|n| (n, NameCheck::Checked)).map_err(|maybe| unknown("module", asked, "English names, e.g. Fuel Scoop, Frame Shift Drive", &maybe))
 }
 
-/// Said when the name sent to Spansh could not be checked against its spelling: an empty answer then proves nothing.
-fn note_unchecked(out: &mut Value, what: &str) {
-    add_note(out, &format!("Spansh's list of {what} names could not be used to check this name, and Spansh matches names exactly: if no station is listed, that may be a spelling mismatch, not a real absence."));
+/// Said when the name sent to Spansh was not checked against its spelling: an empty answer then proves nothing.
+fn note_unchecked(out: &mut Value, what: &str, check: NameCheck) {
+    let why = match check {
+        NameCheck::Checked => return,
+        NameCheck::ListMissing => format!("Spansh's list of {what} names could not be used to check this name"),
+        NameCheck::NotInList => format!("Spansh's list of {what} names does not hold this name"),
+    };
+    add_note(out, &format!("{why}, and Spansh matches names exactly: if no station is listed, that may be a spelling mismatch, not a real absence."));
+}
+
+/// Why a body search stopped: its own time limit when that is used up (a page cut short by it comes back as a Spansh
+/// timeout), else the error Spansh gave.
+fn interruption(error: String, elapsed: Duration) -> String {
+    if page_budget(elapsed).is_none() { TIME_LIMIT.to_string() } else { error }
 }
 
 fn names_of(v: &nexus_spansh::records::FieldValues) -> Vec<String> {
@@ -211,7 +234,7 @@ fn strip_nulls_in(rows: &mut [Value]) {
 
 /// The reply of `find_ship`: the stations Spansh listed, nearest first, with the ship's price and the date of the
 /// shipyard report.
-fn shape_ships(near: &str, ship: &str, asked: &str, checked: bool, stations: &[StationRecord]) -> Value {
+fn shape_ships(near: &str, ship: &str, asked: &str, check: NameCheck, stations: &[StationRecord]) -> Value {
     let mut rows: Vec<Value> = stations
         .iter()
         .map(|s| {
@@ -229,9 +252,7 @@ fn shape_ships(near: &str, ship: &str, asked: &str, checked: bool, stations: &[S
     if stations.is_empty() {
         add_note(&mut out, "No station near enough lists it in Spansh.");
     }
-    if !checked {
-        note_unchecked(&mut out, "ship");
-    }
+    note_unchecked(&mut out, "ship", check);
     note_carriers(&mut out, stations);
     fit_stations(&mut out);
     out
@@ -252,7 +273,7 @@ fn module_matches<'a>(s: &'a StationRecord, module: &str, class: Option<u32>, ra
 
 /// The reply of `find_module`. A station lists dozens of matches when no class or rating is asked for, so the list per
 /// station is cut (6, then 3, then 1) before stations are dropped, and the reply says what was cut.
-fn shape_modules(near: &str, module: &str, class: Option<u32>, rating: Option<&str>, checked: bool, stations: &[StationRecord]) -> Value {
+fn shape_modules(near: &str, module: &str, class: Option<u32>, rating: Option<&str>, check: NameCheck, stations: &[StationRecord]) -> Value {
     let found: Vec<(&StationRecord, Vec<_>)> = stations.iter().map(|s| (s, module_matches(s, module, class, rating))).filter(|(_, m)| !m.is_empty()).collect();
     let skipped = stations.len() - found.len();
     let mut out = Value::Null;
@@ -300,9 +321,7 @@ fn shape_modules(near: &str, module: &str, class: Option<u32>, rating: Option<&s
     if found.is_empty() {
         add_note(&mut out, "No station near enough lists it in Spansh.");
     }
-    if !checked {
-        note_unchecked(&mut out, "module");
-    }
+    note_unchecked(&mut out, "module", check);
     note_carriers(&mut out, stations);
     fit_stations(&mut out);
     out
@@ -425,9 +444,9 @@ impl NexusTools {
         let me = self.me()?;
         let (origin, near) = self.origin(a, &me)?;
         // Spansh matches the name exactly, and spells it its own way ("Krait MkII", but "Kestrel Mk II").
-        let (spansh_name, checked) = spansh_ship_name(ship, &self.catalogue("ships"));
+        let (spansh_name, check) = spansh_ship_name(ship, &self.catalogue("ships"));
         let stations = self.nearest_stations(origin, "ships", json!({ "name": [spansh_name] }), limit)?;
-        Ok(shape_ships(&near, &spansh_name, &asked, checked, &stations))
+        Ok(shape_ships(&near, &spansh_name, &asked, check, &stations))
     }
 
     pub(super) fn find_module(&self, a: &Value) -> Result<Value, String> {
@@ -445,7 +464,7 @@ impl NexusTools {
         let limit = arg_f64(a, "limit").map(|v| v as usize).unwrap_or(10).clamp(1, 25);
         let me = self.me()?;
         let (origin, near) = self.origin(a, &me)?;
-        let (module, checked) = spansh_module_name(&asked, &self.catalogue("modules"))?;
+        let (module, check) = spansh_module_name(&asked, &self.catalogue("modules"))?;
         let mut item = json!({ "name": [module] });
         if let Some(c) = class {
             item["class"] = json!([c.to_string()]);
@@ -454,7 +473,7 @@ impl NexusTools {
             item["rating"] = json!([r]);
         }
         let stations = self.nearest_stations(origin, "modules", item, limit)?;
-        Ok(shape_modules(&near, &module, class, rating.as_deref(), checked, &stations))
+        Ok(shape_modules(&near, &module, class, rating.as_deref(), check, &stations))
     }
 
     pub(super) fn find_material_body(&self, a: &Value) -> Result<Value, String> {
@@ -472,14 +491,18 @@ impl NexusTools {
             return Err("max_gravity_g must be above 0.".to_string());
         }
         let max_ls = arg_f64(a, "max_distance_ls").filter(|d| *d > 0.0);
+        // The limit counts from here: looking up near_system takes its share.
+        let started = Instant::now();
         let me = self.me()?;
         let (origin, near) = self.origin(a, &me)?;
         let mut hits: Vec<(f64, BodyRecord)> = Vec::new();
         let (mut searched, mut enough, mut interrupted) = (0usize, false, None);
-        let started = Instant::now();
         for page in 0..MAX_BODY_PAGES {
             // Every page gets what is left of the search's time; none starts once it is used up.
             let Some(budget) = page_budget(started.elapsed()) else {
+                if page == 0 {
+                    return Err(format!("Spansh: the {} second time limit was used up before the first page.", BODY_SEARCH_LIMIT.as_secs()));
+                }
                 interrupted = Some(TIME_LIMIT.to_string());
                 break;
             };
@@ -494,7 +517,7 @@ impl NexusTools {
                 Ok(res) => res.results,
                 Err(e) if page == 0 => return Err(e),
                 Err(e) => {
-                    interrupted = Some(e);
+                    interrupted = Some(interruption(e, started.elapsed()));
                     break;
                 }
             };
@@ -588,17 +611,17 @@ mod tests {
         let mut s = station(1);
         s.ships = vec![ShipyardEntry { name: "Krait MkII".into(), price: Some(42_000_000), symbol: None }];
         s.shipyard_updated_at = Some("2026-10-30 12:00:00+00".into());
-        let v = shape_ships("Deciat", "Krait MkII", "krait mk2", true, &[s]);
+        let v = shape_ships("Deciat", "Krait MkII", "krait mk2", NameCheck::Checked, &[s]);
         assert_eq!(v["stations"][0]["price_cr"], 42_000_000);
         assert_eq!(v["stations"][0]["largest_pad"], "L");
         assert_eq!(v["stations"][0]["shipyard_reported"], "2026-10-30 12:00:00+00");
         assert_eq!(v["asked_as"], "krait mk2");
         assert!(v["note"].as_str().unwrap().contains("catalogue"));
-        assert!(shape_ships("Deciat", "Krait MkII", "Krait MkII", true, &[])["note"].as_str().unwrap().contains("No station"));
+        assert!(shape_ships("Deciat", "Krait MkII", "Krait MkII", NameCheck::Checked, &[])["note"].as_str().unwrap().contains("No station"));
         assert!(!v["note"].as_str().unwrap().contains("carrier"), "no carrier among them");
         let mut carrier = station(2);
         carrier.station_type = Some("Drake-Class Carrier".into());
-        let v = shape_ships("Deciat", "Krait MkII", "Krait MkII", true, &[carrier]);
+        let v = shape_ships("Deciat", "Krait MkII", "Krait MkII", NameCheck::Checked, &[carrier]);
         assert!(v["note"].as_str().unwrap().contains("jump away"), "{v}");
     }
 
@@ -606,20 +629,20 @@ mod tests {
     fn modules_keep_the_class_and_rating_asked_and_trim_to_fit() {
         let mut s = station(1);
         s.modules = vec![module(5, "A"), module(5, "B"), module(6, "A")];
-        let v = shape_modules("Deciat", "Fuel Scoop", Some(5), Some("A"), true, &[s.clone()]);
+        let v = shape_modules("Deciat", "Fuel Scoop", Some(5), Some("A"), NameCheck::Checked, &[s.clone()]);
         let m = v["stations"][0]["matches"].as_array().unwrap();
         assert_eq!(m.len(), 1, "{v}");
         assert_eq!((m[0]["class"].as_u64(), m[0]["rating"].as_str()), (Some(5), Some("A")));
         // A station that lists the module, but not as 6A, is not an answer for 6A.
         let mut other = station(2);
         other.modules = vec![module(5, "A")];
-        let v = shape_modules("Deciat", "Fuel Scoop", Some(6), Some("A"), true, &[s.clone(), other]);
+        let v = shape_modules("Deciat", "Fuel Scoop", Some(6), Some("A"), NameCheck::Checked, &[s.clone(), other]);
         assert_eq!(v["stations"].as_array().unwrap().len(), 1);
         assert!(v["note"].as_str().unwrap().contains("left out"), "{v}");
         // Without a class, every size and rating matches: the lists are cut, and the reply says so.
         let mut all = station(3);
         all.modules = (1..=8).flat_map(|c| ["A", "B", "C", "D", "E"].map(|r| module(c, r))).collect();
-        let v = shape_modules("Deciat", "Fuel Scoop", None, None, true, &[all]);
+        let v = shape_modules("Deciat", "Fuel Scoop", None, None, NameCheck::Checked, &[all]);
         assert_eq!(v["stations"][0]["matches"].as_array().unwrap().len(), 6);
         assert_eq!(v["stations"][0]["more_matches"], 34);
         assert_eq!(v["stations"][0]["matches"][0]["class"], 8, "the biggest first");
@@ -641,12 +664,12 @@ mod tests {
                 s
             })
             .collect();
-        let v = shape_modules("Deciat", "Fuel Scoop", None, None, true, &stations);
+        let v = shape_modules("Deciat", "Fuel Scoop", None, None, NameCheck::Checked, &stations);
         let n = v["stations"].as_array().unwrap().len();
         assert!(v.to_string().len() < limit, "{} chars", v.to_string().len());
         assert!(n >= 15, "the nearest are kept, not just a few: {n}");
         assert!(n == 25 || v["note"].as_str().unwrap().contains(&format!("nearest {n} of 25")), "{}", v["note"]);
-        let v = shape_ships("Deciat", "Krait MkII", "Krait MkII", true, &stations);
+        let v = shape_ships("Deciat", "Krait MkII", "Krait MkII", NameCheck::Checked, &stations);
         assert_eq!(v["stations"].as_array().unwrap().len(), 25);
         assert!(v.to_string().len() < limit, "{} chars", v.to_string().len());
         // Long station names can't push a reply over either: the farthest stations go first.
@@ -654,7 +677,7 @@ mod tests {
         for s in &mut wide {
             s.name = "N".repeat(300);
         }
-        let v = shape_ships("Deciat", "Krait MkII", "Krait MkII", true, &wide);
+        let v = shape_ships("Deciat", "Krait MkII", "Krait MkII", NameCheck::Checked, &wide);
         assert!(v.to_string().len() < limit, "{} chars", v.to_string().len());
         assert!(v["note"].as_str().unwrap().contains("of 25 stations"), "{}", v["note"]);
         assert_eq!(v["stations"][0]["distance_ly"], 0.0, "the nearest is the one kept");
@@ -688,24 +711,27 @@ mod tests {
     fn unchecked_names_say_an_empty_answer_proves_nothing() {
         let list = |names: &[&str]| names.iter().map(|n| (*n).to_string()).collect::<Vec<_>>();
         // The list is there: Spansh's spelling is used and checked.
-        assert_eq!(spansh_ship_name("Krait Mk II".into(), &list(&["Krait MkII", "Python"])), ("Krait MkII".to_string(), true));
+        assert_eq!(spansh_ship_name("Krait Mk II".into(), &list(&["Krait MkII", "Python"])), ("Krait MkII".to_string(), NameCheck::Checked));
         // No list (the fetch failed): the game's spelling goes out unchecked, and the reply says so.
-        let (name, checked) = spansh_ship_name("Krait Mk II".into(), &[]);
-        assert_eq!((name.as_str(), checked), ("Krait Mk II", false));
-        // A list that lacks the ship is as good as none.
-        assert!(!spansh_ship_name("Krait Mk II".into(), &list(&["Python"])).1);
-        let v = shape_ships("Deciat", &name, "krait mk2", checked, &[]);
+        let (name, check) = spansh_ship_name("Krait Mk II".into(), &[]);
+        assert_eq!((name.as_str(), check), ("Krait Mk II", NameCheck::ListMissing));
+        let v = shape_ships("Deciat", &name, "krait mk2", check, &[]);
         let note = v["note"].as_str().unwrap();
         assert!(note.contains("could not be used to check") && note.contains("spelling mismatch"), "{note}");
-        let v = shape_ships("Deciat", "Krait MkII", "krait mk2", true, &[]);
+        // A list that loaded but lacks the ship says that instead.
+        let (name, check) = spansh_ship_name("Krait Mk II".into(), &list(&["Python"]));
+        assert_eq!(check, NameCheck::NotInList);
+        let note = shape_ships("Deciat", &name, "krait mk2", check, &[])["note"].as_str().unwrap().to_string();
+        assert!(note.contains("does not hold this name") && !note.contains("could not be used"), "{note}");
+        let v = shape_ships("Deciat", "Krait MkII", "krait mk2", NameCheck::Checked, &[]);
         assert!(!v["note"].as_str().unwrap().contains("spelling mismatch"), "checked names add nothing");
         // Modules: no list means unchecked; a list that lacks the name is an error with suggestions.
-        assert_eq!(spansh_module_name("fuel scoop", &[]), Ok(("fuel scoop".to_string(), false)));
-        assert_eq!(spansh_module_name("fuel scoop", &list(&["Fuel Scoop"])), Ok(("Fuel Scoop".to_string(), true)));
+        assert_eq!(spansh_module_name("fuel scoop", &[]), Ok(("fuel scoop".to_string(), NameCheck::ListMissing)));
+        assert_eq!(spansh_module_name("fuel scoop", &list(&["Fuel Scoop"])), Ok(("Fuel Scoop".to_string(), NameCheck::Checked)));
         assert!(spansh_module_name("Warp Core", &list(&["Fuel Scoop"])).unwrap_err().contains("Unknown module"));
-        let v = shape_modules("Deciat", "fuel scoop", None, None, false, &[]);
+        let v = shape_modules("Deciat", "fuel scoop", None, None, NameCheck::ListMissing, &[]);
         assert!(v["note"].as_str().unwrap().contains("spelling mismatch"), "{v}");
-        assert!(!shape_modules("Deciat", "Fuel Scoop", None, None, true, &[])["note"].as_str().unwrap().contains("spelling mismatch"));
+        assert!(!shape_modules("Deciat", "Fuel Scoop", None, None, NameCheck::Checked, &[])["note"].as_str().unwrap().contains("spelling mismatch"));
     }
 
     #[test]
@@ -716,6 +742,11 @@ mod tests {
         assert_eq!(page_budget(s(59)), Some(s(1)));
         assert_eq!(page_budget(BODY_SEARCH_LIMIT), None);
         assert_eq!(page_budget(s(90)), None);
+        // A page cut short by the limit comes back as a Spansh timeout; it is reported as the limit, not as Spansh's.
+        let timeout = || "Spansh: no answer in time".to_string();
+        assert_eq!(interruption(timeout(), s(60)), TIME_LIMIT);
+        assert_eq!(interruption(timeout(), s(75)), TIME_LIMIT);
+        assert_eq!(interruption(timeout(), s(30)), "Spansh: no answer in time", "time was left: Spansh's own error stands");
         // So five pages can never take longer than the limit, whatever Spansh does.
         let polonium = materials::material("Polonium").unwrap();
         let search = BodySearch { near: "Deciat", material: polonium, max_gravity_g: 1.0, max_ls: None, searched: 200, enough: false, interrupted: Some(TIME_LIMIT.into()) };
