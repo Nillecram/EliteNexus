@@ -153,6 +153,10 @@ Navigation. It can't change the game, the game's files or Elite Nexus's settings
 EDDN, EDSM or Inara. It works only while Elite Nexus is open, and the switch is **off by default**: with it off,
 Elite Nexus listens for nothing.
 
+What an agent reads through Elite Nexus (your commander, fleet, journal, the game's files, market data) goes to that
+agent's own AI provider, under that provider's terms, just as Ask's questions and tool results go to the provider you
+chose for Ask.
+
 * **MCP server** switches it on. Agents on this PC then connect to `http://127.0.0.1:47561/mcp` (the **Port** row
   changes the number, 1024 to 65535, if another program already uses it). The **Status** row says whether it is
   listening or why it can't be (a port already in use, say).

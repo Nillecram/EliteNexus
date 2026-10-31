@@ -217,6 +217,9 @@ fn overlay(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
     footnote(ui, "The game hides every overlay in exclusive fullscreen: set Options › Graphics › Display to Borderless or Windowed.");
 }
 
+/// Shown when the sealed access key opens to nothing (settings copied from another account).
+const KEY_UNREADABLE: &str = "The access key can't be read on this PC: press New key.";
+
 /// Settings › AI agents (MCP): the server that lets Claude Code, Claude Desktop and other MCP clients use Ask's tools.
 fn agents(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
     use crate::mcp::{claude_code_command, claude_desktop_config};
@@ -271,10 +274,16 @@ fn agents(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                     let code = copy_button(ui, &mut st.mcp_copied, "lan-code", "Claude Code");
                     (code, desktop)
                 });
-                let key = crate::secrets::open(&m.key);
+                // The key is read only on a click: opening it (DPAPI) isn't something to do every frame.
                 if code || desktop {
-                    let key = (!key.is_empty()).then_some(key.as_str());
-                    ctx.copy_text(if code { claude_code_command(&url, key) } else { claude_desktop_config(&url, key) });
+                    let key = crate::secrets::open(&m.key);
+                    if key.is_empty() {
+                        st.mcp_copied = None;
+                        st.mcp_error = Some(KEY_UNREADABLE.to_string());
+                    } else {
+                        st.mcp_error = None;
+                        ctx.copy_text(if code { claude_code_command(&url, Some(&key)) } else { claude_desktop_config(&url, Some(&key)) });
+                    }
                 }
             }
             let (copy, new) = g.row("Access key", "A new key disconnects agents that use the old one.", |ui| {
@@ -283,7 +292,14 @@ fn agents(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
                 (copy, new)
             });
             if copy {
-                ctx.copy_text(crate::secrets::open(&m.key));
+                let key = crate::secrets::open(&m.key);
+                if key.is_empty() {
+                    st.mcp_copied = None;
+                    st.mcp_error = Some(KEY_UNREADABLE.to_string());
+                } else {
+                    st.mcp_error = None;
+                    ctx.copy_text(key);
+                }
             }
             if new {
                 match nexus_mcp::new_key() {
