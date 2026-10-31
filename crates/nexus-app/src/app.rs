@@ -696,6 +696,7 @@ impl NexusApp {
                     restart_core: false,
                     voice: self.speaker.status(),
                     overlay_see_through: self.overlay.see_through(),
+                    mcp: self.mcp.view(),
                 };
                 pages::settings::show(ui, &mut cx);
                 settings_changed = cx.changed;
@@ -785,6 +786,7 @@ impl NexusApp {
             restart_core: false,
             voice: self.speaker.status(),
             overlay_see_through: self.overlay.see_through(),
+            mcp: self.mcp.view(),
         };
         // Scrolls: with the settings banner above it, a short window would otherwise cut off the folder's buttons.
         egui::ScrollArea::vertical().id_salt(("page", Page::Settings as u8, settings_page)).auto_shrink([false, false]).show(ui, |ui| {

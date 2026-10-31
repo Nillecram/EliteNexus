@@ -27,6 +27,8 @@ pub struct SettingsCtx<'a> {
     pub voice: crate::tts::VoiceStatus,
     /// The overlay is see-through this run (its switch applies after a restart).
     pub overlay_see_through: bool,
+    /// What the MCP server is doing (Settings › AI agents (MCP)).
+    pub mcp: crate::mcp::McpView,
 }
 
 /// What the Settings page keeps between frames: the folder fields and what checking a folder found.
@@ -40,6 +42,10 @@ pub struct SettingsUi {
     /// The game folders in use, and the folder chosen when they were looked for (it may change on another page).
     game_found: Option<(Option<PathBuf>, Vec<nexus_hud::install::GameInstall>)>,
     game_msg: Option<(Color32, String)>,
+    /// The MCP copy button just clicked and when (egui time): it reads "Copied" for a moment.
+    mcp_copied: Option<(&'static str, f64)>,
+    /// Why a new MCP access key couldn't be made.
+    mcp_error: Option<String>,
 }
 
 /// A slider with its value shown on the right, sized for a settings row.
@@ -111,6 +117,7 @@ pub fn show(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
             });
             footnote(ui, "Ctrl + and Ctrl − also change the size; Ctrl 0 goes back to 100 %.");
             overlay(ui, cx);
+            agents(ui, cx);
         });
         c.add(|ui| {
             let st = cx.status;
@@ -208,6 +215,115 @@ fn overlay(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
     });
     cx.changed |= changed;
     footnote(ui, "The game hides every overlay in exclusive fullscreen: set Options › Graphics › Display to Borderless or Windowed.");
+}
+
+/// Settings › AI agents (MCP): the server that lets Claude Code, Claude Desktop and other MCP clients use Ask's tools.
+fn agents(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
+    use crate::mcp::{claude_code_command, claude_desktop_config};
+    section(ui, "AI agents (MCP)");
+    let m = &mut cx.settings.mcp;
+    let st = &mut *cx.ui;
+    let view = &cx.mcp;
+    let ctx = ui.ctx().clone();
+    let mut changed = false;
+    group(ui, |g| {
+        changed |= g.switch(&mut m.enabled, "MCP server", "Lets an AI agent on this PC (Claude Code, Claude Desktop, …) use the same tools as Ask while Elite Nexus is open. Agents can read your commander and the market data, and put routes on Navigation; they can't change the game or your settings.");
+        if !m.enabled {
+            return;
+        }
+        changed |= g.switch(&mut m.lan, "Allow other devices on the network", "For an agent on another PC. Every request from another device must carry the access key. The connection isn't encrypted: use it on your home network only, never open the port to the internet. Windows may ask to let Elite Nexus through the firewall.");
+        g.row("Port", "Where agents connect. Change it if another program uses this one.", |ui| {
+            let r = ui.add(egui::DragValue::new(&mut m.port).range(1024..=65535));
+            // The server restarts on the new port when the value is let go, not at every step of a drag.
+            changed |= r.drag_stopped() || r.lost_focus();
+        });
+        let port = view.listening.map_or(m.port, |a| a.port());
+        let status = if view.disabled {
+            ("Not started: test run".to_string(), pal::DIM)
+        } else if let Some(e) = &view.error {
+            (e.clone(), pal::BAD)
+        } else if let Some(a) = view.listening {
+            let text = match (a.ip().is_loopback(), view.lan_ip) {
+                (true, _) => format!("Listening on 127.0.0.1:{port}"),
+                (false, Some(ip)) => format!("Listening on 127.0.0.1:{port} and on {}:{port} for other devices", ip_text(ip)),
+                (false, None) => format!("Listening on 127.0.0.1:{port} and on this PC's network addresses for other devices"),
+            };
+            (text, pal::GOOD)
+        } else {
+            ("Not running".to_string(), pal::DIM)
+        };
+        g.content(|ui| {
+            ui.label(RichText::new("Status").color(pal::TEXT));
+            ui.add(egui::Label::new(RichText::new(status.0).size(size::FOOTNOTE).color(status.1)).wrap());
+        });
+        let local = format!("http://127.0.0.1:{port}/mcp");
+        if g.row("Claude Code", "Adds Elite Nexus to Claude Code: paste the command in a terminal.", |ui| copy_button(ui, &mut st.mcp_copied, "code", "Copy command")) {
+            ctx.copy_text(claude_code_command(&local, None));
+        }
+        if g.row("Claude Desktop", "Paste it into claude_desktop_config.json. Claude Desktop reaches Elite Nexus through the mcp-remote bridge, which needs Node.js.", |ui| copy_button(ui, &mut st.mcp_copied, "desktop", "Copy configuration")) {
+            ctx.copy_text(claude_desktop_config(&local, None));
+        }
+        if m.lan {
+            if let Some(ip) = view.lan_ip {
+                let url = format!("http://{}:{port}/mcp", ip_text(ip));
+                let (code, desktop) = g.row("Another PC", "The same command or configuration with this PC's network address and the access key. The key is in the text you copy: keep it to your own PCs.", |ui| {
+                    let desktop = copy_button(ui, &mut st.mcp_copied, "lan-desktop", "Claude Desktop");
+                    let code = copy_button(ui, &mut st.mcp_copied, "lan-code", "Claude Code");
+                    (code, desktop)
+                });
+                let key = crate::secrets::open(&m.key);
+                if code || desktop {
+                    let key = (!key.is_empty()).then_some(key.as_str());
+                    ctx.copy_text(if code { claude_code_command(&url, key) } else { claude_desktop_config(&url, key) });
+                }
+            }
+            let (copy, new) = g.row("Access key", "A new key disconnects agents that use the old one.", |ui| {
+                let new = widgets::button(ui, "New key").clicked();
+                let copy = copy_button(ui, &mut st.mcp_copied, "key", "Copy key");
+                (copy, new)
+            });
+            if copy {
+                ctx.copy_text(crate::secrets::open(&m.key));
+            }
+            if new {
+                match nexus_mcp::new_key() {
+                    Ok(k) => {
+                        m.key = crate::secrets::seal(&k);
+                        st.mcp_error = None;
+                        changed = true;
+                    }
+                    Err(e) => st.mcp_error = Some(format!("Couldn't make a new key: {e}")),
+                }
+            }
+            if let Some(e) = &st.mcp_error {
+                g.content(|ui| ui.add(egui::Label::new(RichText::new(e).size(size::FOOTNOTE).color(pal::BAD)).wrap()));
+            }
+        }
+    });
+    cx.changed |= changed;
+}
+
+/// A copy button that reads "Copied" for two seconds after a click. True on the click.
+fn copy_button(ui: &mut Ui, copied: &mut Option<(&'static str, f64)>, id: &'static str, label: &str) -> bool {
+    let now = ui.input(|i| i.time);
+    let flashing = matches!(copied, Some((c, at)) if *c == id && now - *at < 2.0);
+    let r = widgets::button(ui, &if flashing { format!("{} Copied", icon::CHECK) } else { format!("{} {label}", icon::COPY) });
+    if flashing {
+        ui.ctx().request_repaint_after(std::time::Duration::from_millis(2100));
+    }
+    if r.clicked() {
+        *copied = Some((id, now));
+        ui.ctx().request_repaint_after(std::time::Duration::from_millis(2100));
+    }
+    r.clicked()
+}
+
+/// An address as it goes in a URL: IPv6 in brackets.
+fn ip_text(ip: std::net::IpAddr) -> String {
+    match ip {
+        std::net::IpAddr::V4(a) => a.to_string(),
+        std::net::IpAddr::V6(a) => format!("[{a}]"),
+    }
 }
 
 /// The last speech attempt in a line, when there is something to say about it.

@@ -45,6 +45,11 @@ Key facts for answering questions about it (current as of version 0.7.2, October
   small black island at the top of the game's screen: the next jump, arrivals worth it, approach, sampling distance,
   the nearest Rhino deposit, trade stops, what a station buys, carrier countdowns; click-through, shown only while the
   game is in front, with a VR mode for mirroring tools), and an AI assistant (Google Gemini, Claude or a local model).
+- AI agents (MCP): Settings › AI agents (MCP), off by default, offers the same tools as the Ask assistant to Claude Code,
+  Claude Desktop and other MCP clients while Elite Nexus is open: they can read the commander, fleet, market database and
+  Spansh and put routes on Navigation, but can't change the game, its files or the settings. Only programs on the same PC
+  can connect unless "Allow other devices on the network" is on (then an access key is required; the connection isn't
+  encrypted, so home network only, never the internet). Claude Desktop needs Node.js for the mcp-remote bridge.
 - Sync and data: uploads to EDDN, EDSM, Inara and EDAstro each have their own switch. Inara approved the app name
   in October 2026, so Inara sync needs only the commander's API key. Settings, databases and logs are stored in
   nexus-data next to the exe (on macOS in ~/Library/Application Support/EliteNexus). Optional cloud AI sends

@@ -41,7 +41,7 @@ a real install.
 | `nexus-binds` | `.binds` parser, conflicts/missing essentials, printable reference card | — |
 | `nexus-hud` | HUD colour matrix: maths and previews (linear light), surgical edits of `GraphicsConfigurationOverride.xml` (only the `<Matrix…>` rows, backup once, atomic), credited community presets, friend/foe readability checks, game install and EDHM detection, tone mapping (glare, ACES curve, auto-exposure targets in `<HDRNode_Reference>`), Elite Nexus's graphics hook (`dimmer`: 3Dmigoto from its official release with pinned SHA-256s and a pure-Rust 7z reader; `[ShaderRegex]` patterns that patch the game's box-light shader at load (cockpit-light dimmer) and, when switched on, the HUD shaders that apply the colour matrix (keep hostile red, friendly green and shield blue; `palette::is_hud_orange` is the same rule in Rust for previews); install / settings / removal tracked by a manifest in the game folder) | — |
 | `nexus-ai` | built-in assistant: providers (Gemini via its OpenAI-compatible endpoint, Claude Messages API with prompt caching, local/other OpenAI-compatible), tool-calling loop, embedded knowledge base (`knowledge/*.md` + `docs/USER_GUIDE.md`, BM25 search) | — |
-| `nexus-mcp` | MCP server for outside AI clients (Claude Desktop, Claude Code, ...): reads HTTP requests (size and time caps), checks `Origin` and the bearer key, answers JSON-RPC; it only serves the assistant's tools (`nexus-ai`'s `ToolSpec`s), the app implements them | ai |
+| `nexus-mcp` | MCP server (streamable HTTP, JSON-RPC `initialize`, `tools/list`, `tools/call`) for outside AI clients (Claude Desktop, Claude Code, ...): binds `127.0.0.1`, or `0.0.0.0` with a bearer key for other devices; reads one request per connection (size, time and connection caps), checks `Origin` and the key; it serves the assistant's tools (`nexus-ai`'s `ToolHost` and `ToolSpec`s), which the app implements and swaps in through a `HostSlot` | ai |
 | `nexus-app` | egui 0.36 / eframe (wgpu) GUI, services wiring, TTS, toasts | everything |
 
 ## Runtime
@@ -60,9 +60,15 @@ UI pages ──► background jobs (jobs.rs) ──► galaxy read pool / Spansh
 
 * `app.rs` owns the services: `Core` (journal → model), `SyncService` (sync.rs → nexus-uplink),
   `MarketService` (market.rs → nexus-galaxy + nexus-eddn, price alerts, Spansh import), `AssistantService`
-  (assistant.rs → nexus-ai on a worker thread; `ai_tools.rs` implements its 16 tools over the model, galaxy DB,
-  journal and Spansh), Spansh client, TTS. `finder.rs` holds market lookups shared by pages and tools (sell plan,
+  (assistant.rs → nexus-ai on a worker thread; `ai_tools.rs` implements its 26 tools over the model, galaxy DB,
+  journal and Spansh, and serves the same tools over MCP), `McpService` (mcp.rs → nexus-mcp, Settings › AI agents (MCP);
+  off by default), Spansh client, TTS. `finder.rs` holds market lookups shared by pages and tools (sell plan,
   colonisation suppliers).
+* The MCP server (`mcp.rs`) adds no thread of its own: when it is switched on, its accept loop is one task on the
+  `nexus-net` tokio runtime (the one that also runs the EDDN socket), and each tool call runs in `spawn_blocking`
+  (tokio's blocking pool starts a thread for it only while a call runs), never on a runtime worker, because a tool
+  may wait on Spansh. Switched off, there is no listener and nothing runs. `apply` runs
+  at start and when Settings change, never per frame; `set_host` swaps in new tools when the journal reader restarts.
 * The overlay (`overlay.rs`, `overlay/`): one black island at the top of the game's screen, in its own deferred
   viewport (a borderless always-on-top window beside the main one). `overlay.rs` is its view model, pure and tested:
   `Inputs::read` copies what it needs from the model (via `nexus_model::context`), `Rhythm::view` picks the moment,

@@ -27,7 +27,6 @@ pub struct McpService {
 
 /// What Settings › MCP server shows.
 #[derive(Clone, Debug, Default)]
-#[allow(dead_code)] // Settings › MCP server reads it (next commit)
 pub struct McpView {
     pub disabled: bool,
     pub listening: Option<SocketAddr>,
@@ -80,14 +79,12 @@ impl McpService {
         *self.slot.write() = host;
     }
 
-    #[allow(dead_code)] // Settings › MCP server shows it (next commit)
     pub fn view(&self) -> McpView {
         McpView { disabled: self.disabled, listening: self.running.as_ref().map(|(_, s)| s.addr()), error: self.last_error.clone(), lan_ip: self.lan_ip }
     }
 }
 
 /// The command that adds the server to Claude Code. The key goes in a header, never in the URL.
-#[allow(dead_code)] // Settings › MCP server shows it (next commit)
 pub fn claude_code_command(url: &str, key: Option<&str>) -> String {
     let mut cmd = format!("claude mcp add --transport http {SERVER_NAME} {url}");
     if let Some(key) = key {
@@ -99,7 +96,6 @@ pub fn claude_code_command(url: &str, key: Option<&str>) -> String {
 /// The `claude_desktop_config.json` entry: Claude Desktop reaches an HTTP server through `mcp-remote`. With a key,
 /// the header's value comes from an environment variable: Claude Desktop on Windows doesn't escape the space in
 /// `Bearer <key>` inside `args` (mcp-remote's README), and `--allow-http` lets it use a plain-http network address.
-#[allow(dead_code)] // Settings › MCP server shows it (next commit)
 pub fn claude_desktop_config(url: &str, key: Option<&str>) -> String {
     use serde_json::json;
     let mut server = json!({ "command": "npx", "args": ["-y", "mcp-remote", url] });

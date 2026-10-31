@@ -150,6 +150,7 @@ fn setup(ui: &mut Ui, st: &mut AskUi, ai: &mut AiSettings) -> AskAction {
                 };
                 ui.add(Label::new(RichText::new(note).size(12.5).color(pal::FAINT)).wrap());
             });
+            widgets::footnote(ui, "Prefer your own AI? Settings › AI agents (MCP) connects Claude Code, Claude Desktop and other MCP clients to the same tools.");
             ui.add_space(12.0);
             // Hidden depth: other providers, model, address.
             if widgets::disclosure(ui, &mut st.show_other, "Other providers and model") {

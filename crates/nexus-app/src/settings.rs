@@ -263,6 +263,12 @@ impl Settings {
                         0 => format!("settings.json couldn't be read ({e}), so Elite Nexus started with the default settings."),
                         n => format!("Some settings in settings.json couldn't be read ({e}): {} {} back at the default. Every other setting was kept.", and_list(&names), if n == 1 { "is" } else { "are" }),
                     };
+                    // salvage() keeps the server off: say so, since the commander may not look at that page.
+                    let what = if names.iter().any(|n| *n == "mcp" || n.starts_with("mcp.")) {
+                        what + " The AI agents (MCP) server stays off until you switch it on under Settings › AI agents (MCP)."
+                    } else {
+                        what
+                    };
                     (s, what, "")
                 }
                 // Not JSON at all, typically a folder typed in by hand with single backslashes.
@@ -740,6 +746,16 @@ mod tests {
         assert_eq!(dropped, vec!["mcp.port"]);
         // A file that isn't JSON: the defaults, so the server is off.
         assert!(!recover_keys("{ \"mcp\": { \"enabled\": true }, \"journal_dir\": \"\\\\x\" ").0.mcp.enabled);
+    }
+
+    #[test]
+    fn the_banner_says_the_mcp_server_stays_off() {
+        let d = Dir::new("mcp-banner");
+        std::fs::write(d.0.join("settings.json"), r#"{ "tts_rate": 1.2, "mcp": { "enabled": true, "port": 99999 } }"#).expect("write");
+        let (s, problem) = Settings::load(&d.0);
+        assert!(!s.mcp.enabled && s.tts_rate == 1.2);
+        let what = problem.expect("a notice").what;
+        assert!(what.contains("mcp.port") && what.contains("server stays off"), "{what}");
     }
 
     #[test]

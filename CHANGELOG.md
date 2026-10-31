@@ -6,6 +6,14 @@ release time that section becomes the new version and the release workflow publi
 ## Unreleased
 
 ### Added
+- **Settings › AI agents (MCP)** (off by default) lets Claude Code, Claude Desktop or any other MCP client use the
+  same tools as Ask while Elite Nexus is open: it reads your commander, fleet, the market database and Spansh, and the
+  routes it plans appear on Navigation. It can't change the game, its files or your settings. It listens on this PC
+  only (`http://127.0.0.1:47561/mcp`, the port can be changed) unless you also allow other devices on the network,
+  which then need an access key; that connection isn't encrypted, so use it on your home network only, never the
+  internet. Copy buttons give the Claude Code command and the Claude Desktop configuration (which needs Node.js for
+  the `mcp-remote` bridge). If `settings.json` can't be read, the server starts off. With the switch off nothing
+  listens and nothing runs.
 - **Ask** knows more: it can list your whole fleet (where each ship is, or when a transfer arrives, jump range,
   cargo, value, rebuy and the engineered modules with their blueprint, grade and experimental effect, from the last
   loadout the game reported for that ship) and tell you how far you are on every rank, which engineers you've

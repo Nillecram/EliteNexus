@@ -31,7 +31,7 @@ choices or market filters, is one click away under **› Options**.
 
 | Page | What it's for | Tips |
 |---|---|---|
-| Ask | Your AI co-pilot: ask anything in plain words ("Where can I make the most money in the next hour?", "Where should I sell my cargo?", "Plan an exobiology trip near me") | It answers from your ship, your whole fleet and its engineering, your rank progress and engineers, cargo, materials and on-foot gear, recent credits, the factions of systems you've visited (with your reputation), the game's live files (Status, NavRoute, Cargo, the last Market, Outfitting or Shipyard screen opened), journal, the live market database and Spansh (including where to buy a ship or a module, and where to find a raw material: the ship and module results are each station's catalogue as reported through EDDN, not its stock, so a listed ship can be sold out; the material search reads the nearest landable bodies, up to 500, stopping once it has 10 hits or after 60 seconds, and lists those richest first, so a richer body may lie farther out; a search can take tens of seconds), plus a built-in knowledge base of game mechanics and this guide. One-time setup: click "Get a free Gemini key", paste it, Connect. Routes it plans appear on the Navigation page. Claude or a local model (Ollama, LM Studio) can be chosen under "Other providers and model". |
+| Ask | Your AI co-pilot: ask anything in plain words ("Where can I make the most money in the next hour?", "Where should I sell my cargo?", "Plan an exobiology trip near me") | It answers from your ship, your whole fleet and its engineering, your rank progress and engineers, cargo, materials and on-foot gear, recent credits, the factions of systems you've visited (with your reputation), the game's live files (Status, NavRoute, Cargo, the last Market, Outfitting or Shipyard screen opened), journal, the live market database and Spansh (including where to buy a ship or a module, and where to find a raw material: the ship and module results are each station's catalogue as reported through EDDN, not its stock, so a listed ship can be sold out; the material search reads the nearest landable bodies, up to 500, stopping once it has 10 hits or after 60 seconds, and lists those richest first, so a richer body may lie farther out; a search can take tens of seconds), plus a built-in knowledge base of game mechanics and this guide. One-time setup: click "Get a free Gemini key", paste it, Connect. Routes it plans appear on the Navigation page. Claude or a local model (Ollama, LM Studio) can be chosen under "Other providers and model". Prefer your own AI? Settings › AI agents (MCP) offers the same tools to Claude Code, Claude Desktop and other MCP clients. |
 | Dashboard | Everything at a glance | Session card shows earnings since you logged in; transfers to your own carrier are not counted as spending (credits given to a squadron carrier are: they're the squadron's). The Holdings card shows your fleet carrier and your squadron's carrier (each with its jump countdown or cooldown while one runs, and a decommission under way); a carrier that has been decommissioned isn't listed. |
 | Navigation | Your plotted route: scoopable stars, neutron/white-dwarf hazards, longest non-scoopable streak. Travel planners: Neutron, Exact plotter, Fleet carrier | With "copy next system" on, the next waypoint is on your clipboard after every jump — paste it in the galaxy map. Tours planned on Exploration (Find valuable bodies) and Exobiology (Find planets), and routes the assistant plans, show up here too; stops tick off as you arrive, so a tour that starts and ends at home isn't "done" at once; once every stop is reached, the route plotted in the game takes over under the tour's summary. Jump range follows Spansh's limits (10–100 ly). The **Fleet carrier** planner plans with the tritium and cargo of your carrier; if you also have a squadron carrier, pick which one above the hint (the choice is shared with the Fleet carrier page and remembered). A squadron carrier is planned with Spansh's squadron carrier figures (60,000 t capacity, 15,000 t mass); with no carrier in your journal, Spansh works out the tritium an empty fleet carrier needs. The planner shows that carrier's jump timer beside it (the same one as on the Fleet carrier page). With a carrier route active it also shows the next leg (click to copy) and an estimate of the time to the destination: the countdown or cooldown running now, then a 15-minute countdown for each jump and a 5-minute cooldown between jumps. Busy servers set later departures and each jump takes a little time, so it's a minimum. A carrier route ticks off its stops as the carrier arrives, even when you're somewhere else. |
 | Exploration | **Current system** as a tree (stars → planets → moons) with value now vs. value if mapped · **Find valuable bodies** · **Unsold data** · **History** · Codex | Click a body for materials, rings/hotspots, biology, discovery & footfall status. In a system you haven't scanned (or a populated one, where scanning pays little) the page says so instead of showing zeros. **Find valuable bodies** is Spansh's Road to Riches: a tour of Earth-likes, water/ammonia worlds and terraformables, up to 1,000 ly and 2,000 stops. Spansh skips populated systems, so from the bubble the search widens itself (to 100, 250, 500, then 1,000 ly) until it finds something and says so; **Follow this route** sends it to Navigation. **History** lists every system you scanned with what became of the data: sold (and when), unsold, not sellable (left out of a sale by Universal Cartographics), or lost with your ship. To check whether anyone has set foot on a planet in another system, ask the assistant ("has anyone landed on planet X in system Y?"). With **Follow my flight** (Settings) on, the page opens by itself while you fly a system. |
@@ -143,6 +143,39 @@ priority in Settings:
   mission done, fuel low with a non-scoopable star next, interdiction.
 * **Normal** — biological signals, sample 1 logged (+ distance to move), codex entries, carrier jump scheduled.
 * **Low** — arrival announcements, discovery-scan body counts, system fully scanned.
+
+## AI agents (MCP)
+
+Settings › **AI agents (MCP)** lets an AI agent you already use, such as Claude Code or Claude Desktop (or any other
+program that speaks MCP, the Model Context Protocol), use the same tools as Ask: it reads your commander, your fleet,
+the market database and Spansh, and when it plans a route (a trade run or an exobiology trip) the route appears on
+Navigation. It can't change the game, the game's files or Elite Nexus's settings, and it can't send anything to
+EDDN, EDSM or Inara. It works only while Elite Nexus is open, and the switch is **off by default**: with it off,
+Elite Nexus listens for nothing.
+
+* **MCP server** switches it on. Agents on this PC then connect to `http://127.0.0.1:47561/mcp` (the **Port** row
+  changes the number, 1024 to 65535, if another program already uses it). The **Status** row says whether it is
+  listening or why it can't be (a port already in use, say).
+* **Claude Code**: **Copy command** copies a `claude mcp add` command; paste it in a terminal, then start `claude`.
+* **Claude Desktop**: **Copy configuration** copies an entry for `claude_desktop_config.json`. Claude Desktop reaches
+  Elite Nexus through the `mcp-remote` bridge, which runs with `npx`, so it needs Node.js on that PC.
+* **Allow other devices on the network** is for an agent on another PC. Elite Nexus then listens on every network
+  address of this PC, and every request from another device must carry the **access key** (a long random key made
+  for you; **Copy key** copies it, **New key** makes another one and disconnects every agent that has the old one).
+  An **Another PC** row then copies the Claude Code command or the Claude Desktop configuration with this PC's
+  network address and the key in it: keep that text to your own PCs. Windows may ask to let Elite Nexus through its
+  firewall the first time; allow it for private networks only.
+
+The connection is **not encrypted**: use "other devices" on your home network only, and never open the port to the
+internet (no port forwarding, no tunnel). The key only keeps other devices on your network out. A program on the same
+PC reaches the server without it, as a tunnel or a reverse proxy that forwards to Elite Nexus would, so don't expose
+it that way. The key is stored like the other keys: encrypted on this PC on Windows; on Linux and macOS only
+base64-encoded, in a settings file that your user account alone can read, so anything that can read your account's
+files can read it.
+
+If `settings.json` can't be read, Elite Nexus starts with the default settings (the banner above every page says so),
+which means the server is off, and a new access key is made when you switch it on again: agents on other PCs then need
+the new key (**Copy key**, or the **Another PC** buttons).
 
 ## Data & privacy
 
