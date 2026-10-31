@@ -2590,6 +2590,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nexus-mcp"
+version = "0.7.3-beta.2"
+dependencies = [
+ "getrandom 0.3.4",
+ "nexus-ai",
+ "parking_lot",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "nexus-model"
 version = "0.7.3-beta.2"
 dependencies = [

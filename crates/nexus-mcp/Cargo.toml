@@ -1,0 +1,16 @@
+[package]
+name = "nexus-mcp"
+description = "MCP server for outside AI clients: HTTP reading, access checks, JSON-RPC, serving the assistant's tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+nexus-ai.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+getrandom = "0.3"
