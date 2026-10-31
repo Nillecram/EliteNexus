@@ -1444,6 +1444,8 @@ impl ToolHost for NexusTools {
             "materials" => self.materials(args),
             "on_foot" => self.on_foot(),
             "credit_history" => self.credit_history(args),
+            "system_factions" => self.system_factions(args),
+            "game_files" => self.game_files(args),
             "knowledge" => {
                 let q = arg_str(args, "query").ok_or("query is required")?;
                 let hits = nexus_ai::knowledge::search(&q, 4);
@@ -1658,6 +1660,21 @@ pub fn specs() -> Vec<ToolSpec> {
                 json!({
                     "limit": { "type": "integer", "description": "How many transactions to list, newest first. Default 25, at most 100." },
                     "since_hours": { "type": "number", "description": "Look back this many hours instead of since the game was last loaded." }
+                }),
+                &[],
+            ),
+        },
+        ToolSpec {
+            name: "system_factions",
+            description: "Factions in a system as the commander last saw it (default: the current system): influence, state, active, pending and recovering states, happiness and the commander's own reputation with each. Only for systems in the commander's journal; system_info has EDDN faction data for any system, without reputation.",
+            parameters: schema(json!({ "system": { "type": "string", "description": "System name. Default: the commander's current system." } }), &[]),
+        },
+        ToolSpec {
+            name: "game_files",
+            description: "The game's live companion files as written now: Status (flags, fuel, legal state, destination…), NavRoute, Cargo, Market, Outfitting, Shipyard, ModulesInfo, ShipLocker, Backpack, FCMaterials. Default: Status and NavRoute. Market, Outfitting and Shipyard are the last station screen opened. Also says whether the game is running.",
+            parameters: schema(
+                json!({
+                    "files": { "type": "array", "items": { "type": "string", "enum": cmdr::GAME_FILES }, "description": "Which files to read. Default: Status and NavRoute. Ask for big ones (Market, Outfitting, Shipyard) one at a time." }
                 }),
                 &[],
             ),
@@ -2232,6 +2249,195 @@ mod tests {
         let many = tools.call("credit_history", &json!({ "limit": 5000 })).unwrap();
         assert!(many["transactions"].as_array().unwrap().len() <= 100);
         assert!(many.to_string().len() < limit);
+    }
+
+    /// A throw-away journal folder, deleted on drop.
+    struct JournalDir(std::path::PathBuf);
+
+    impl JournalDir {
+        fn new(name: &str) -> JournalDir {
+            let dir = std::env::temp_dir().join(format!("nexus-app-test-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).expect("temp journal dir");
+            JournalDir(dir)
+        }
+
+        fn write(&self, file: &str, text: &str) {
+            std::fs::write(self.0.join(file), text).expect("write test file");
+        }
+    }
+
+    impl Drop for JournalDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// An `FSDJump` into Gamma: two factions, the first with a reputation and a pending state.
+    fn gamma_jump(ts: &str) -> String {
+        format!(
+            r#"{{ "timestamp":"{ts}", "event":"FSDJump", "Taxi":false, "StarSystem":"Gamma", "SystemAddress":1003, "StarPos":[10.0,0.0,0.0], "SystemAllegiance":"Federation", "SystemEconomy":"$economy_Industrial;", "SystemEconomy_Localised":"Industrial", "SystemSecondEconomy":"$economy_None;", "SystemGovernment":"$government_Democracy;", "SystemGovernment_Localised":"Democracy", "SystemSecurity":"$SYSTEM_SECURITY_medium;", "SystemSecurity_Localised":"Medium Security", "Population":5000000, "Body":"Gamma A", "BodyID":1, "BodyType":"Star", "JumpDist":10.0, "FuelUsed":1.0, "FuelLevel":20.0, "SystemFaction":{{ "Name":"Gamma Labour", "FactionState":"Boom" }}, "Factions":[ {{ "Name":"Gamma Labour", "FactionState":"Boom", "Government":"Democracy", "Influence":0.52, "Allegiance":"Federation", "Happiness":"$Faction_HappinessBand2;", "Happiness_Localised":"Happy", "MyReputation":42.5, "PendingStates":[ {{ "State":"Expansion", "Trend":0 }} ], "ActiveStates":[ {{ "State":"Boom" }} ] }}, {{ "Name":"Gamma Crew", "FactionState":"None", "Government":"Anarchy", "Influence":0.48, "Allegiance":"Independent", "Happiness":"", "MyReputation":-10.0 }} ] }}"#
+        )
+    }
+
+    /// A `Location` in Alpha with one faction.
+    fn alpha_location(ts: &str) -> String {
+        format!(
+            r#"{{ "timestamp":"{ts}", "event":"Location", "Docked":false, "StarSystem":"Alpha", "SystemAddress":1001, "StarPos":[0.0,0.0,0.0], "SystemAllegiance":"Federation", "SystemEconomy":"$economy_Agri;", "SystemEconomy_Localised":"Agriculture", "SystemGovernment":"$government_Democracy;", "SystemGovernment_Localised":"Democracy", "SystemSecurity":"$SYSTEM_SECURITY_high;", "SystemSecurity_Localised":"High Security", "Population":1000, "Body":"Alpha", "BodyID":0, "BodyType":"Star", "SystemFaction":{{ "Name":"Alpha Party", "FactionState":"None" }}, "Factions":[ {{ "Name":"Alpha Party", "FactionState":"None", "Government":"Democracy", "Influence":1.0, "Allegiance":"Federation", "Happiness":"$Faction_HappinessBand2;", "Happiness_Localised":"Happy", "MyReputation":5.0 }} ] }}"#
+        )
+    }
+
+    /// Tools over `lines` written as a journal file in `dir` and indexed the way the app does; the model is the
+    /// commander with those lines replayed on top.
+    fn journal_tools(dir: &JournalDir, lines: &[String], rt: &tokio::runtime::Runtime) -> NexusTools {
+        let path = dir.0.join("Journal.2026-10-31T100000.01.log");
+        let mut text = String::new();
+        let mut index = JournalIndex::default();
+        let file = index.add_file(path.clone());
+        for line in lines {
+            let (ts, name) = scan_line(line).expect("line");
+            index.push(ts, file, text.len() as u64, line.len(), name);
+            text.push_str(line);
+            text.push('\n');
+        }
+        std::fs::write(&path, text).expect("write journal");
+        let tools = model_tools(with_lines(commander(), lines), rt);
+        *tools.index.write() = index;
+        tools
+    }
+
+    fn runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap()
+    }
+
+    #[test]
+    fn factions_of_current_system_from_model() {
+        let (dir, rt) = (JournalDir::new("factions-now"), runtime());
+        let tools = journal_tools(&dir, &[gamma_jump(&at(10)), alpha_location(&at(20))], &rt);
+        let v = tools.call("system_factions", &json!({})).unwrap();
+        assert_eq!(v["system"], "Alpha", "{v}");
+        assert_eq!(v["factions"].as_array().unwrap().len(), 1);
+        assert_eq!(v["factions"][0]["name"], "Alpha Party");
+        assert_eq!(v["factions"][0]["influence_pct"], 100.0);
+        assert_eq!(v["factions"][0]["my_reputation"], 5.0);
+        assert!(v["source"].as_str().unwrap().contains("journal"), "{v}");
+        assert!(v["as_of"].is_string());
+        // Naming the current system gives the same answer, whatever the case.
+        let named = tools.call("system_factions", &json!({ "system": "ALPHA" })).unwrap();
+        assert_eq!(named["factions"], v["factions"]);
+    }
+
+    #[test]
+    fn factions_of_a_visited_system_from_journal() {
+        let (dir, rt) = (JournalDir::new("factions-visited"), runtime());
+        let visit = at(10);
+        let tools = journal_tools(&dir, &[gamma_jump(&visit), alpha_location(&at(20))], &rt);
+        let v = tools.call("system_factions", &json!({ "system": "gamma" })).unwrap();
+        assert_eq!(v["system"], "Gamma", "{v}");
+        assert_eq!(v["as_of"], visit, "the time of that visit");
+        assert_eq!(v["controlling_faction"], "Gamma Labour");
+        assert_eq!(v["government"], "Democracy");
+        let f = v["factions"].as_array().unwrap();
+        assert_eq!(f.len(), 2);
+        assert_eq!(f[0]["name"], "Gamma Labour");
+        assert_eq!(f[0]["influence_pct"], 52.0);
+        assert_eq!(f[0]["my_reputation"], 42.5);
+        assert_eq!(f[0]["happiness"], "Happy");
+        assert_eq!(f[0]["pending_states"], json!(["Expansion"]));
+        assert_eq!(f[0]["active_states"], json!(["Boom"]));
+        assert_eq!(f[1]["my_reputation"], -10.0);
+        assert!(f[1].get("pending_states").is_none(), "empty lists are left out: {}", f[1]);
+        assert!(v["source"].as_str().unwrap().contains("journal"));
+    }
+
+    #[test]
+    fn unvisited_system_says_so() {
+        let (dir, rt) = (JournalDir::new("factions-unvisited"), runtime());
+        let tools = journal_tools(&dir, &[gamma_jump(&at(10)), alpha_location(&at(20))], &rt);
+        let e = tools.call("system_factions", &json!({ "system": "Nowhere" })).unwrap_err();
+        assert!(e.contains("Nowhere") && e.contains("system_info"), "{e}");
+    }
+
+    /// A system with ten factions, each in three states of every kind, still fits the assistant's result size.
+    #[test]
+    fn system_factions_stays_within_the_assistants_result_size() {
+        let (dir, rt) = (JournalDir::new("factions-big"), runtime());
+        let states = |names: [&str; 3]| names.iter().map(|n| format!(r#"{{ "State":"{n}", "Trend":0 }}"#)).collect::<Vec<_>>().join(", ");
+        let factions: Vec<String> = (0..10)
+            .map(|i| {
+                format!(
+                    r#"{{ "Name":"The Very Long Named Minor Faction Number {i} Of Gamma", "FactionState":"CivilUnrest", "Government":"Confederacy", "Influence":0.1, "Allegiance":"Independent", "Happiness":"$Faction_HappinessBand2;", "Happiness_Localised":"Discontented", "MyReputation":-12.5, "ActiveStates":[ {} ], "PendingStates":[ {} ], "RecoveringStates":[ {} ] }}"#,
+                    states(["CivilUnrest", "Outbreak", "Lockdown"]),
+                    states(["Expansion", "Retreat", "Famine"]),
+                    states(["Drought", "Blight", "Bust"])
+                )
+            })
+            .collect();
+        let jump = gamma_jump(&at(10));
+        let start = jump.find(r#""Factions":["#).unwrap();
+        let big = format!(r#"{}"Factions":[ {} ] }}"#, &jump[..start], factions.join(", "));
+        let tools = journal_tools(&dir, &[big, alpha_location(&at(20))], &rt);
+        let v = tools.call("system_factions", &json!({ "system": "Gamma" })).unwrap();
+        assert_eq!(v["factions"].as_array().unwrap().len(), 10, "{v}");
+        assert!(v.to_string().len() < nexus_ai::agent::MAX_RESULT_CHARS, "{} chars", v.to_string().len());
+    }
+
+    #[test]
+    fn game_files_reads_allowed_files_only() {
+        let (dir, rt) = (JournalDir::new("game-files"), runtime());
+        let tools = journal_tools(&dir, &[alpha_location(&at(20))], &rt);
+        dir.write("Status.json", r#"{ "timestamp":"2026-10-31T10:00:00Z", "event":"Status", "Flags":16842765, "Fuel":{ "FuelMain":32.0, "FuelReservoir":0.63 } }"#);
+        dir.write("NavRoute.json", r#"{ "timestamp":"2026-10-31T10:00:00Z", "event":"NavRoute", "Route":[ { "StarSystem":"Alpha" }, { "StarSystem":"Beta" } ] }"#);
+        let v = tools.call("game_files", &json!({})).unwrap();
+        assert_eq!(v["files"]["Status"]["content"]["Flags"], 16842765, "{v}");
+        assert_eq!(v["files"]["NavRoute"]["content"]["Route"][1]["StarSystem"], "Beta");
+        assert!(v["files"]["Status"]["modified"].is_string());
+        assert!(v["game_running"].is_boolean(), "{v}");
+        assert!(v["files"].get("Market").is_none(), "only Status and NavRoute by default");
+        // A file the game hasn't written (yet).
+        let m = tools.call("game_files", &json!({ "files": ["Market"] })).unwrap();
+        assert_eq!(m["files"]["Market"]["missing"], true, "{m}");
+        // Only the ten companion files, by name.
+        for bad in ["../settings", "Status.json", "journal", ""] {
+            let e = tools.call("game_files", &json!({ "files": [bad] })).unwrap_err();
+            assert!(e.contains("Status") && e.contains("FCMaterials"), "{bad:?}: {e}");
+        }
+        // Not valid JSON (the game was mid-write, or it is something else).
+        dir.write("Cargo.json", "{ not json");
+        let c = tools.call("game_files", &json!({ "files": ["Cargo"] })).unwrap();
+        assert_eq!(c["files"]["Cargo"]["unreadable"], true, "{c}");
+    }
+
+    #[test]
+    fn game_files_fit_the_assistants_result_size() {
+        let (dir, rt) = (JournalDir::new("game-files-big"), runtime());
+        let tools = journal_tools(&dir, &[alpha_location(&at(20))], &rt);
+        let market = |items: usize| {
+            let rows: Vec<String> = (0..items).map(|i| format!(r#"{{ "id":{i}, "Name":"commodity{i}", "Name_Localised":"Commodity number {i}", "Category":"$MARKET_category_metals;", "BuyPrice":{}, "SellPrice":1200, "MeanPrice":1100, "StockBracket":2, "DemandBracket":1, "Stock":500, "Demand":20, "Consumer":false, "Producer":true, "Rare":false }}"#, 1000 + i)).collect();
+            format!(r#"{{ "timestamp":"2026-10-31T10:00:00Z", "event":"Market", "MarketID":5001, "StationName":"Alpha Port", "StarSystem":"Alpha", "Items":[ {} ] }}"#, rows.join(", "))
+        };
+        let limit = nexus_ai::agent::MAX_RESULT_CHARS;
+        // Each of these fits a reply on its own, but not together.
+        dir.write("Market.json", &market(35));
+        dir.write("Outfitting.json", &market(35));
+        dir.write("Status.json", r#"{ "event":"Status", "Flags":1 }"#);
+        let v = tools.call("game_files", &json!({ "files": ["Market", "Outfitting", "Status"] })).unwrap();
+        assert!(v.to_string().len() < limit, "{} chars", v.to_string().len());
+        assert_eq!(v["files"]["Market"]["content"]["MarketID"], 5001, "the first one that fits is given: {v}");
+        assert_eq!(v["files"]["Outfitting"]["too_large_for_one_reply"], true, "{v}");
+        assert!(v["files"]["Outfitting"].get("content").is_none());
+        assert!(v["notes"].to_string().contains("one at a time"), "{}", v["notes"]);
+        // Alone it comes through.
+        let alone = tools.call("game_files", &json!({ "files": ["Outfitting"] })).unwrap();
+        assert!(alone["files"]["Outfitting"]["content"].is_object(), "{alone}");
+        // One that can't fit any reply says how big it is and doesn't stop the others.
+        dir.write("Market.json", &market(400));
+        let size = std::fs::metadata(dir.0.join("Market.json")).unwrap().len();
+        let big = tools.call("game_files", &json!({ "files": ["Market", "Status"] })).unwrap();
+        assert_eq!(big["files"]["Market"]["too_large"], true, "{big}");
+        assert_eq!(big["files"]["Market"]["size_bytes"], size);
+        assert_eq!(big["files"]["Status"]["content"]["Flags"], 1);
+        assert!(big.to_string().len() < limit);
     }
 
     #[test]

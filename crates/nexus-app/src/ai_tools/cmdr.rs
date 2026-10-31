@@ -1,16 +1,21 @@
-//! The assistant's tools about the commander themselves: their fleet, their progress, their materials, on-foot gear
-//! and credits. Each takes one short read of the model and returns compact JSON.
+//! The assistant's tools about the commander themselves: their fleet, their progress, their materials, on-foot gear,
+//! credits, the factions of the systems they have visited and the game's live files. Each takes one short read of the
+//! model (or the journal index) and returns compact JSON; nothing is read from disk under a lock.
 
 use super::{NexusTools, arg_bool, arg_f64, arg_str, r1, strip_nulls};
 use nexus_data::materials::{self, Material};
 use nexus_data::outfitting::{display_name, slot_display};
 use nexus_data::ranks::RankKind;
-use nexus_journal::Timestamp;
+use nexus_journal::events::SystemArrival;
+use nexus_journal::{IndexEntry, Timestamp};
 use nexus_model::GameState;
 use nexus_model::fleet::{Ship, ShipModule};
 use nexus_model::history::LedgerCategory;
 use nexus_model::inventory::{Locker, MaterialCategory, SuitLoadoutInfo};
+use nexus_model::location::{FactionSummary, SystemInfo};
 use serde_json::{Value, json};
+use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 
 fn pct(x: f64) -> i64 {
     (x * 100.0).round() as i64
@@ -209,6 +214,127 @@ fn clip(s: &str, max: usize) -> String {
     let mut t: String = s.chars().take(max.saturating_sub(1)).collect();
     t.push('…');
     t
+}
+
+/// The companion files the game keeps rewriting next to the journal that `game_files` may read, by name.
+pub(super) const GAME_FILES: [&str; 10] = ["Status", "NavRoute", "Cargo", "Market", "Outfitting", "Shipyard", "ModulesInfo", "ShipLocker", "Backpack", "FCMaterials"];
+
+/// What `game_files` gives when it isn't told which files.
+const DEFAULT_GAME_FILES: [&str; 2] = ["Status", "NavRoute"];
+
+/// A companion file bigger than this is never read: it would not fit a reply by far.
+const MAX_GAME_FILE_BYTES: u64 = 512 * 1024;
+
+/// Room kept in a `game_files` reply for everything but the files.
+const GAME_FILES_RESERVE: usize = 700;
+
+/// A list for the reply, or nothing when it is empty.
+fn list(v: &[String]) -> Option<&[String]> {
+    (!v.is_empty()).then_some(v)
+}
+
+/// One faction of a system, from the most (0) to the least (2) detailed.
+fn faction(f: &FactionSummary, form: u8) -> Value {
+    let mut v = json!({
+        "name": f.name, "state": text(&f.state), "influence_pct": r1(f.influence * 100.0), "my_reputation": f.my_reputation.map(r1),
+    });
+    if form < 2 {
+        v["active_states"] = json!(list(&f.active_states));
+        v["pending_states"] = json!(list(&f.pending_states));
+        v["recovering_states"] = json!(list(&f.recovering_states));
+    }
+    if form < 1 {
+        v["government"] = json!(text(&f.government));
+        v["allegiance"] = json!(text(&f.allegiance));
+        v["happiness"] = json!(text(&f.happiness));
+    }
+    strip_nulls(&mut v);
+    v
+}
+
+/// A system's factions and conflicts as one reply of the given form.
+fn system_reply(system: &str, info: &SystemInfo, source: &str, form: u8) -> Value {
+    let side = |s: &nexus_journal::events::ConflictSide| {
+        let mut v = json!({ "faction": s.name, "stake": if form < 1 { text(&s.stake) } else { None }, "days_won": s.won_days });
+        strip_nulls(&mut v);
+        v
+    };
+    let mut v = json!({
+        "system": system, "source": source, "as_of": (!info.updated.is_zero()).then(|| info.updated.to_iso()),
+        "controlling_faction": info.controlling_faction, "controlling_faction_state": info.controlling_faction_state.as_deref().and_then(text),
+        "government": text(&info.government), "allegiance": text(&info.allegiance), "economy": text(&info.economy), "security": text(&info.security),
+        "population": info.population,
+        "factions": info.factions.iter().map(|f| faction(f, form)).collect::<Vec<_>>(),
+    });
+    if !info.conflicts.is_empty() {
+        v["conflicts"] = info.conflicts.iter().map(|c| json!({ "type": text(&c.war_type), "status": text(&c.status), "sides": [side(&c.faction1), side(&c.faction2)] })).collect();
+    }
+    strip_nulls(&mut v);
+    v
+}
+
+/// The raw line of an index entry, read from disk. The last file opened stays open in `open`: a walk through the
+/// journal newest first reads one file's lines together.
+fn read_entry(files: &[PathBuf], e: &IndexEntry, open: &mut Option<(u32, std::fs::File)>) -> Option<String> {
+    if open.as_ref().is_none_or(|(file, _)| *file != e.file) {
+        *open = Some((e.file, std::fs::File::open(files.get(e.file as usize)?).ok()?));
+    }
+    let (_, f) = open.as_mut()?;
+    f.seek(SeekFrom::Start(u64::from(e.offset))).ok()?;
+    let mut buf = vec![0u8; e.len as usize];
+    f.read_exact(&mut buf).ok()?;
+    Some(String::from_utf8_lossy(&buf).into_owned())
+}
+
+/// The files `game_files` was asked for, as the canonical names; the default pair when it was asked for none.
+fn requested_files(a: &Value) -> Result<Vec<&'static str>, String> {
+    let allowed = || format!("Allowed files: {}.", GAME_FILES.join(", "));
+    let asked: Vec<String> = match a.get("files") {
+        None | Some(Value::Null) => Vec::new(),
+        Some(Value::String(s)) => vec![s.clone()],
+        Some(Value::Array(items)) => items.iter().map(|v| v.as_str().map(str::to_string).ok_or_else(|| format!("files must be file names. {}", allowed()))).collect::<Result<_, _>>()?,
+        Some(_) => return Err(format!("files must be a list of file names. {}", allowed())),
+    };
+    let mut names: Vec<&'static str> = Vec::new();
+    for n in &asked {
+        let name = GAME_FILES.iter().copied().find(|g| g.eq_ignore_ascii_case(n.trim())).ok_or_else(|| format!("\"{}\" is not a game file the assistant can read. {}", clip(n, 40), allowed()))?;
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    if names.is_empty() {
+        names.extend(DEFAULT_GAME_FILES);
+    }
+    Ok(names)
+}
+
+/// A companion file as found on disk.
+enum GameFile {
+    /// The game hasn't written it.
+    Missing,
+    /// Too big to read.
+    TooBig(u64),
+    /// Not valid JSON (the game may have been writing it), or not readable.
+    Unreadable,
+    Json { content: Value, bytes: u64, modified: Option<Timestamp> },
+}
+
+fn read_game_file(dir: &Path, name: &str) -> GameFile {
+    let path = dir.join(format!("{name}.json"));
+    let meta = match std::fs::metadata(&path) {
+        Ok(m) if m.is_file() => m,
+        Ok(_) => return GameFile::Missing,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return GameFile::Missing,
+        Err(_) => return GameFile::Unreadable,
+    };
+    if meta.len() > MAX_GAME_FILE_BYTES {
+        return GameFile::TooBig(meta.len());
+    }
+    let modified = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| Timestamp(d.as_secs() as i64));
+    match std::fs::read(&path).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok()) {
+        Some(content) => GameFile::Json { content, bytes: meta.len(), modified },
+        None => GameFile::Unreadable,
+    }
 }
 
 impl NexusTools {
@@ -474,5 +600,144 @@ impl NexusTools {
             "squadron": c.squadron.as_ref().map(|s| json!({ "name": s.name, "rank": s.rank_name.clone().or_else(|| s.rank.map(|r| r.to_string())) })),
             "game": game,
         }))
+    }
+
+    /// The last arrival in `system` the journal records (FSDJump, Location or CarrierJump), found newest first. Only
+    /// the entries are copied under the index lock; the lines are read from disk after it is released.
+    fn last_arrival_in(&self, system: &str) -> Option<(SystemArrival, Timestamp)> {
+        let (candidates, files) = {
+            let index = self.index.read();
+            let ids: Vec<u16> = ["FSDJump", "Location", "CarrierJump"].iter().filter_map(|n| index.id_of(n)).collect();
+            let candidates: Vec<IndexEntry> = index.entries.iter().rev().filter(|e| ids.contains(&e.name)).copied().collect();
+            (candidates, index.files.clone())
+        };
+        let needle = system.to_ascii_lowercase();
+        let mut open = None;
+        for e in candidates {
+            let Some(line) = read_entry(&files, &e, &mut open) else { continue };
+            if !line.to_ascii_lowercase().contains(&needle) {
+                continue;
+            }
+            if let Ok(a) = serde_json::from_str::<SystemArrival>(&line)
+                && a.star_system.eq_ignore_ascii_case(system)
+            {
+                return Some((a, Timestamp(e.ts)));
+            }
+        }
+        None
+    }
+
+    pub(super) fn system_factions(&self, a: &Value) -> Result<Value, String> {
+        let asked = arg_str(a, "system");
+        // The system being flown comes from the model; any other from the journal.
+        let here = {
+            let model = self.model.read();
+            let gs: &GameState = model.active().ok_or("No commander loaded yet.")?;
+            let loc = &gs.location;
+            match &asked {
+                Some(s) if !loc.system.eq_ignore_ascii_case(s) => None,
+                _ if text(&loc.system).is_none() => return Err("The commander's current system isn't known yet: name a system with system=.".into()),
+                _ => Some((loc.system.clone(), loc.info.clone())),
+            }
+        };
+        let (system, info, source) = match here {
+            Some((system, info)) => (system, info, "Commander's journal: what the game reported at the last arrival in this system. Influence and states may have moved since."),
+            None => {
+                let name = asked.unwrap_or_default();
+                let (arrival, ts) = self.last_arrival_in(&name).ok_or_else(|| {
+                    format!("\"{}\" isn't in the commander's journal, so there is nothing to say about its factions or the commander's reputation there. system_info has EDDN faction data for any system, without reputation.", clip(&name, 60))
+                })?;
+                let info = SystemInfo::from_arrival(&arrival, ts);
+                (arrival.star_system, info, "Commander's journal: what the game reported when the commander last arrived in this system. Influence and states may have moved since.")
+            }
+        };
+        // The reply has to fit what the model is given of a tool result: government, allegiance and happiness go
+        // first, then the pending, active and recovering states.
+        let mut notes: Vec<&str> = vec!["my_reputation runs from -100 to 100; influence_pct is the faction's share of the system's influence."];
+        if info.factions.is_empty() {
+            notes.push("The journal lists no factions for this system (uninhabited, or it was not reported).");
+        }
+        for form in 0..=2u8 {
+            let mut out = system_reply(&system, &info, source, form);
+            match form {
+                1 => notes.push("Government, allegiance and happiness left out to fit."),
+                2 => notes.push("Active, pending and recovering states left out to fit."),
+                _ => {}
+            }
+            out["notes"] = json!(notes);
+            if form == 2 || out.to_string().len() <= BUDGET {
+                return Ok(out);
+            }
+        }
+        Err("Too much to list.".into())
+    }
+
+    pub(super) fn game_files(&self, a: &Value) -> Result<Value, String> {
+        let names = requested_files(a)?;
+        // The journal folder is the one the newest journal file is in. Everything below runs without a lock.
+        let dir = self.index.read().files.last().and_then(|p| p.parent()).map(Path::to_path_buf).ok_or("The game's folder isn't known yet: no journal has been read.")?;
+        let running = {
+            let model = self.model.read();
+            model.active().is_some_and(|gs| !gs.game_closed)
+        };
+        // The reply has to fit what the model is given of a tool result: files are given in the order asked for as
+        // long as they fit, and the others say they didn't.
+        let room = BUDGET.saturating_sub(GAME_FILES_RESERVE);
+        let mut used = 0usize;
+        let (mut too_large, mut left_out, mut missing, mut unreadable) = (false, false, false, false);
+        let mut files = serde_json::Map::new();
+        for name in names {
+            let entry = match read_game_file(&dir, name) {
+                GameFile::Missing => {
+                    missing = true;
+                    json!({ "missing": true })
+                }
+                GameFile::Unreadable => {
+                    unreadable = true;
+                    json!({ "unreadable": true })
+                }
+                GameFile::TooBig(size) => {
+                    too_large = true;
+                    json!({ "too_large": true, "size_bytes": size })
+                }
+                GameFile::Json { content, bytes, modified } => {
+                    let mut entry = json!({ "modified": modified.map(Timestamp::to_iso), "content": content });
+                    strip_nulls(&mut entry);
+                    let len = entry.to_string().len() + name.len() + 6;
+                    if len > room {
+                        too_large = true;
+                        json!({ "too_large": true, "size_bytes": bytes })
+                    } else if used + len > room {
+                        left_out = true;
+                        json!({ "too_large_for_one_reply": true, "size_bytes": bytes })
+                    } else {
+                        used += len;
+                        entry
+                    }
+                }
+            };
+            if entry.get("content").is_none() {
+                used += entry.to_string().len() + name.len() + 6;
+            }
+            files.insert(name.to_string(), entry);
+        }
+        let mut notes: Vec<&str> = Vec::new();
+        if left_out {
+            notes.push("Not every file fits one reply: ask for the ones marked too_large_for_one_reply one at a time (files=[name]).");
+        }
+        if too_large {
+            notes.push("A file marked too_large is bigger than a whole reply and can't be given; size_bytes says how big it is.");
+        }
+        if missing {
+            notes.push("A missing file hasn't been written by the game (Market, Outfitting and Shipyard appear when that screen is opened at a station).");
+        }
+        if unreadable {
+            notes.push("An unreadable file isn't valid JSON right now (the game may be writing it): try again in a moment.");
+        }
+        let mut out = json!({ "game_running": running, "files": files });
+        if !notes.is_empty() {
+            out["notes"] = json!(notes);
+        }
+        Ok(out)
     }
 }
