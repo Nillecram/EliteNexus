@@ -4,5 +4,7 @@
 
 pub mod http;
 pub mod rpc;
+pub mod server;
 
 pub use rpc::ServerInfo;
+pub use server::{Config, DEFAULT_PORT, Host, HostSlot, Server, lan_ip, new_key};

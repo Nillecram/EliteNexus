@@ -172,12 +172,25 @@ pub(crate) fn ct_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 /// The host of an `Origin` value (`scheme://host[:port]`), lower-cased, brackets kept for IPv6; `None` if it has no
-/// scheme (`null` included).
+/// scheme (`null` included) or whose authority is not a plain `host[:port]`: userinfo (`@`) and backslashes are
+/// read differently by different parsers, so such an origin is never trusted.
 fn origin_host(origin: &str) -> Option<String> {
     let (_, rest) = origin.split_once("://")?;
     let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
-    let authority = authority.rsplit('@').next().unwrap_or(""); // `http://localhost@evil.example` is evil.example
-    let host = if authority.starts_with('[') { authority.split_once(']').map(|(h, _)| format!("{h}]"))? } else { authority.split(':').next().unwrap_or("").to_string() };
+    if authority.contains(['@', '\\']) {
+        return None;
+    }
+    let (host, port) = if authority.starts_with('[') {
+        let (h, after) = authority.split_once(']')?;
+        (format!("{h}]"), after.strip_prefix(':').unwrap_or(after))
+    } else {
+        let (h, p) = authority.split_once(':').unwrap_or((authority, ""));
+        (h.to_string(), p)
+    };
+    // What follows the host must be empty or a port: `http://[::1]evil` is not `[::1]`.
+    if !port.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
     Some(host.to_ascii_lowercase())
 }
 
@@ -299,6 +312,10 @@ mod tests {
         assert_eq!(check_access(&req(&[("origin", "null")]), lo, "k"), Err(403));
         assert_eq!(check_access(&req(&[("origin", "http://localhost.evil.example")]), lo, "k"), Err(403));
         assert_eq!(check_access(&req(&[("origin", "http://localhost@evil.example")]), lo, "k"), Err(403));
+        // Userinfo, backslashes and junk after a bracketed host are not a plain `localhost`.
+        for bad in ["http://evil.example@localhost", "http://evil.example\\@localhost", "http://[::1]evil", "http://[::1]:80x", "http://localhost:80x", "http://localhost\\.evil.example"] {
+            assert_eq!(check_access(&req(&[("origin", bad)]), lo, "k"), Err(403), "{bad}");
+        }
         for ok in ["http://localhost:3000", "http://127.0.0.1", "http://[::1]:8080", "https://localhost"] {
             assert_eq!(check_access(&req(&[("origin", ok)]), lo, "k"), Ok(()), "{ok}");
         }
