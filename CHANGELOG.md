@@ -6,6 +6,10 @@ release time that section becomes the new version and the release workflow publi
 ## Unreleased
 
 ### Added
+- **Ask** knows more: it can list your whole fleet (where each ship is, or when a transfer arrives, jump range,
+  cargo, value, rebuy and the engineered modules with their blueprint, grade and experimental effect, from the last
+  loadout the game reported for that ship) and tell you how far you are on every rank, which engineers you've
+  unlocked, your superpower reputation, Powerplay, squadron, and whether the game is running or at the main menu.
 - **Settings › Follow my flight** (off by default) changes the page as you fly, the way Elite Dangerous
   Exploration Buddy switches its tabs: it reads what you're doing from the game's Status.json and switches when
   that changes. Flying a system opens Exploration; getting below **Planet view below** (150 km by default) over a
