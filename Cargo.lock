@@ -2482,6 +2482,7 @@ dependencies = [
  "nexus-galaxy",
  "nexus-hud",
  "nexus-journal",
+ "nexus-mcp",
  "nexus-model",
  "nexus-spansh",
  "nexus-uplink",

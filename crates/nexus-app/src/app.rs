@@ -144,6 +144,8 @@ pub struct NexusApp {
     ask_ui: pages::ask::AskUi,
     /// Routes the assistant planned, moved to the Navigation page each frame.
     ai_routes: std::sync::Arc<parking_lot::Mutex<Option<pages::navigation::PlannedRoute>>>,
+    /// The MCP server that serves the assistant's tools to outside AI agents (Settings › MCP server; off by default).
+    mcp: crate::mcp::McpService,
     // Command-line overrides: applied at runtime, never written to settings.json.
     overrides: Overrides,
     shot: Option<ScreenshotJob>,
@@ -168,7 +170,7 @@ pub struct NexusApp {
 impl NexusApp {
     pub fn new(cc: &eframe::CreationContext<'_>, data_dir: PathBuf, start_page: Option<Page>, shot: Option<ScreenshotJob>, ov: Overrides) -> Self {
         crate::theme::install(&cc.egui_ctx);
-        let (settings, settings_problem) = Settings::load(&data_dir);
+        let (mut settings, settings_problem) = Settings::load(&data_dir);
         let settings_read_only = settings_problem.as_ref().is_some_and(|p| !p.can_save);
         let mut notices = Vec::new();
         if let Some(p) = settings_problem {
@@ -195,6 +197,12 @@ impl NexusApp {
             market_ui.tab = t;
         }
         let map = pages::galaxy_map::MapUi::new(ov.tab.as_deref() == Some("galaxy"));
+        // The MCP server: off unless the commander switched it on; test runs (journal folder, screenshots) never start it.
+        let (spansh, ai_routes) = (nexus_spansh::Spansh::new(), Default::default());
+        let mcp_off = ov.journal_dir.is_some() || shot.is_some();
+        let mcp_key_made = !mcp_off && (settings.mcp.enabled || settings.mcp.lan) && settings.mcp.ensure_key();
+        let mut mcp = crate::mcp::McpService::new(nexus_tools(&core, &market, &spansh, rt.handle(), &ai_routes), mcp_off);
+        mcp.apply(&settings.mcp, rt.handle());
         let speaker = Speaker::start();
         speaker.set_rate(settings.tts_rate);
         speaker.set_volume(settings.tts_volume);
@@ -224,7 +232,7 @@ impl NexusApp {
             },
             speaker,
             applied_scale: 0.0,
-            settings_dirty: None,
+            settings_dirty: mcp_key_made.then(Instant::now),
             explo: pages::exploration::ExplorationUi::new(ov.tab.as_deref(), shot.is_some()),
             exo: pages::exobio::ExobioUi::new(ov.tab.as_deref(), shot.is_some()),
             fleet: Default::default(),
@@ -236,7 +244,7 @@ impl NexusApp {
             settings_ui: Default::default(),
             nav: pages::navigation::NavUi::new(ov.tab.as_deref()),
             rt,
-            spansh: nexus_spansh::Spansh::new(),
+            spansh,
             accounts: Default::default(),
             sync,
             market,
@@ -244,7 +252,8 @@ impl NexusApp {
             colo: Default::default(),
             assistant: if ov.demo && shot.is_some() { crate::assistant::AssistantService::demo() } else { Default::default() },
             ask_ui: pages::ask::AskUi::new(ov.demo && shot.is_some()),
-            ai_routes: Default::default(),
+            ai_routes,
+            mcp,
             overrides: ov,
             shot,
             last_jump_count: None,
@@ -661,14 +670,8 @@ impl NexusApp {
             Page::Colonisation => settings_changed |= pages::colonisation::show(ui, gs, &self.market, &mut self.colo, &mut self.settings.colonisation),
             Page::Ask => match pages::ask::show(ui, &mut self.assistant, &mut self.ask_ui, &mut self.settings.ai) {
                 pages::ask::AskAction::Ask(question) => {
-                    let tools = crate::ai_tools::NexusTools {
-                        model: self.core.model.clone(),
-                        db: self.market.db.clone(),
-                        index: self.core.index.clone(),
-                        spansh: self.spansh.clone(),
-                        rt: self.rt.handle().clone(),
-                        routes: self.ai_routes.clone(),
-                    };
+                    // Not `self.tools()`: the model guard above borrows `self.core`, so only the fields can be named here.
+                    let tools = nexus_tools(&self.core, &self.market, &self.spansh, self.rt.handle(), &self.ai_routes);
                     let context = crate::ai_tools::context_line(gs);
                     self.assistant.ask(question, self.settings.ai.provider(), tools, context, ui.ctx());
                 }
@@ -808,6 +811,11 @@ impl NexusApp {
             self.sync.apply(&self.settings.accounts);
             self.market.set_watches(&self.settings.price_watches);
             self.market.set_listen(self.settings.accounts.eddn_listen, self.rt.handle());
+            // A key is made as soon as "other devices" could need one (the dirty mark above saves it).
+            if self.settings.mcp.enabled || self.settings.mcp.lan {
+                self.settings.mcp.ensure_key();
+            }
+            self.mcp.apply(&self.settings.mcp, self.rt.handle());
         }
         if test_voice {
             self.speaker.say("Elite Nexus voice check. All systems nominal, commander.");
@@ -816,7 +824,14 @@ impl NexusApp {
             self.core = start_core(ctx, self.overrides.journal_dir.as_ref().or(self.settings.journal_dir.as_ref()), self.market.history_sink());
             self.sync.attach(&self.core);
             self.market.attach(&self.core);
+            // The server's tools read the model and index of the core that was just replaced.
+            self.mcp.set_host(self.tools());
         }
+    }
+
+    /// The tools the Ask assistant and the MCP server share, over the current model, index and databases.
+    fn tools(&self) -> crate::ai_tools::NexusTools {
+        nexus_tools(&self.core, &self.market, &self.spansh, self.rt.handle(), &self.ai_routes)
     }
 
     /// Alerts as macOS-style notification banners, top right, newest first.
@@ -879,6 +894,12 @@ impl NexusApp {
 fn start_core(ctx: &egui::Context, journal_dir: Option<&PathBuf>, history: Option<crate::core::HistorySink>) -> Core {
     let repaint_ctx = ctx.clone();
     Core::start(journal_dir.cloned(), move || repaint_ctx.request_repaint(), history)
+}
+
+/// The assistant's tools over `core`'s model and journal index and the market database. Also built before the app
+/// exists (the MCP server starts in `NexusApp::new`), hence not a method.
+fn nexus_tools(core: &Core, market: &crate::market::MarketService, spansh: &nexus_spansh::Spansh, rt: &tokio::runtime::Handle, routes: &Arc<parking_lot::Mutex<Option<pages::navigation::PlannedRoute>>>) -> crate::ai_tools::NexusTools {
+    crate::ai_tools::NexusTools { model: core.model.clone(), db: market.db.clone(), index: core.index.clone(), spansh: spansh.clone(), rt: rt.clone(), routes: routes.clone() }
 }
 
 #[derive(Clone, Copy)]

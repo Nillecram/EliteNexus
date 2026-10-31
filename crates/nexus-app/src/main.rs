@@ -14,6 +14,7 @@ mod folders;
 mod icon;
 mod jobs;
 mod market;
+mod mcp;
 mod notices;
 mod overlay;
 mod pages;

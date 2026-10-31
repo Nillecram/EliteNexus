@@ -53,6 +53,51 @@ pub struct Settings {
     pub mining: crate::pages::mining::MiningPrefs,
     /// The overlay: the island at the top of the game's screen.
     pub overlay: crate::overlay::window::OverlayPrefs,
+    /// The MCP server that lets outside AI agents use the Ask assistant's tools (off by default).
+    pub mcp: McpSettings,
+}
+
+/// The MCP server (Settings › MCP server). Off by default; the access key is sealed like the other secrets.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct McpSettings {
+    pub enabled: bool,
+    /// Listen on every interface (not just this PC); other devices then need the access key.
+    pub lan: bool,
+    pub port: u16,
+    /// The access key, sealed (see secrets.rs). Empty until the first time "other devices" is switched on.
+    pub key: String,
+}
+
+impl Default for McpSettings {
+    fn default() -> Self {
+        McpSettings { enabled: false, lan: false, port: nexus_mcp::DEFAULT_PORT, key: String::new() }
+    }
+}
+
+impl McpSettings {
+    /// Makes an access key when there is none that can be read (a key sealed on another account reads as empty).
+    /// Returns true if one was made, so the settings need saving. Without a key, "other devices" couldn't start.
+    pub fn ensure_key(&mut self) -> bool {
+        if !crate::secrets::open(&self.key).is_empty() {
+            return false;
+        }
+        match nexus_mcp::new_key() {
+            Ok(k) => {
+                self.key = crate::secrets::seal(&k);
+                true
+            }
+            Err(e) => {
+                tracing::warn!("MCP access key not made: {e}");
+                false
+            }
+        }
+    }
+
+    /// How the server should listen; `None` while it is off.
+    pub fn config(&self) -> Option<nexus_mcp::Config> {
+        self.enabled.then(|| nexus_mcp::Config { port: self.port, lan: self.lan, key: crate::secrets::open(&self.key) })
+    }
 }
 
 /// A named HUD colour matrix.
@@ -171,6 +216,7 @@ impl Default for Settings {
             bgs: Default::default(),
             mining: Default::default(),
             overlay: Default::default(),
+            mcp: Default::default(),
         }
     }
 }
@@ -328,6 +374,11 @@ fn salvage(v: serde_json::Value) -> (Settings, Vec<String>) {
     if dropped.iter().any(|d| d == "ai.provider" || d == "ai.base_url") && good["ai"]["api_key"].as_str().is_some_and(|k| !k.is_empty()) {
         good["ai"]["api_key"] = Value::String(String::new());
         dropped.push("ai.api_key".into());
+    }
+    // The MCP server only as the commander set it: with a port or an option gone back to its default, it could
+    // listen somewhere they never chose, so it stays off until they switch it on again.
+    if dropped.iter().any(|d| d == "mcp" || d.starts_with("mcp.")) {
+        good["mcp"]["enabled"] = Value::Bool(false);
     }
     dropped.sort();
     (serde_json::from_value(good).unwrap_or_default(), dropped)
@@ -643,6 +694,52 @@ mod tests {
         assert_eq!(back.bgs, s.bgs);
         std::fs::write(d.0.join("settings.json"), r#"{ "tts_rate": 1.2 }"#).expect("write");
         assert_eq!(Settings::load(&d.0).0.bgs, crate::pages::bgs::BgsPrefs::default());
+    }
+
+    #[test]
+    fn mcp_is_off_by_default() {
+        let m = McpSettings::default();
+        assert!(!m.enabled && !m.lan);
+        assert_eq!(m.port, 47561);
+        assert!(m.config().is_none());
+        assert!(!Settings::default().mcp.enabled);
+        // An older settings file has no `mcp` section at all.
+        let d = Dir::new("mcp-old");
+        std::fs::write(d.0.join("settings.json"), r#"{ "tts_rate": 1.2 }"#).expect("write");
+        let (s, problem) = Settings::load(&d.0);
+        assert!(problem.is_none());
+        assert!(!s.mcp.enabled);
+    }
+
+    #[test]
+    fn lan_without_readable_key_gets_new_key() {
+        let mut m = McpSettings { enabled: true, lan: true, key: "dpapi:garbage".into(), ..Default::default() };
+        assert_eq!(m.config().map(|c| c.key), Some(String::new()), "an unreadable key reads as empty");
+        assert!(m.ensure_key());
+        let cfg = m.config().expect("on");
+        assert_eq!(cfg.key.len(), 64);
+        assert!(cfg.lan && cfg.port == 47561);
+        // A key that reads is kept.
+        let sealed = m.key.clone();
+        assert!(!m.ensure_key());
+        assert_eq!(m.key, sealed);
+        assert!(!sealed.contains(&cfg.key), "stored sealed, not in clear");
+    }
+
+    #[test]
+    fn a_broken_mcp_section_leaves_the_server_off() {
+        // Not an object at all.
+        let (s, dropped) = salvage(serde_json::json!({ "tts_rate": 1.2, "mcp": "on" }));
+        assert!(!s.mcp.enabled && s.mcp.port == 47561);
+        assert_eq!(s.tts_rate, 1.2);
+        assert_eq!(dropped, vec!["mcp"]);
+        // One field of the wrong type: the others are kept, but the server doesn't start on a port nobody chose.
+        let (s, dropped) = salvage(serde_json::json!({ "mcp": { "enabled": true, "lan": true, "port": 99999, "key": "dpapi:AAAA" } }));
+        assert!(!s.mcp.enabled);
+        assert!(s.mcp.lan && s.mcp.port == 47561 && s.mcp.key == "dpapi:AAAA");
+        assert_eq!(dropped, vec!["mcp.port"]);
+        // A file that isn't JSON: the defaults, so the server is off.
+        assert!(!recover_keys("{ \"mcp\": { \"enabled\": true }, \"journal_dir\": \"\\\\x\" ").0.mcp.enabled);
     }
 
     #[test]
