@@ -179,6 +179,7 @@ pub fn tool_label(name: &str) -> &'static str {
         "trade_routes" => "Finding trade routes…",
         "nearest_service" => "Finding stations…",
         "mining_hotspots" => "Finding hotspots…",
+        "mining_sites" => "Checking your mining sites…",
         "system_info" => "Looking up the system…",
         "system_bodies" => "Checking the planets…",
         "untouched_biology" => "Looking for untouched planets…",
@@ -187,6 +188,16 @@ pub fn tool_label(name: &str) -> &'static str {
         "exobiology_here" => "Checking the biology here…",
         "journal_search" => "Searching your journal…",
         "knowledge" => "Reading up…",
+        "fleet" => "Reading your fleet…",
+        "progress" => "Checking your ranks and engineers…",
+        "materials" => "Counting your materials…",
+        "on_foot" => "Checking your on-foot gear…",
+        "credit_history" => "Reading your credit history…",
+        "system_factions" => "Reading the factions you saw there…",
+        "game_files" => "Reading the game's live files…",
+        "find_ship" => "Searching Spansh for shipyards… (can take a while)",
+        "find_module" => "Searching Spansh for outfitting… (can take a while)",
+        "find_material_body" => "Searching Spansh for bodies… (can take a while)",
         _ => "Working…",
     }
 }
@@ -201,6 +212,7 @@ pub fn tool_noun(name: &str) -> &'static str {
         "trade_routes" => "trade routes",
         "nearest_service" => "stations",
         "mining_hotspots" => "hotspots",
+        "mining_sites" => "your mining sites",
         "system_info" => "system data",
         "system_bodies" => "planets",
         "untouched_biology" => "untouched planets",
@@ -208,6 +220,14 @@ pub fn tool_noun(name: &str) -> &'static str {
         "exobiology_here" => "biology",
         "journal_search" => "your journal",
         "knowledge" => "knowledge base",
+        "fleet" => "your fleet",
+        "progress" => "your ranks and engineers",
+        "materials" => "your materials",
+        "on_foot" => "your on-foot gear",
+        "credit_history" => "your credit history",
+        "system_factions" => "your journal",
+        "game_files" => "the game's files",
+        "find_ship" | "find_module" | "find_material_body" => "Spansh",
         _ => "tools",
     }
 }
@@ -220,5 +240,20 @@ fn friendly(e: &AiError) -> String {
         AiError::NoModel => "No model is available for this service.".into(),
         AiError::Http(m) => format!("Can't reach the model service: {m}"),
         other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_tool_has_a_label_and_a_noun() {
+        for spec in crate::ai_tools::specs() {
+            assert_ne!(tool_label(spec.name), "Working…", "{} has no status label", spec.name);
+            assert_ne!(tool_noun(spec.name), "tools", "{} has no noun", spec.name);
+        }
+        assert_eq!(tool_label("nope"), "Working…");
+        assert_eq!(tool_noun("nope"), "tools");
     }
 }
