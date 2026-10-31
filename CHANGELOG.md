@@ -17,8 +17,9 @@ release time that section becomes the new version and the release workflow publi
   reputation with each, as the game last told you) and read the game's live files (Status, NavRoute, Cargo, the
   last Market, Outfitting or Shipyard screen you opened, and the rest) to see what the game says right now. It can
   also say where to buy a ship or a module (the nearest stations whose shipyard or outfitting lists it, from Spansh:
-  the station's catalogue, not its stock, so a listed ship can be sold out) and where to find a raw material (the
-  richest landable bodies near a system, among the 500 nearest).
+  the station's catalogue, not its stock, so a listed ship can be sold out) and where to find a raw material (it
+  reads the nearest landable bodies, up to 500, stopping once it has 10 hits or after 60 seconds, and lists those
+  richest first, so a richer body may lie farther out).
 - **Settings › Follow my flight** (off by default) changes the page as you fly, the way Elite Dangerous
   Exploration Buddy switches its tabs: it reads what you're doing from the game's Status.json and switches when
   that changes. Flying a system opens Exploration; getting below **Planet view below** (150 km by default) over a

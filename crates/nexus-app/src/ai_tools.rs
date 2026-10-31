@@ -1685,7 +1685,7 @@ pub fn specs() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "find_ship",
-            description: "Nearest stations whose shipyard lists a ship type, from Spansh (EDDN data): price and when the shipyard was last reported. It is the station's catalogue, not its stock: a listed ship can be sold out. Never call it in stock.",
+            description: "Nearest stations whose shipyard lists a ship type, from Spansh (EDDN data): price and when the shipyard was last reported. It is the station's catalogue, not its stock: a listed ship can be sold out. Never call it in stock. A search can take tens of seconds.",
             parameters: schema(
                 json!({
                     "ship": { "type": "string", "description": "Ship type, e.g. Asp Explorer, Diamondback Explorer, Mandalay, Krait Mk II (Mk II, MkII and mk2 all work)." },
@@ -1697,7 +1697,7 @@ pub fn specs() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "find_module",
-            description: "Nearest stations whose outfitting lists a module (English name, e.g. Fuel Scoop, Frame Shift Drive), optionally of a class (1-8) and rating (A-I), from Spansh (EDDN data): the catalogue, not the stock.",
+            description: "Nearest stations whose outfitting lists a module (English name, e.g. Fuel Scoop, Frame Shift Drive), optionally of a class (1-8) and rating (A-I), from Spansh (EDDN data): the catalogue, not the stock. A search can take tens of seconds.",
             parameters: schema(
                 json!({
                     "module": { "type": "string", "description": "Module name in English, e.g. Fuel Scoop, Frame Shift Drive, Detailed Surface Scanner, Auto Field-Maintenance Unit." },
@@ -1711,7 +1711,7 @@ pub fn specs() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "find_material_body",
-            description: "Landable bodies near a system that hold a raw material (e.g. Polonium), richest first, from Spansh. Searches the 500 nearest landable bodies at most (a cap that keeps the answer quick); max_gravity_g defaults to 1.0.",
+            description: "Landable bodies near a system that hold a raw material (e.g. Polonium), from Spansh. Reads the nearest landable bodies page by page (up to 500), stops once it has 10 hits or after 60 seconds, and lists those richest first, so a richer body may lie farther out. max_gravity_g defaults to 1.0. A search can take tens of seconds.",
             parameters: schema(
                 json!({
                     "material": { "type": "string", "description": "A raw material, e.g. Polonium, Tellurium, Niobium, Arsenic." },
