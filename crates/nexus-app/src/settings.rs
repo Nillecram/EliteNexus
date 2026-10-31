@@ -57,8 +57,8 @@ pub struct Settings {
     pub mcp: McpSettings,
 }
 
-/// The MCP server (Settings › MCP server). Off by default; the access key is sealed like the other secrets.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// The MCP server (Settings › AI agents (MCP)). Off by default; the access key is sealed like the other secrets.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct McpSettings {
     pub enabled: bool,
@@ -67,6 +67,18 @@ pub struct McpSettings {
     pub port: u16,
     /// The access key, sealed (see secrets.rs). Empty until the first time "other devices" is switched on.
     pub key: String,
+}
+
+// By hand so a `{:?}` of the settings never prints the key (on Linux and macOS the "sealed" form is only encoded).
+impl std::fmt::Debug for McpSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("McpSettings")
+            .field("enabled", &self.enabled)
+            .field("lan", &self.lan)
+            .field("port", &self.port)
+            .field("key", &if self.key.is_empty() { "<empty>" } else { "<set>" })
+            .finish()
+    }
 }
 
 impl Default for McpSettings {
@@ -730,6 +742,17 @@ mod tests {
         assert!(!m.ensure_key());
         assert_eq!(m.key, sealed);
         assert!(!sealed.contains(&cfg.key), "stored sealed, not in clear");
+    }
+
+    #[test]
+    fn debug_of_mcp_settings_never_prints_the_key() {
+        let mut m = McpSettings { enabled: true, lan: true, ..Default::default() };
+        assert!(format!("{m:?}").contains("<empty>"));
+        assert!(m.ensure_key());
+        let clear = m.config().expect("on").key;
+        let shown = format!("{m:?} {:?}", Settings { mcp: m.clone(), ..Default::default() });
+        assert!(shown.contains("<set>"), "{shown}");
+        assert!(!shown.contains(&clear) && !shown.contains(&m.key), "the key leaked into Debug");
     }
 
     #[test]

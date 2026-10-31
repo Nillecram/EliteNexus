@@ -167,8 +167,8 @@ chose for Ask.
   address of this PC, and every request from another device must carry the **access key** (a long random key made
   for you; **Copy key** copies it, **New key** makes another one and disconnects every agent that has the old one).
   An **Another PC** row then copies the Claude Code command or the Claude Desktop configuration with this PC's
-  network address and the key in it: keep that text to your own PCs. Windows may ask to let Elite Nexus through its
-  firewall the first time; allow it for private networks only.
+  network address and the key in it: keep that text to your own PCs. Windows or macOS may ask to let Elite Nexus
+  accept incoming connections the first time; allow it for private networks only.
 
 The connection is **not encrypted**: use "other devices" on your home network only, and never open the port to the
 internet (no port forwarding, no tunnel). The key only keeps other devices on your network out. A program on the same

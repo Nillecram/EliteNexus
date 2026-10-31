@@ -1690,7 +1690,7 @@ pub fn specs() -> Vec<ToolSpec> {
                 json!({
                     "ship": { "type": "string", "description": "Ship type, e.g. Asp Explorer, Diamondback Explorer, Mandalay, Krait Mk II (Mk II, MkII and mk2 all work)." },
                     "near_system": { "type": "string", "description": NEAR },
-                    "limit": { "type": "integer", "description": "How many stations. Default 10, at most 25." }
+                    "limit": { "type": "integer", "description": "How many stations. Default 10, at most 25 (more would not fit in what the assistant can read in one reply)." }
                 }),
                 &["ship"],
             ),
@@ -1704,7 +1704,7 @@ pub fn specs() -> Vec<ToolSpec> {
                     "class": { "type": "integer", "description": "Class (size) 1-8. Default: any." },
                     "rating": { "type": "string", "description": "Rating A-I. Default: any." },
                     "near_system": { "type": "string", "description": NEAR },
-                    "limit": { "type": "integer", "description": "How many stations. Default 10, at most 25." }
+                    "limit": { "type": "integer", "description": "How many stations. Default 10, at most 25 (more would not fit in what the assistant can read in one reply)." }
                 }),
                 &["module"],
             ),

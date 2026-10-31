@@ -18,6 +18,9 @@ pub struct McpService {
     /// The tools being served; swapped by [`McpService::set_host`] while the server runs.
     slot: HostSlot,
     running: Option<(Config, Server)>,
+    /// The settings `apply` last saw (sealed key as stored): lets the app skip the work, and the unsealing of the key,
+    /// when a change on some other page leaves the MCP settings as they were.
+    applied: Option<McpSettings>,
     last_error: Option<String>,
     /// This PC's address on the network, looked up when a LAN server starts.
     lan_ip: Option<IpAddr>,
@@ -25,7 +28,7 @@ pub struct McpService {
     disabled: bool,
 }
 
-/// What Settings › MCP server shows.
+/// What Settings › AI agents (MCP) shows.
 #[derive(Clone, Debug, Default)]
 pub struct McpView {
     pub disabled: bool,
@@ -37,13 +40,20 @@ pub struct McpView {
 impl McpService {
     pub fn new(host: NexusTools, disabled: bool) -> Self {
         let host: Host = Arc::new(host);
-        McpService { slot: Arc::new(RwLock::new(host)), running: None, last_error: None, lan_ip: None, disabled }
+        McpService { slot: Arc::new(RwLock::new(host)), running: None, applied: None, last_error: None, lan_ip: None, disabled }
+    }
+
+    /// True when `apply` has work to do: the MCP settings differ from the last ones applied, or the last start failed
+    /// (so a change elsewhere still retries a port that has been freed since). Compares the stored strings only.
+    pub fn needs_apply(&self, s: &McpSettings) -> bool {
+        self.last_error.is_some() || self.applied.as_ref() != Some(s)
     }
 
     /// Makes the server match the settings: starts it, restarts it when the port or the network option changed
     /// (or the key), stops it when switched off. Does nothing when nothing changed. Call from the UI thread:
     /// dropping the old server waits (a few ms) for its port to be free again.
     pub fn apply(&mut self, s: &McpSettings, rt: &tokio::runtime::Handle) {
+        self.applied = Some(s.clone());
         if self.disabled {
             return;
         }
@@ -206,6 +216,38 @@ mod tests {
         svc.apply(&McpSettings { enabled: false, ..on() }, rt.handle());
         assert!(svc.view().listening.is_none() && svc.view().error.is_none());
         assert!(std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_err());
+    }
+
+    #[test]
+    fn unchanged_settings_need_no_apply() {
+        let rt = runtime();
+        let mut svc = McpService::new(tools(&rt, "First"), false);
+        assert!(svc.needs_apply(&McpSettings::default()), "nothing applied yet");
+        svc.apply(&McpSettings::default(), rt.handle());
+        assert!(!svc.needs_apply(&McpSettings::default()));
+        svc.apply(&on(), rt.handle());
+        let addr = svc.view().listening.expect("listening");
+        assert!(!svc.needs_apply(&on()), "same settings: skip the key and config work");
+        assert!(svc.needs_apply(&McpSettings { lan: true, ..on() }));
+        assert!(svc.needs_apply(&McpSettings { key: "x".into(), ..on() }));
+        assert!(svc.needs_apply(&McpSettings { enabled: false, ..on() }));
+        // The server is untouched meanwhile.
+        assert_eq!(svc.view().listening, Some(addr));
+    }
+
+    #[test]
+    fn a_failed_start_is_retried_even_with_unchanged_settings() {
+        let rt = runtime();
+        let taken = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = taken.local_addr().expect("addr").port();
+        let s = McpSettings { port, ..on() };
+        let mut svc = McpService::new(tools(&rt, "First"), false);
+        svc.apply(&s, rt.handle());
+        assert!(svc.view().error.is_some() && svc.needs_apply(&s));
+        drop(taken);
+        svc.apply(&s, rt.handle());
+        assert!(svc.view().listening.is_some() && svc.view().error.is_none());
+        assert!(!svc.needs_apply(&s));
     }
 
     #[test]

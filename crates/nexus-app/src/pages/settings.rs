@@ -234,7 +234,7 @@ fn agents(ui: &mut Ui, cx: &mut SettingsCtx<'_>) {
         if !m.enabled {
             return;
         }
-        changed |= g.switch(&mut m.lan, "Allow other devices on the network", "For an agent on another PC. Every request from another device must carry the access key. The connection isn't encrypted: use it on your home network only, never open the port to the internet. Windows may ask to let Elite Nexus through the firewall.");
+        changed |= g.switch(&mut m.lan, "Allow other devices on the network", "For an agent on another PC. Every request from another device must carry the access key. The connection isn't encrypted: use it on your home network only, never open the port to the internet. Windows or macOS may ask to let Elite Nexus accept incoming connections.");
         g.row("Port", "Where agents connect. Change it if another program uses this one.", |ui| {
             let r = ui.add(egui::DragValue::new(&mut m.port).range(1024..=65535));
             // The server restarts on the new port when the value is let go, not at every step of a drag.

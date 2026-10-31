@@ -144,7 +144,7 @@ pub struct NexusApp {
     ask_ui: pages::ask::AskUi,
     /// Routes the assistant planned, moved to the Navigation page each frame.
     ai_routes: std::sync::Arc<parking_lot::Mutex<Option<pages::navigation::PlannedRoute>>>,
-    /// The MCP server that serves the assistant's tools to outside AI agents (Settings › MCP server; off by default).
+    /// The MCP server that serves the assistant's tools to outside AI agents (Settings › AI agents (MCP); off by default).
     mcp: crate::mcp::McpService,
     // Command-line overrides: applied at runtime, never written to settings.json.
     overrides: Overrides,
@@ -813,11 +813,14 @@ impl NexusApp {
             self.sync.apply(&self.settings.accounts);
             self.market.set_watches(&self.settings.price_watches);
             self.market.set_listen(self.settings.accounts.eddn_listen, self.rt.handle());
-            // A key is made as soon as "other devices" could need one (the dirty mark above saves it).
-            if self.settings.mcp.enabled || self.settings.mcp.lan {
-                self.settings.mcp.ensure_key();
+            // Only when the MCP settings changed: every other change on any page would unseal the key twice for nothing.
+            if self.mcp.needs_apply(&self.settings.mcp) {
+                // A key is made as soon as "other devices" could need one (the dirty mark above saves it).
+                if self.settings.mcp.enabled || self.settings.mcp.lan {
+                    self.settings.mcp.ensure_key();
+                }
+                self.mcp.apply(&self.settings.mcp, self.rt.handle());
             }
-            self.mcp.apply(&self.settings.mcp, self.rt.handle());
         }
         if test_voice {
             self.speaker.say("Elite Nexus voice check. All systems nominal, commander.");
