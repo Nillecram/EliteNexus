@@ -18,6 +18,9 @@ pub const LEGACY_VERSIONS: &[&str] = &["2025-11-25", "2025-06-18", "2025-03-26"]
 const META_VERSION: &str = "io.modelcontextprotocol/protocolVersion";
 const META_CAPABILITIES: &str = "io.modelcontextprotocol/clientCapabilities";
 const META_SERVER_INFO: &str = "io.modelcontextprotocol/serverInfo";
+/// How long a client may keep the modern `server/discover` and `tools/list` results (the spec requires a hint on
+/// both). The tool list is the same for every caller and only changes with a new build, so it is cached publicly.
+const CACHE_TTL_MS: u64 = 300_000;
 
 /// What the server says about itself.
 #[derive(Debug, Clone)]
@@ -118,6 +121,10 @@ fn modern(id: &Value, method: &str, params: &Value, meta_version: Option<&Value>
     match result {
         Ok(mut result) => {
             result["resultType"] = json!("complete");
+            if method != "tools/call" {
+                result["ttlMs"] = json!(CACHE_TTL_MS);
+                result["cacheScope"] = json!("public");
+            }
             result["_meta"] = json!({META_SERVER_INFO: server_info(info)});
             ok(id, result)
         }
@@ -294,10 +301,16 @@ mod tests {
         assert_eq!(body(&r)["result"]["tools"][0], want);
         assert_eq!(body(&r)["result"]["tools"][1]["name"], "fail");
         assert!(body(&r)["result"].get("resultType").is_none());
+        assert!(body(&r)["result"].get("ttlMs").is_none());
         let r = modern_run("tools/list", json!({}), None);
         assert_eq!(r.status, 200);
         assert_eq!(body(&r)["result"]["tools"][0], want);
         assert_eq!(body(&r)["result"]["resultType"], "complete");
+        assert_eq!(body(&r)["result"]["ttlMs"], CACHE_TTL_MS);
+        assert_eq!(body(&r)["result"]["cacheScope"], "public");
+        let r = modern_run("tools/call", json!({"name": "echo"}), Some("echo"));
+        assert!(body(&r)["result"].get("ttlMs").is_none());
+        assert!(body(&r)["result"].get("cacheScope").is_none());
     }
 
     #[test]
@@ -355,6 +368,8 @@ mod tests {
         let res = &body(&r)["result"];
         assert_eq!(res["supportedVersions"], json!(["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26"]));
         assert_eq!(res["resultType"], "complete");
+        assert_eq!(res["ttlMs"], CACHE_TTL_MS);
+        assert_eq!(res["cacheScope"], "public");
         assert_eq!(res["_meta"][META_SERVER_INFO]["name"], "elite-nexus");
         assert_eq!(res["instructions"], info().instructions);
         assert!(res["capabilities"]["tools"].is_object());
